@@ -1,5 +1,13 @@
 import type { ReactNode } from "react";
 import { Badge } from "./ui";
+function FeeQualifiers({ rule }: { rule: Record<string, unknown> }) {
+  const allowance = rule.allowance as { amount: unknown; period: string } | undefined;
+  return <>
+    {!!rule.minFee && <> · Minimum: <Value value={rule.minFee} /></>}
+    {!!rule.maxFee && <> · Maximum: <Value value={rule.maxFee} /></>}
+    {!!allowance && <> · Allowance: <Value value={allowance.amount} />/{allowance.period}</>}
+  </>;
+}
 export function Value({ value }: { value: unknown }): ReactNode {
   if (value === undefined || value === null)
     return <span className="muted">Unknown</span>;
@@ -24,8 +32,9 @@ export function Value({ value }: { value: unknown }): ReactNode {
   if ("ratePercent" in obj)
     return (
       <span>
-        {String(obj.kind || "Cashback")}: {String(obj.ratePercent)}%
+        {String(obj.serviceId || obj.kind || "Cashback").replace(/[_-]/g, " ")}: {String(obj.ratePercent)}%
         {typeof obj.rewardAsset === "string" && <> in {obj.rewardAsset}</>}
+        <FeeQualifiers rule={obj} />
         {!!obj.cap && (
           <>
             {" "}
@@ -53,7 +62,9 @@ export function Value({ value }: { value: unknown }): ReactNode {
   if ("calculation" in obj && obj.calculation === "fixed")
     return (
       <span>
-        {String(obj.kind)}: <Value value={obj.fixed} />
+        {String(obj.serviceId || obj.kind).replace(/[_-]/g, " ")}: <Value value={obj.fixed} />
+        <FeeQualifiers rule={obj} />
+        {typeof obj.description === "string" && <> · {obj.description}</>}
         {!!obj.scope && Object.keys(obj.scope as object).length > 0 && (
           <>
             {" "}
@@ -74,7 +85,7 @@ export function Value({ value }: { value: unknown }): ReactNode {
         .filter(([k]) => !["id", "source", "fieldSources"].includes(k))
         .map(([k, v]) => (
           <div key={k} className="contents">
-            <dt>{k.replace(/([A-Z])/g, " $1")}</dt>
+            <dt>{k === "serviceId" ? "Service" : k.replace(/([A-Z])/g, " $1")}</dt>
             <dd>
               <Value value={v} />
             </dd>

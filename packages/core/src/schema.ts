@@ -2,7 +2,7 @@ import { z } from "zod";
 import countries from "i18n-iso-countries";
 import { compareDecimals } from "./serialize";
 
-export const SCHEMA_VERSION = "6";
+export const SCHEMA_VERSION = "7";
 export const Id = z
   .string()
   .regex(/^[a-z0-9][a-z0-9-]*$/)
@@ -84,8 +84,10 @@ const FeeBase = {
     "chargeback",
     "transaction_decline",
     "small_transaction",
+    "other",
   ]).describe("fx is fiat currency exchange; conversion is crypto/asset conversion. atm is withdrawal; atm_decline and atm_balance_inquiry are separate services. refund applies only to processing a refund. delivery is shipping, separate from issuance. cross_border, late_payment and returned_payment are separate from ordinary purchase transaction fees."),
   minFee: Money.optional(),
+  serviceId: Id.describe("Required only for kind other: stable kebab-case name of the charged service. Omit for known kinds.").optional(),
   maxFee: Money.optional(),
   allowance: z.object({ amount: Money, period: Period }).strict().optional(),
 };
@@ -137,6 +139,10 @@ export const FeeRule = z
       .strict(),
   ])
   .superRefine((r, ctx) => {
+    if (r.kind === "other" && !r.serviceId)
+      ctx.addIssue({ code: "custom", path: ["serviceId"], message: "Other fee requires a stable serviceId" });
+    if (r.kind !== "other" && r.serviceId)
+      ctx.addIssue({ code: "custom", path: ["serviceId"], message: "serviceId is only for kind other" });
     if (r.calculation === "tiered") {
       const c = r.brackets[0]?.upperBound?.currency;
       let last: string | undefined;

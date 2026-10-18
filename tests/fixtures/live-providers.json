@@ -396,5 +396,35 @@
         }
       }
     ]
+  },
+  {
+    "id": "avalanche-statement-copy-service",
+    "provider": "avalanche-card",
+    "url": "https://legal.avalanchecard.com/legal/avalanche-card-us-card-agreement-bcc089aa",
+    "verifiedAt": "2026-10-19",
+    "text": "Copying Fee: We may charge you a Fee of $10.00 for each copy of a transaction document or a Statement you request, unless they are required to resolve a billing dispute. We will post and treat this Fee as a Purchase transaction.",
+    "expected": [
+      {
+        "field": "fees",
+        "rule": {
+          "kind": "other",
+          "serviceId": "statement-copy",
+          "calculation": "fixed",
+          "fixed": {
+            "amount": "10",
+            "currency": "USD"
+          },
+          "calculable": true
+        }
+      }
+    ],
+    "forbidden": [
+      {
+        "field": "fees",
+        "rule": {
+          "kind": "transaction"
+        }
+      }
+    ]
   }
 ]

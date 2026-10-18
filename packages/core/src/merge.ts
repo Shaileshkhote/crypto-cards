@@ -8,7 +8,7 @@ import {
 } from "./schema";
 import { canonical, hash, slug } from "./serialize";
 import { verifyEvidence, verifyFinancialEvidence } from "./evidence";
-export const MERGE_VERSION = "7";
+export const MERGE_VERSION = "8";
 type ObjectValue = Record<string, unknown>;
 const isObject = (v: unknown): v is ObjectValue =>
   !!v && typeof v === "object" && !Array.isArray(v);
@@ -199,6 +199,7 @@ function rules(value: unknown, field: string, target: string, origin: unknown): 
     const obj = ordered(r) as ObjectValue;
     const id = `${field.slice(0, -1)}-${hash({
       target, kind: obj.kind || "cashback",
+      serviceId: obj.kind === "other" ? obj.serviceId : undefined,
       rewardAsset: field === "rewards" ? obj.rewardAsset : undefined,
       requirements: field === "rewards" ? ordered(obj.requirements) : undefined,
       period: field === "limits" ? obj.period : undefined,

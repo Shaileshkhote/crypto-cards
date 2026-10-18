@@ -3,6 +3,13 @@ import { Card } from "@cards/core/schema";
 import { directory, sortFees, filterDirectory, applicable } from "@cards/core/cache";
 import { REGIONS } from "@cards/core/regions";
 describe("directory scope and sorting", () => {
+  it("does not compare prices for unrelated uncommon services", () => {
+    const cards = [
+      { id: "z", serviceId: "account-letter", amount: "1" },
+      { id: "a", serviceId: "statement-copy", amount: "10" },
+    ].map(({ id, serviceId, amount }) => Card.parse({ id, name: id, website: "https://example.com", fees: [{ id: "fee", kind: "other", serviceId, calculation: "fixed", fixed: { amount, currency: "USD" }, scope: {}, calculable: true }] }));
+    expect(sortFees(directory(cards), "other", { country: "US", currency: "USD" }, "fixed").map(row => row.providerId)).toEqual(["a", "z"]);
+  });
   it("applies weekday and weekend rates only with an explicit matching day", () => {
     const scope = { daysOfWeek: ["sat" as const, "sun" as const] };
     expect(applicable(scope, {})).toBe(false);

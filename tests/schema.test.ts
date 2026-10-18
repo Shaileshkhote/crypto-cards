@@ -2,6 +2,12 @@ import { describe, it, expect } from "vitest";
 import { FeeRule, Card, Money, Scope, Extraction } from "@cards/core/schema";
 import { document, extraction } from "./helpers";
 describe("typed canonical schema", () => {
+  it("retains a typed price for a named uncommon service without pretending it is a purchase fee", () => {
+    const fee = { id: "copy", kind: "other", serviceId: "statement-copy", calculation: "fixed", fixed: { amount: "10", currency: "USD" }, scope: {}, calculable: true };
+    expect(FeeRule.parse(fee)).toMatchObject({ serviceId: "statement-copy", fixed: { amount: "10" } });
+    expect(FeeRule.safeParse({ ...fee, serviceId: undefined }).success).toBe(false);
+    expect(FeeRule.safeParse({ ...fee, kind: "transaction" }).success).toBe(false);
+  });
   it("represents observed card service fees without misclassifying their event", () => {
     const fee = { id: "fee", calculation: "fixed", fixed: { amount: "50", currency: "USD" }, calculable: true, scope: {} };
     for (const kind of ["cancellation", "chargeback", "transaction_decline", "small_transaction"])

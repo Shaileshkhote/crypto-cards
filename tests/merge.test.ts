@@ -11,6 +11,15 @@ import { adapter, document, extraction } from "./helpers";
 import { Card } from "@cards/core/schema";
 import { documentFromText } from "@cards/core/crawler";
 describe("deterministic merge and protection", () => {
+  it("assigns distinct stable identities to uncommon services", () => {
+    const a = adapter(), doc = documentFromText("https://example.com/fees", "Statement copy: USD 10. Account letter: USD 3."), e = extraction(doc);
+    const base = { kind: "other" as const, calculation: "fixed" as const, scope: {}, calculable: true as const };
+    e.facts[0].value = [{ ...base, id: "copy", serviceId: "statement-copy", fixed: { amount: "10", currency: "USD" } }, { ...base, id: "letter", serviceId: "account-letter", fixed: { amount: "3", currency: "USD" } }];
+    const fees = candidate(a, [e], undefined, [doc]).data.products![0].tiers![0].fees!;
+    expect(new Set(fees.map(fee => fee.id)).size).toBe(2);
+    (e.facts[0].value as Record<string, unknown>[])[0].description = "Copy requested by the cardholder.";
+    expect(candidate(a, [e], undefined, [doc]).data.products![0].tiers![0].fees!.map(fee => fee.id)).toEqual(fees.map(fee => fee.id));
+  });
   it("keeps distinct service fees stable when narrative changes", () => {
     const a = adapter(), doc = documentFromText("https://example.com/fees", "Card cancellation: 0. Chargeback: USD 50 per transaction."), e = extraction(doc);
     e.facts[0].value = [{ id: "cancel", kind: "cancellation", calculation: "percentage", ratePercent: 0, scope: {}, calculable: true }, { id: "dispute", kind: "chargeback", calculation: "fixed", fixed: { amount: "50", currency: "USD" }, scope: {}, calculable: true }];

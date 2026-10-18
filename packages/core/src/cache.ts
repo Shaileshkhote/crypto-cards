@@ -195,6 +195,7 @@ export function sortFees(
   const val = (r: DirectoryRow) => {
     const rules = r.fees.filter(
       (x) =>
+        x.kind !== "other" &&
         x.kind === kind &&
         x.status !== "unconfirmed" &&
         applicable(x.scope, { ...context, tierId: r.tierId || undefined }),
