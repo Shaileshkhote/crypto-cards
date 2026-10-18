@@ -2,7 +2,7 @@ import { z } from "zod";
 import countries from "i18n-iso-countries";
 import { compareDecimals } from "./serialize";
 
-export const SCHEMA_VERSION = "5";
+export const SCHEMA_VERSION = "6";
 export const Id = z
   .string()
   .regex(/^[a-z0-9][a-z0-9-]*$/)
@@ -80,6 +80,10 @@ const FeeBase = {
     "cross_border",
     "late_payment",
     "returned_payment",
+    "cancellation",
+    "chargeback",
+    "transaction_decline",
+    "small_transaction",
   ]).describe("fx is fiat currency exchange; conversion is crypto/asset conversion. atm is withdrawal; atm_decline and atm_balance_inquiry are separate services. refund applies only to processing a refund. delivery is shipping, separate from issuance. cross_border, late_payment and returned_payment are separate from ordinary purchase transaction fees."),
   minFee: Money.optional(),
   maxFee: Money.optional(),

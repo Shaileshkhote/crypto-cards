@@ -4,7 +4,7 @@
     "provider": "avici",
     "url": "https://docs.avici.money/getting-started/secured-credit-cards/fees-and-limits",
     "verifiedAt": "2026-10-18",
-    "text": "### Card Purchase Fees\n#### Virtual Cards\u2013\n* Platinum\u2013 First card costs $15. Subsequent cards: $10 one-time fee, no recurring charges.\n#### Physical Cards\u2013\n* Platinum\u2013 $50 basic card fee, one-time, no recurring charges",
+    "text": "### Card Purchase Fees\n#### Virtual Cards\u2013\n* Platinum\u2013 First card costs $15. Subsequent cards: $10 one-time fee, no recurring charges.\n#### Physical Cards\u2013\n* Platinum\u2013 $50 basic card fee, one-time, no recurring charges\n| Feature | Platinum Card | Signature Card |\n| ------------------------ | ---------------------------------------- | ---------------------------------------- |\n| Transaction limit | <p>$1000 per txn</p><p>$3000 per day</p> | <p>$1000 per txn</p><p>$3000 per day</p> |\n| ATM Withdrawal Fees | $1 + 0.65% per transaction | $0 |",
     "expected": [
       {
         "field": "fees",
@@ -55,9 +55,42 @@
         },
         "productId": "avici",
         "tierId": "avici--global--platinum"
+      },
+      {
+        "field": "fees",
+        "productId": "avici",
+        "tierId": "avici--global--platinum",
+        "rule": {
+          "kind": "atm",
+          "calculation": "unknown",
+          "calculable": false
+        }
       }
     ],
-    "forbidden": []
+    "forbidden": [
+      {
+        "field": "fees",
+        "productId": "avici",
+        "tierId": "avici--global--platinum",
+        "rule": {
+          "kind": "atm",
+          "calculation": "fixed",
+          "fixed": {
+            "amount": "1"
+          }
+        }
+      },
+      {
+        "field": "fees",
+        "productId": "avici",
+        "tierId": "avici--global--platinum",
+        "rule": {
+          "kind": "atm",
+          "calculation": "percentage",
+          "ratePercent": 0.65
+        }
+      }
+    ]
   },
   {
     "id": "avici-contractual-maximum",
@@ -321,5 +354,47 @@
       }
     ],
     "forbidden": []
+  },
+  {
+    "id": "bitunix-card-service-fees",
+    "provider": "bitunix",
+    "url": "https://www.bitunix.com/hub/helpcenter/article/bitunix-card-fee-usage-limit?id=286",
+    "verifiedAt": "2026-10-19",
+    "text": "Fee Type | Rate and details | Notes\nCard cancellation fee | 0 |\nChargeback | 50 USD / transaction | If you wish to dispute a transaction and request a reversal and refund, please contact customer service for assistance in initiating the dispute and arbitration process with the card network.",
+    "expected": [
+      {
+        "field": "fees",
+        "rule": {
+          "kind": "cancellation",
+          "calculable": true
+        }
+      },
+      {
+        "field": "fees",
+        "rule": {
+          "kind": "chargeback",
+          "calculation": "fixed",
+          "fixed": {
+            "amount": "50",
+            "currency": "USD"
+          },
+          "calculable": true
+        }
+      }
+    ],
+    "forbidden": [
+      {
+        "field": "fees",
+        "rule": {
+          "kind": "replacement"
+        }
+      },
+      {
+        "field": "fees",
+        "rule": {
+          "kind": "transaction"
+        }
+      }
+    ]
   }
 ]

@@ -11,6 +11,15 @@ import { adapter, document, extraction } from "./helpers";
 import { Card } from "@cards/core/schema";
 import { documentFromText } from "@cards/core/crawler";
 describe("deterministic merge and protection", () => {
+  it("keeps distinct service fees stable when narrative changes", () => {
+    const a = adapter(), doc = documentFromText("https://example.com/fees", "Card cancellation: 0. Chargeback: USD 50 per transaction."), e = extraction(doc);
+    e.facts[0].value = [{ id: "cancel", kind: "cancellation", calculation: "percentage", ratePercent: 0, scope: {}, calculable: true }, { id: "dispute", kind: "chargeback", calculation: "fixed", fixed: { amount: "50", currency: "USD" }, scope: {}, calculable: true }];
+    const fees = candidate(a, [e], undefined, [doc]).data.products![0].tiers![0].fees!;
+    expect(fees).toHaveLength(2);
+    expect(new Set(fees.map(fee => fee.id)).size).toBe(2);
+    (e.facts[0].value as Record<string, unknown>[])[1].description = "Formal chargeback.";
+    expect(candidate(a, [e], undefined, [doc]).data.products![0].tiers![0].fees!.map(fee => fee.id)).toEqual(fees.map(fee => fee.id));
+  });
   it("retains opaque source statements without choosing a price and still rejects conflicting numeric bounds", () => {
     const a = adapter(), one = documentFromText("https://example.com/fees", "ATM fee: minimum $1 plus 0.65%."), two = documentFromText("https://example.com/help", "ATM fee: minimum $2 plus 1%.");
     const first = extraction(one), second = extraction(two);

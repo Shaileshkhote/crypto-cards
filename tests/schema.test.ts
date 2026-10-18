@@ -2,6 +2,11 @@ import { describe, it, expect } from "vitest";
 import { FeeRule, Card, Money, Scope, Extraction } from "@cards/core/schema";
 import { document, extraction } from "./helpers";
 describe("typed canonical schema", () => {
+  it("represents observed card service fees without misclassifying their event", () => {
+    const fee = { id: "fee", calculation: "fixed", fixed: { amount: "50", currency: "USD" }, calculable: true, scope: {} };
+    for (const kind of ["cancellation", "chargeback", "transaction_decline", "small_transaction"])
+      expect(FeeRule.parse({ ...fee, kind })).toMatchObject({ kind, calculation: "fixed" });
+  });
   it("distinguishes unknown, zero, false and empty lists", () => {
     const card = Card.parse({
       id: "test",
