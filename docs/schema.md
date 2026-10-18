@@ -1,0 +1,17 @@
+# Canonical schema
+
+Runtime schemas and exported TypeScript types live in `packages/core/src/schema.ts`. All objects are strict. Schema and prompt versions participate in extraction fingerprints; update their constants after incompatible extraction changes.
+
+Provider → products → tiers each support common feature fields. A fact belongs to its declared scope. Directory projections expose provider defaults, product defaults, and leaf facts separately. Ancestor fields are inherited only when listed explicitly in `inheritFields`, supported by source evidence or static data. Leaf values override inherited defaults. The agent defaults `inherit` to false; set it true only when the source explicitly applies the fact to every child. Retired identity metadata is retained.
+
+Money is `{ amount: "10.50", currency: "EUR" }`. Strings preserve decimal precision. Rate fields use percentage points (`ratePercent: 1.5` means 1.5%). Countries must be real ISO 3166-1 alpha-2 codes. EU and EEA have centralized, distinct memberships. APAC, Europe, international and legacy region labels have no invented membership.
+
+Fees discriminate on calculation: fixed requires money; percentage requires a nonnegative finite rate; tiered requires thresholds, inclusive flags, a period, and marginal/whole-amount behavior; unknown requires a description and `calculable: false`. Tiered thresholds increase in one currency and an unbounded threshold must be last. Rewards have scoped rates, assets, caps and requirements; non-calculable rewards retain narrative. Spending and ATM limits retain amount, currency and period. Terms and eligibility requirements remain available when they cannot be reduced safely.
+
+Rule IDs are assigned by the core from hierarchy, rule kind, and applicability, never the value or position. Conflicting rules sharing an identity fail extraction. A possible scope replacement is reviewed rather than silently replacing a rule. Unknown values never become 0; confirmed empty lists never become unknown.
+
+Extracted feature origins are in `fieldSources`. Rules carry their individual source. Evidence is `{ url, blockId, quote }`; URL/block/substring must all match a cached normalized document. Static origin is `{ origin: "static" }`. A valid quote proves the text exists, not its interpretation. Changes to existing values still require review. `unconfirmedFields` marks accepted values missing in changed source text. Fetch status and timestamps are stored outside canonical data.
+
+Directory filters operate on typed leaf facts for residence, region, network, issuer, tier, physical/virtual, IBAN, KYC, currency, rewards and features. Scoped numeric fee sorting requires residence country and transaction currency, excludes unconfirmed/ambiguous rules, and puts unknowns last. Fixed-money sorting compares only the explicitly requested currency using decimal string comparison. No currency conversion, effective spending calculation, or ranking is implemented.
+
+Published JSON uses stable object keys, identity ordering, and string-set ordering. Timestamps and run metadata are excluded from canonical JSON. Bracket order is meaningful and preserved. The same accepted snapshots/static inputs produce the same bytes even when extraction cache records are grouped differently.

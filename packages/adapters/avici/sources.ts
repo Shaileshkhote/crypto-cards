@@ -1,0 +1,101 @@
+import type { CardSources } from "@cards/core/schema";
+
+export default {
+  urls: [
+    "https://avici.money/",
+    "https://avici.money/cashback",
+    "https://docs.avici.money/getting-started/legal/terms-of-service-avici-card",
+    "https://docs.avici.money/getting-started/legal/terms-of-service-usa/avici-card-terms",
+    "https://docs.avici.money/getting-started/referrals",
+    "https://docs.avici.money/getting-started/secured-credit-cards",
+    "https://docs.avici.money/getting-started/secured-credit-cards/fees-and-limits",
+    "https://docs.avici.money/getting-started/secured-credit-cards/profile-verification",
+    "https://docs.avici.money/getting-started/secured-credit-cards/regions-and-prohibitions-for-avici-card",
+    "https://docs.avici.money/getting-started/secured-credit-cards/regions-and-prohibitions-for-avici-card#available-regions",
+    "https://docs.avici.money/getting-started/secured-credit-cards/spending-and-transactions",
+    "https://docs.avici.money/getting-started/secured-credit-cards/virtual-and-physical-cards",
+  ],
+  allowedDomains: ["avici.money", "docs.avici.money"],
+  metadata: [
+    {
+      url: "https://avici.money/",
+      productIds: ["avici"],
+      kind: "product-page",
+      topics: ["card_type", "product_status"],
+    },
+    {
+      url: "https://avici.money/cashback",
+      productIds: ["avici"],
+      kind: "product-page",
+      topics: ["rewards", "card_type", "product_status"],
+    },
+    {
+      url: "https://docs.avici.money/getting-started/legal/terms-of-service-avici-card",
+      productIds: ["avici"],
+      kind: "terms",
+      topics: ["requirements", "fees", "product_status", "card_type"],
+    },
+    {
+      url: "https://docs.avici.money/getting-started/legal/terms-of-service-usa/avici-card-terms",
+      productIds: ["avici"],
+      kind: "cardholder-agreement",
+      scope: "united_states",
+      topics: [
+        "fees",
+        "requirements",
+        "card_type",
+        "atm",
+        "limits",
+        "countries",
+      ],
+    },
+    {
+      url: "https://docs.avici.money/getting-started/referrals",
+      productIds: ["avici"],
+      kind: "product-page",
+      topics: ["rewards"],
+    },
+    {
+      url: "https://docs.avici.money/getting-started/secured-credit-cards",
+      productIds: ["avici"],
+      kind: "product-page",
+      topics: ["card_type"],
+    },
+    {
+      url: "https://docs.avici.money/getting-started/secured-credit-cards/fees-and-limits",
+      productIds: ["avici"],
+      kind: "fee-schedule",
+      topics: ["fees", "atm", "limits", "card_type"],
+    },
+    {
+      url: "https://docs.avici.money/getting-started/secured-credit-cards/profile-verification",
+      productIds: ["avici"],
+      kind: "product-page",
+      topics: ["rewards", "requirements", "card_type", "product_status"],
+    },
+    {
+      url: "https://docs.avici.money/getting-started/secured-credit-cards/regions-and-prohibitions-for-avici-card",
+      productIds: ["avici"],
+      kind: "availability",
+      topics: ["countries", "requirements", "product_status", "card_type"],
+    },
+    {
+      url: "https://docs.avici.money/getting-started/secured-credit-cards/regions-and-prohibitions-for-avici-card#available-regions",
+      productIds: ["avici"],
+      kind: "product-page",
+      topics: ["countries"],
+    },
+    {
+      url: "https://docs.avici.money/getting-started/secured-credit-cards/spending-and-transactions",
+      productIds: ["avici"],
+      kind: "help-article",
+      topics: ["fees", "requirements", "card_type", "atm", "limits"],
+    },
+    {
+      url: "https://docs.avici.money/getting-started/secured-credit-cards/virtual-and-physical-cards",
+      productIds: ["avici"],
+      kind: "help-article",
+      topics: ["fees", "card_type", "integrations", "product_status"],
+    },
+  ],
+} satisfies CardSources;

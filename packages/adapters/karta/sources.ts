@@ -1,0 +1,93 @@
+import type { CardSources } from "@cards/core/schema";
+
+export default {
+  urls: [
+    "https://content.conkarta.com/docs/card-member-agreements-us.pdf",
+    "https://content.conkarta.com/docs/card-member-agreements.pdf",
+    "https://content.conkarta.com/docs/karta-terms-of-service-july-29-2026.pdf",
+    "https://www.conkarta.com/",
+    "https://www.conkarta.com/credit-card-for-non-residents",
+    "https://www.conkarta.com/us-virtual-credit-card",
+  ],
+  allowedDomains: ["content.conkarta.com", "www.conkarta.com"],
+  metadata: [
+    {
+      url: "https://content.conkarta.com/docs/card-member-agreements-us.pdf",
+      productIds: ["karta"],
+      kind: "cardholder-agreement",
+      scope: "united_states",
+      topics: [
+        "fees",
+        "requirements",
+        "card_type",
+        "atm",
+        "limits",
+        "countries",
+      ],
+    },
+    {
+      url: "https://content.conkarta.com/docs/card-member-agreements.pdf",
+      productIds: ["karta"],
+      kind: "cardholder-agreement",
+      topics: [
+        "fees",
+        "requirements",
+        "card_type",
+        "atm",
+        "limits",
+        "countries",
+      ],
+    },
+    {
+      url: "https://content.conkarta.com/docs/karta-terms-of-service-july-29-2026.pdf",
+      productIds: ["karta"],
+      kind: "terms",
+      topics: ["fees", "requirements", "crypto", "card_type", "product_status"],
+    },
+    {
+      url: "https://www.conkarta.com/",
+      productIds: ["karta"],
+      kind: "product-page",
+      topics: [
+        "rewards",
+        "fees",
+        "requirements",
+        "card_type",
+        "integrations",
+        "atm",
+        "limits",
+        "product_status",
+      ],
+    },
+    {
+      url: "https://www.conkarta.com/credit-card-for-non-residents",
+      productIds: ["karta"],
+      kind: "product-page",
+      topics: [
+        "rewards",
+        "fees",
+        "requirements",
+        "card_type",
+        "integrations",
+        "countries",
+        "limits",
+        "product_status",
+      ],
+    },
+    {
+      url: "https://www.conkarta.com/us-virtual-credit-card",
+      productIds: ["karta"],
+      kind: "product-page",
+      scope: "united_states",
+      topics: [
+        "rewards",
+        "fees",
+        "requirements",
+        "card_type",
+        "integrations",
+        "limits",
+        "product_status",
+      ],
+    },
+  ],
+} satisfies CardSources;

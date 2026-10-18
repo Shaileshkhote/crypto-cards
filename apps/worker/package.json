@@ -1,0 +1,9 @@
+{
+  "name": "@cards/worker",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@cards/core": "workspace:*",
+    "@cards/db": "workspace:*"
+  }
+}

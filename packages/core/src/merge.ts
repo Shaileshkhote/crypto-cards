@@ -1,0 +1,591 @@
+import {
+  Card,
+  type CardData,
+  type Adapter,
+  type ExtractionData,
+  type Document,
+  Features,
+} from "./schema";
+import { canonical, hash, slug } from "./serialize";
+import { verifyEvidence } from "./evidence";
+export const MERGE_VERSION = "1";
+type ObjectValue = Record<string, unknown>;
+const isObject = (v: unknown): v is ObjectValue =>
+  !!v && typeof v === "object" && !Array.isArray(v);
+const keyed = (v: unknown): v is (ObjectValue & { id: string })[] =>
+  Array.isArray(v) && v.every((x) => isObject(x) && typeof x.id === "string");
+const featureFields = new Set(Object.keys(Features.shape));
+export interface Change {
+  path: string[];
+  before?: unknown;
+  after?: unknown;
+  reason: string;
+}
+export function overlay(base: unknown, patch: unknown): unknown {
+  if (keyed(base) && keyed(patch) && patch.length > 0) {
+    const values = new Map(base.map((x) => [x.id, x]));
+    for (const x of patch)
+      values.set(
+        x.id,
+        overlay(values.get(x.id) || {}, x) as ObjectValue & { id: string },
+      );
+    return [...values.values()].sort((a, b) => a.id.localeCompare(b.id));
+  }
+  if (isObject(base) && isObject(patch)) {
+    // Provenance and fee calculations are unions, so switching variants replaces
+    // the object instead of retaining incompatible keys from its old variant.
+    if (
+      patch.origin === "static" ||
+      ("url" in patch && "blockId" in patch && "quote" in patch)
+    )
+      return patch;
+    if (
+      base.calculation !== undefined &&
+      patch.calculation !== undefined &&
+      base.calculation !== patch.calculation
+    )
+      return patch;
+    const out = { ...base };
+    for (const [k, v] of Object.entries(patch))
+      if (v !== undefined) out[k] = overlay(base[k], v);
+    return out;
+  }
+  return patch;
+}
+export function ordered(v: unknown): unknown {
+  if (Array.isArray(v)) {
+    const a = v.map(ordered);
+    return keyed(a)
+      ? a.sort((x, y) => x.id.localeCompare(y.id))
+      : a.every((x) => typeof x === "string")
+        ? [...new Set(a as string[])].sort()
+        : a;
+  }
+  return isObject(v)
+    ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, ordered(x)]))
+    : v;
+}
+function diff(before: unknown, after: unknown, path: string[] = []): Change[] {
+  if (canonical(before) === canonical(after)) return [];
+  if (keyed(before) && keyed(after)) {
+    return [
+      ...after.flatMap((x) =>
+        diff(
+          before.find((y) => y.id === x.id),
+          x,
+          [...path, x.id],
+        ),
+      ),
+      ...before
+        .filter((x) => !after.some((y) => x.id === y.id))
+        .map((x) => ({
+          path: [...path, x.id],
+          before: x,
+          reason: "Explicit removal requested",
+        })),
+    ];
+  }
+  if (isObject(before) && isObject(after))
+    return [
+      ...Object.entries(after).flatMap(([k, v]) =>
+        diff(before[k], v, [...path, k]),
+      ),
+      ...Object.keys(before)
+        .filter((k) => !(k in after))
+        .map((k) => ({
+          path: [...path, k],
+          before: before[k],
+          reason: "Explicit variant replacement removed an incompatible field",
+        })),
+    ];
+  return [
+    {
+      path,
+      before,
+      after,
+      reason:
+        before === undefined
+          ? "New grounded fact"
+          : "Existing accepted value changed",
+    },
+  ];
+}
+export function applyChanges(card: unknown, changes: Change[]): CardData {
+  let out = structuredClone(card) as ObjectValue;
+  for (const change of changes) {
+    let parent: unknown = out;
+    for (const [index, key] of change.path.entries()) {
+      const last = index === change.path.length - 1;
+      if (Array.isArray(parent)) {
+        const found = parent.findIndex((x) => isObject(x) && x.id === key);
+        if (last) {
+          if (change.after === undefined) {
+            if (found >= 0) parent.splice(found, 1);
+          } else if (found >= 0) parent[found] = change.after;
+          else parent.push(change.after);
+        } else {
+          if (found < 0)
+            throw new Error(
+              `Missing reviewed entity: ${change.path.slice(0, index + 1).join("/")}`,
+            );
+          parent = parent[found];
+        }
+      } else if (isObject(parent)) {
+        if (last) {
+          if (change.after === undefined) delete parent[key];
+          else parent[key] = change.after;
+        } else {
+          if (parent[key] === undefined)
+            parent[key] = [
+              "products",
+              "tiers",
+              "fees",
+              "rewards",
+              "limits",
+            ].includes(key)
+              ? []
+              : {};
+          parent = parent[key];
+        }
+      } else throw new Error("Invalid change path");
+    }
+  }
+  out = ordered(out) as ObjectValue;
+  return Card.parse(out);
+}
+function identity(
+  id: string,
+  name: string,
+  known: { id: string; name: string }[],
+  aliases: Record<string, string>,
+): string {
+  const exact = known.find((x) => x.id === id);
+  if (exact) return exact.id;
+  const matches = [...new Map(known.map((x) => [x.id, x])).values()].filter(
+    (x) =>
+      slug(x.name) === slug(name) ||
+      x.id === aliases[id] ||
+      x.id === aliases[name],
+  );
+  if (matches.length > 1)
+    throw new Error(
+      `Ambiguous identity: ${name}; declare an ID or alias in config.ts`,
+    );
+  return matches[0]?.id || slug(id || name);
+}
+function rules(
+  value: unknown,
+  field: string,
+  target: string,
+  origin: unknown,
+): unknown {
+  if (!Array.isArray(value) || !["fees", "rewards", "limits"].includes(field))
+    return value;
+  const seen = new Map<string, string>();
+  return value.map((r) => {
+    const obj = r as ObjectValue;
+    const id = `${field.slice(0, -1)}-${hash({
+      target,
+      kind: obj.kind || "cashback",
+      period: field === "limits" ? obj.period : undefined,
+      scope: ordered(obj.scope || {}),
+    }).slice(0, 20)}`;
+    const next = { ...obj, id, source: origin, status: "verified" };
+    if (seen.has(id) && seen.get(id) !== canonical(next))
+      throw new Error(
+        `Ambiguous ${field} identity; conflicting rules share a scope`,
+      );
+    seen.set(id, canonical(next));
+    return next;
+  });
+}
+function staticOrigin(v: unknown, path = "provider"): unknown {
+  if (Array.isArray(v)) return v.map((x) => staticOrigin(x, path));
+  if (!isObject(v)) return v;
+  const out = { ...v },
+    sources: Record<string, unknown> = {};
+  for (const [k, x] of Object.entries(v)) {
+    if (featureFields.has(k)) {
+      sources[k] = { origin: "static" };
+      out[k] = rules(x, k, path, { origin: "static" });
+    } else if (k === "products" || k === "tiers")
+      out[k] = (x as ObjectValue[]).map((e) =>
+        staticOrigin(e, `${path}/${e.id}`),
+      );
+  }
+  if (Object.keys(sources).length) out.fieldSources = sources;
+  return out;
+}
+function compatible(left: unknown, right: unknown, ruleArray = false): boolean {
+  if (isObject(left) && isObject(right))
+    return Object.keys(right)
+      .filter((k) => !["source", "status", "id"].includes(k))
+      .every((k) => !(k in left) || compatible(left[k], right[k]));
+  if (
+    Array.isArray(left) &&
+    Array.isArray(right) &&
+    ruleArray &&
+    keyed(left) &&
+    keyed(right)
+  )
+    return right.every((r) => {
+      const old = left.find((x) => x.id === r.id);
+      return !old || compatible(old, r);
+    });
+  return canonical(ordered(left)) === canonical(ordered(right));
+}
+export function candidate(
+  adapter: Adapter,
+  extractions: ExtractionData[],
+  accepted?: CardData,
+  documents: Document[] = [],
+): { data: CardData; discrepancies: string[] } {
+  const knownProducts = [
+    ...adapter.config.products,
+    ...(accepted?.products || []),
+  ];
+  const productMap = new Map<string, string>();
+  const tierMap = new Map<string, string>();
+  let data: ObjectValue = {
+    id: adapter.config.id,
+    name: adapter.config.name,
+    website: adapter.config.website,
+    ...(adapter.config.products.length
+      ? {
+          products: adapter.config.products.map((p) => {
+            const tiers = adapter.config.tiers
+              .filter((t) => t.productId === p.id)
+              .map(({ productId: _productId, ...t }) => t);
+            return { ...p, ...(tiers.length ? { tiers } : {}) };
+          }),
+        }
+      : {}),
+  };
+  const factsSeen = new Map<string, unknown>();
+  const combined: ExtractionData = {
+    complete: extractions.every((e) => e.complete),
+    products: extractions
+      .flatMap((e) => e.products)
+      .sort((a, b) => a.id.localeCompare(b.id)),
+    tiers: extractions
+      .flatMap((e) => e.tiers)
+      .sort((a, b) => a.id.localeCompare(b.id)),
+    facts: extractions
+      .flatMap((e) => e.facts)
+      .sort((a, b) =>
+        canonical([
+          a.productId,
+          a.tierId,
+          a.field,
+          a.evidence.url,
+          a.evidence.blockId,
+          a.value,
+        ]).localeCompare(
+          canonical([
+            b.productId,
+            b.tierId,
+            b.field,
+            b.evidence.url,
+            b.evidence.blockId,
+            b.value,
+          ]),
+        ),
+      ),
+  };
+  for (const extraction of [combined]) {
+    if (!extraction.complete)
+      throw new Error("Incomplete extraction cannot form a candidate");
+    for (const p of extraction.products) {
+      const id = identity(p.id, p.name, knownProducts, adapter.config.aliases);
+      productMap.set(p.id, id);
+      data = overlay(data, { products: [{ ...p, id }] }) as ObjectValue;
+    }
+    for (const t of extraction.tiers) {
+      const productId = productMap.get(t.productId) || t.productId;
+      const product = ((data.products || []) as ObjectValue[]).find(
+        (p) => p.id === productId,
+      );
+      if (!product) throw new Error(`Unknown product for tier: ${t.productId}`);
+      const known = [
+        ...adapter.config.tiers.filter((x) => x.productId === productId),
+        ...(accepted?.products?.find((x) => x.id === productId)?.tiers || []),
+      ];
+      const id = identity(t.id, t.name, known, adapter.config.aliases);
+      tierMap.set(t.id, id);
+      const { productId: _productId, ...tier } = t;
+      data = overlay(data, {
+        products: [{ id: productId, tiers: [{ ...tier, id }] }],
+      }) as ObjectValue;
+    }
+    for (const fact of extraction.facts) {
+      if (!verifyEvidence(fact.evidence, documents))
+        throw new Error(`Invalid evidence: ${fact.field}`);
+      if (fact.tierId && !fact.productId)
+        throw new Error("Tier fact requires productId");
+      const productId = fact.productId
+        ? productMap.get(fact.productId) || fact.productId
+        : null;
+      const tierId = fact.tierId
+        ? tierMap.get(fact.tierId) || fact.tierId
+        : null;
+      const p = productId
+        ? ((data.products || []) as ObjectValue[]).find(
+            (p) => p.id === productId,
+          )
+        : null;
+      if (productId && !p)
+        throw new Error(`Unknown fact product: ${productId}`);
+      if (
+        tierId &&
+        !(p?.tiers as ObjectValue[] | undefined)?.some((t) => t.id === tierId)
+      )
+        throw new Error(`Unknown fact tier: ${tierId}`);
+      // Unknown isn't a deletion request. Keep accepted values until an explicit removal is reviewed.
+      if (fact.value === null || fact.value === undefined) continue;
+      const target = [adapter.config.id, productId, tierId]
+        .filter(Boolean)
+        .join("/");
+      const value = rules(fact.value, fact.field, target, fact.evidence);
+      const factKey = `${target}/${fact.field}`;
+      const earlier = factsSeen.get(factKey);
+      if (
+        earlier !== undefined &&
+        !compatible(
+          earlier,
+          value,
+          ["fees", "rewards", "limits"].includes(fact.field),
+        )
+      )
+        throw new Error(
+          `Conflicting extracted facts: ${factKey}; published values retained`,
+        );
+      factsSeen.set(factKey, overlay(earlier, value));
+      const currentTarget = tierId
+        ? (p?.tiers as ObjectValue[]).find((t) => t.id === tierId)
+        : p || data;
+      const fields = {
+        ...(fact.inherit
+          ? {
+              inheritFields: [
+                ...new Set([
+                  ...((currentTarget?.inheritFields || []) as string[]),
+                  fact.field,
+                ]),
+              ],
+            }
+          : {}),
+        [fact.field]: value,
+        fieldSources: { [fact.field]: fact.evidence },
+      };
+      const patch = productId
+        ? {
+            products: [
+              {
+                id: productId,
+                ...(tierId ? { tiers: [{ id: tierId, ...fields }] } : fields),
+              },
+            ],
+          }
+        : fields;
+      data = overlay(data, patch) as ObjectValue;
+    }
+  }
+  const { note: _note, sourceDate: _date, ...staticData } = adapter.static;
+  const staticWithOrigin = staticOrigin(staticData, adapter.config.id);
+  const discrepancies = diff(data, overlay(data, staticWithOrigin))
+    .filter((c) => c.before !== undefined && !c.path.includes("fieldSources"))
+    .map((c) => c.path.join("/"));
+  data = overlay(data, staticWithOrigin) as ObjectValue;
+  return { data: Card.parse(ordered(data)), discrepancies };
+}
+export function merge(accepted: CardData | undefined, incoming: CardData) {
+  const combined = Card.parse(ordered(overlay(accepted || {}, incoming)));
+  if (!accepted)
+    return {
+      published: combined,
+      changes: [] as Change[],
+      safeChanges: [] as Change[],
+    };
+  const changes = diff(accepted, combined);
+  const unsafe = changes.filter((c) => {
+    if (
+      c.path.includes("fieldSources") ||
+      c.path.includes("unconfirmedFields") ||
+      ["source", "status"].some((k) => c.path.includes(k))
+    )
+      return false;
+    if (c.before !== undefined || c.path.includes("inheritFields")) return true;
+    // A new scoped rule beside an accepted rule can be a changed scope, so hold it.
+    const ruleIndex = c.path.findIndex((p) =>
+      ["fees", "rewards", "limits"].includes(p),
+    );
+    if (ruleIndex >= 0) {
+      let current: unknown = accepted;
+      for (const k of c.path.slice(0, ruleIndex + 1))
+        current = Array.isArray(current)
+          ? current.find((x) => x.id === k)
+          : isObject(current)
+            ? current[k]
+            : undefined;
+      if (Array.isArray(current) && current.length) return true;
+    }
+    // Identity changes/new entities in an existing catalog need human review.
+    return c.path[0] === "products" && c.path.length <= 4;
+  });
+  const isCompanion = (c: Change) => {
+    const field = c.path.indexOf("fieldSources"),
+      source = c.path.indexOf("source"),
+      status = c.path.indexOf("status");
+    const group =
+      field >= 0
+        ? [...c.path.slice(0, field), c.path[field + 1]]
+        : source >= 0
+          ? c.path.slice(0, source)
+          : status >= 0
+            ? c.path.slice(0, status)
+            : null;
+    return (
+      group !== null &&
+      unsafe.some((u) => group.every((v, i) => u.path[i] === v))
+    );
+  };
+  const companions = changes.filter(
+    (c) => !unsafe.includes(c) && isCompanion(c),
+  );
+  const safeChanges = changes.filter(
+    (c) => !unsafe.includes(c) && !companions.includes(c),
+  );
+
+  return {
+    published: applyChanges(accepted, safeChanges),
+    changes: [...unsafe, ...companions],
+    safeChanges,
+  };
+}
+export function markUnconfirmed(
+  card: CardData,
+  documents: Document[],
+  extractions: ExtractionData[],
+  incoming?: CardData,
+): CardData {
+  const seen = new Set(
+    extractions.flatMap((x) =>
+      x.facts.map(
+        (f) =>
+          `${f.productId || ""}/${f.tierId || ""}/${f.field}/${f.evidence.url}`,
+      ),
+    ),
+  );
+  const changed = new Set(
+    documents.filter((d) => d.status === "ok").map((d) => d.url),
+  );
+  const visit = (v: unknown, product = "", tier = ""): unknown => {
+    if (!isObject(v)) return v;
+    const out = { ...v };
+    const unconfirmed = new Set((v.unconfirmedFields || []) as string[]);
+    for (const [field, origin] of Object.entries(
+      (v.fieldSources || {}) as ObjectValue,
+    ))
+      if (
+        isObject(origin) &&
+        typeof origin.url === "string" &&
+        changed.has(origin.url)
+      ) {
+        if (!seen.has(`${product}/${tier}/${field}/${origin.url}`))
+          unconfirmed.add(field);
+        else unconfirmed.delete(field);
+      }
+    const freshProduct = incoming?.products?.find((p) => p.id === product);
+    const fresh: unknown = tier
+      ? freshProduct?.tiers?.find((t) => t.id === tier)
+      : product
+        ? freshProduct
+        : incoming;
+    for (const field of ["fees", "rewards", "limits"])
+      if (Array.isArray(v[field])) {
+        out[field] = (v[field] as ObjectValue[]).map((rule) => {
+          const source = rule.source;
+          if (
+            !isObject(source) ||
+            typeof source.url !== "string" ||
+            !changed.has(source.url)
+          )
+            return rule;
+          const present =
+            isObject(fresh) &&
+            Array.isArray(fresh[field]) &&
+            (fresh[field] as ObjectValue[]).some((r) => r.id === rule.id);
+          if (!present) unconfirmed.add(field);
+          return { ...rule, status: present ? "verified" : "unconfirmed" };
+        });
+      }
+    if (unconfirmed.size) out.unconfirmedFields = [...unconfirmed].sort();
+    else if (v.unconfirmedFields) out.unconfirmedFields = [];
+    if (v.products)
+      out.products = (v.products as ObjectValue[]).map((p) =>
+        visit(p, String(p.id)),
+      );
+    if (v.tiers)
+      out.tiers = (v.tiers as ObjectValue[]).map((t) =>
+        visit(t, product, String(t.id)),
+      );
+    return out;
+  };
+  return Card.parse(visit(card));
+}
+export const publicationHash = (card: CardData) => hash(ordered(card));
+
+export function unconfirmedChanges(
+  before: CardData,
+  after: CardData,
+): Change[] {
+  return diff(before, after)
+    .filter(
+      (c) =>
+        c.path.at(-1) === "unconfirmedFields" &&
+        Array.isArray(c.after) &&
+        c.after.length > 0,
+    )
+    .map((c) => ({
+      ...c,
+      reason:
+        "Accepted facts were not found in changed source text; values retained for review",
+    }));
+}
+export function describeChange(card: CardData, change: Change) {
+  const path = change.path;
+  const p = card.products?.find(
+    (p) => p.id === path[path.indexOf("products") + 1],
+  );
+  const t = p?.tiers?.find((t) => t.id === path[path.indexOf("tiers") + 1]);
+  const node = t || p || card;
+  const kind = ["fees", "rewards", "limits"].find((k) => path.includes(k));
+  const rule = kind
+    ? (
+        node[kind as "fees" | "rewards" | "limits"] as
+          | { id: string; kind?: string; scope: Record<string, unknown> }[]
+          | undefined
+      )?.find((r) => r.id === path[path.indexOf(kind) + 1])
+    : undefined;
+  const label = (v: string) =>
+    v === "ratePercent"
+      ? "Rate (%)"
+      : v.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase());
+  const scope = rule?.scope
+    ? Object.entries(rule.scope)
+        .map(([k, v]) => `${label(k)}: ${Array.isArray(v) ? v.join(", ") : v}`)
+        .join(" · ")
+    : "";
+  return [
+    card.name,
+    p?.name,
+    t?.name,
+    rule?.kind
+      ? `${rule.kind.toUpperCase()} ${kind === "fees" ? "fee" : "limit"}`
+      : kind,
+    scope,
+    label(path.at(-1) || "Change"),
+  ]
+    .filter(Boolean)
+    .join(" → ");
+}

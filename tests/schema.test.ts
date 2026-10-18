@@ -1,0 +1,77 @@
+import { describe, it, expect } from "vitest";
+import { FeeRule, Card, Money, Scope, Extraction } from "@cards/core/schema";
+import { document, extraction } from "./helpers";
+describe("typed canonical schema", () => {
+  it("distinguishes unknown, zero, false and empty lists", () => {
+    const card = Card.parse({
+      id: "test",
+      name: "Test",
+      website: "https://example.com",
+      kyc: false,
+      residentCountries: null,
+      excludedResidentCountries: [],
+      fees: [
+        {
+          id: "zero",
+          kind: "monthly",
+          calculation: "fixed",
+          fixed: { amount: "0", currency: "EUR" },
+          scope: {},
+          calculable: true,
+        },
+      ],
+    });
+    expect(card.kyc).toBe(false);
+    expect(card.residentCountries).toBeNull();
+    expect(card.excludedResidentCountries).toEqual([]);
+    expect(card.fees?.[0].calculation).toBe("fixed");
+  });
+  it("rejects missing numeric calculation inputs and prose countries", () => {
+    expect(
+      FeeRule.safeParse({
+        id: "x",
+        kind: "fx",
+        calculation: "percentage",
+        calculable: true,
+        scope: {},
+      }).success,
+    ).toBe(false);
+    expect(Scope.safeParse({ residentCountries: ["Europe"] }).success).toBe(
+      false,
+    );
+    expect(Money.safeParse({ amount: 1, currency: "USD" }).success).toBe(false);
+  });
+  it("validates tiered inclusion, thresholds, currency, period and behavior", () => {
+    const rule = {
+      id: "atm",
+      kind: "atm",
+      calculation: "tiered",
+      scope: {},
+      calculable: true,
+      period: "month",
+      mode: "marginal",
+      brackets: [
+        {
+          upperBound: { amount: "200", currency: "EUR" },
+          inclusive: true,
+          ratePercent: 0,
+        },
+        { upperBound: null, inclusive: false, ratePercent: 2 },
+      ],
+    };
+    expect(FeeRule.safeParse(rule).success).toBe(true);
+    expect(FeeRule.safeParse({ ...rule, mode: undefined }).success).toBe(false);
+    expect(
+      FeeRule.safeParse({
+        ...rule,
+        brackets: [
+          { upperBound: null, inclusive: true, ratePercent: 0 },
+          ...rule.brackets,
+        ],
+      }).success,
+    ).toBe(false);
+  });
+  it("validates source-backed fixture candidates", () => {
+    expect(Extraction.safeParse(extraction(document())).success).toBe(true);
+  });
+});

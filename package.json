@@ -1,0 +1,37 @@
+{
+  "name": "crypto-cards",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.25.0",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "cards": "tsx apps/worker/src/cli.ts",
+    "worker": "tsx apps/worker/src/worker.ts",
+    "dev": "pnpm --filter @cards/admin dev",
+    "build": "pnpm --filter @cards/admin build",
+    "typecheck": "tsc --noEmit && pnpm --filter @cards/admin typecheck",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:integration": "vitest run tests/integration.test.ts",
+    "db:migrate": "tsx packages/db/src/migrate.ts",
+    "check": "pnpm typecheck && pnpm lint && pnpm test",
+    "benchmark": "tsx scripts/benchmark.ts",
+    "cloud:dev": "node scripts/cloud-dev.mjs"
+  },
+  "dependencies": {
+    "@cards/core": "workspace:*",
+    "@cards/db": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "tsx": "^4.21.0",
+    "vitest": "^4.0.18",
+    "@types/node": "^24.10.0",
+    "@types/pg": "^8.16.0",
+    "eslint": "^9.39.0",
+    "typescript-eslint": "^8.53.0",
+    "@eslint/js": "^9.39.0"
+  }
+}

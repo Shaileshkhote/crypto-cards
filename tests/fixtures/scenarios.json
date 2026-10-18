@@ -1,0 +1,37 @@
+[
+  {
+    "id": "regional",
+    "text": "Standard card FX fee for residents of Germany: 1.5%. UK residents pay 2%. Effective 2026-09-01.",
+    "kind": "percentage",
+    "ratePercent": 1.5,
+    "countries": ["DE"]
+  },
+  {
+    "id": "zero",
+    "text": "The virtual card has a monthly fee of 0 EUR. No physical card is offered.",
+    "kind": "fixed",
+    "amount": "0",
+    "currency": "EUR"
+  },
+  {
+    "id": "tiered",
+    "text": "Monthly ATM withdrawals: up to 200 EUR inclusive at 0%; amounts above 200 EUR at 2% marginally.",
+    "kind": "tiered"
+  },
+  {
+    "id": "rewards",
+    "text": "Premium earns 3% in USDC, capped at 50 USD each month, excluding cash withdrawals.",
+    "ratePercent": 3,
+    "cap": "50"
+  },
+  {
+    "id": "unknown",
+    "text": "ATM fees depend on the operator and are disclosed at the terminal. The issuer is Example Bank.",
+    "kind": "unknown"
+  },
+  {
+    "id": "tiers",
+    "text": "Core is virtual only. Luxe offers physical and virtual cards. Each tier has its own eligibility requirements.",
+    "tiers": ["core", "luxe"]
+  }
+]
