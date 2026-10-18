@@ -236,6 +236,7 @@ describe.skipIf(!enabled)(
           const result = await executeJob(claimed!);
           expect(result.status).toBe("failed");
           expect(mocked.mock.calls.length).toBe(haltRun ? 1 : (await loadAdapters()).length);
+          if (haltRun) expect((result.progress.results as { error?: string }[])[1].error).toBe("Run stopped: Budget exhausted: no new OpenRouter request sent");
         } finally { mocked.mockRestore(); }
       }
     });

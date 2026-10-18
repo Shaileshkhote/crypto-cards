@@ -25,9 +25,9 @@ export async function executeJob(job: JobRow) {
         ? all.filter((a) => a.config.id === job.card_id)
         : all;
       if (!adapters.length) throw new Error("No matching adapters");
-      let exhausted = false;
+      let haltReason: string | undefined;
       for (const adapter of adapters) {
-        const result: SyncResult = exhausted
+        const result: SyncResult = haltReason
           ? {
               cardId: adapter.config.id,
               status: "not_run",
@@ -37,11 +37,11 @@ export async function executeJob(job: JobRow) {
               costUsd: 0,
               inputTokens: 0,
               outputTokens: 0,
-              error: "Shared run budget exhausted",
+              error: `Run stopped: ${haltReason}`,
             }
           : await syncAdapter(adapter, budget, { force: job.force });
         results.push(result);
-        if (result.haltRun) exhausted = true;
+        if (result.haltRun) haltReason = result.error || "Fatal extraction error";
         await db().query(
           "UPDATE jobs SET progress=$2,cost_usd=$3,heartbeat_at=now() WHERE id=$1",
           [
