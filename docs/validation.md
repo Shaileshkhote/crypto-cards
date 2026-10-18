@@ -27,7 +27,7 @@ Live OpenRouter testing found and fixed unsupported URI schema annotations, cont
 
 Both Docker targets build. The admin image starts as the non-root runtime user and passes the same authenticated HTTP/API checks. The worker image starts as the non-root runtime user, applies migrations, and polls jobs. Its CLI validates all adapters and completes a cache job, and Chromium executes a JavaScript-rendered fixture successfully. The Dockerfile consolidates stages and keeps browser installation independent of app source changes.
 
-Those individual image checks predate the latest extraction/PDF fixes. The latest source passes the host build and automated checks; fresh images and the complete Compose stack have not been rebuilt after those fixes because of this machine's previously demonstrated storage limit.
+Those individual image checks predate the latest extraction/PDF fixes. The latest source passes the host build and automated checks. Fresh image validation runs in GitHub CI; current results appear in the pull request checks. The complete Compose stack has not been rerun because of this machine's previously demonstrated storage limit.
 
 The complete three-service Compose deployment could not be validated simultaneously on this cloud machine: the 32 GB Docker VFS filesystem ran out of space. Individual service checks and the real shared PostgreSQL workflows above passed. Validate the complete Compose stack on a Docker host with sufficient storage before production.
 

@@ -91,8 +91,8 @@ A Ready spot check found `physical: false, virtual: false` supported only by “
 
 Repair or replace stale source inventories with verified public sources, use a machine with working DNS, and rerun the native crawler. Complete browser-required pages and obtain usable versions of restricted or timing-out PDFs. Evaluate model coverage and citations against manually labeled real-provider fixtures before selecting a production model. Schema, evidence and incomplete-output failures continue to prevent publication.
 
-Fresh Docker images after these fixes and a complete three-service Compose run remain unverified because the earlier full build exhausted the cloud machine’s 32 GB VFS filesystem. Individual image checks predate these fixes. Coolify deployment, HTTPS routing, real Cloudflare Access, off-host backups and a production restore remain untested.
+The cloud machine did not rebuild complete worker/admin images after these fixes: the earlier full build exhausted its 32 GB VFS filesystem. Fresh image validation runs in GitHub CI; the latest build results appear in the pull request checks. A complete three-service Compose run, Coolify deployment, HTTPS routing, real Cloudflare Access, off-host backups and a production restore remain untested.
 
-GitHub CI also exposed an HTTPS CA bootstrap failure in the worker image. The browser stage now uses Node's bundled trusted roots, plus the optional build proxy CA, until the OS CA package is installed. TLS and APT package signatures remain verified; the fix is being checked in CI.
+GitHub CI also exposed an HTTPS CA bootstrap failure in the worker image. The browser stage now uses Node's bundled trusted roots, plus the optional build proxy CA, until the OS CA package is installed. TLS and APT package signatures remain verified. See pull request checks for fresh image-build results.
 
 Raw source snapshots, detailed model usage, synthetic outputs and benchmark database bindings remain in ignored `.local` artifacts. They are not committed. Reproduce the native workflow with `pnpm benchmark` against a dedicated database once DNS/source access works; cold and warm passes share one capped budget.
