@@ -19,6 +19,6 @@ pnpm db:migrate
 pnpm benchmark etherfi avici mexc gnosis-pay nexo-card revolut
 ```
 
-Forced and unchanged passes share one budget. Unchanged snapshots must make zero model requests. Inspect successful outputs against source context and exact scopes; a valid quote proves the passage exists, not that the interpretation is right. Do not extrapolate 50-provider cost from failed or incomplete runs. The latest full-inventory replay and access restrictions are recorded in [live validation](live-validation.md).
+Forced and unchanged passes share one budget. Unchanged snapshots must make zero model requests. Inspect successful outputs against source context and exact scopes; a valid quote proves the passage exists, not that the interpretation is right. Do not extrapolate 50-provider cost from failed or incomplete runs. The selection run used schema 2 / prompt 6. Schema 3 / prompt 7 adds service-specific fees, weekday/weekend scope, per-transaction and count limits after the full replay exposed those gaps. Regression tests cover the additions; full live acceptance of that revision is pending. The latest full-inventory replay and access restrictions are recorded in [live validation](live-validation.md).
 
 This cloud machine's native DNS resolver returns EAI_AGAIN. Proxy-fetched source snapshots test parsing, model extraction, publication and cache reuse, but cannot prove the native crawler or production deployment. Explicit robots restrictions remain enforced. Production credentials belong in deployment environment bindings, never Git or reports.

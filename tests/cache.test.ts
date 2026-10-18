@@ -3,6 +3,12 @@ import { Card } from "@cards/core/schema";
 import { directory, sortFees, filterDirectory, applicable } from "@cards/core/cache";
 import { REGIONS } from "@cards/core/regions";
 describe("directory scope and sorting", () => {
+  it("applies weekday and weekend rates only with an explicit matching day", () => {
+    const scope = { daysOfWeek: ["sat" as const, "sun" as const] };
+    expect(applicable(scope, {})).toBe(false);
+    expect(applicable(scope, { dayOfWeek: "mon" })).toBe(false);
+    expect(applicable(scope, { dayOfWeek: "sat" })).toBe(true);
+  });
   it("requires the real card/issuance/payment-rail context before applying a scoped fee", () => {
     const scope = { cardTypes: ["virtual" as const], cardOrder: "additional" as const, paymentRails: ["ach"] };
     expect(applicable(scope, {})).toBe(false);

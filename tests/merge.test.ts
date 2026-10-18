@@ -189,6 +189,29 @@ it("gives daily and monthly limits separate identities without value-based IDs",
     new Set(out.products?.[0].tiers?.[0].limits?.map((x) => x.id)).size,
   ).toBe(2);
 });
+it("keeps actual card services as separate charges rather than generic transactions", () => {
+  const a = adapter(), doc = document(), e = extraction(doc);
+  e.facts[0].value = (["atm", "atm_decline", "atm_balance_inquiry", "cross_border", "late_payment", "returned_payment", "delivery"] as const).map(kind => ({
+    id: kind, kind,
+    calculation: "fixed" as const, fixed: { amount: "0.6", currency: "USD" },
+    scope: {}, calculable: true as const,
+  }));
+  const fees = candidate(a, [e], undefined, [doc]).data.products![0].tiers![0].fees!;
+  expect(new Set(fees.map(f => f.id)).size).toBe(7);
+});
+it("distinguishes per-purchase, daily-money and daily-count limits", () => {
+  const a = adapter(), doc = document(), e = extraction(doc);
+  e.facts[0].field = "limits";
+  e.facts[0].value = [
+    { id: "purchase", kind: "spending", amount: { amount: "80000", currency: "USD" }, period: "transaction", scope: {}, calculable: true },
+    { id: "daily", kind: "spending", amount: { amount: "1000000", currency: "USD" }, period: "day", scope: {}, calculable: true },
+    { id: "count", kind: "transaction_count", count: 50, period: "day", scope: {}, calculable: true },
+  ];
+  const limits = candidate(a, [e], undefined, [doc]).data.products![0].tiers![0].limits!;
+  expect(new Set(limits.map(l => l.id)).size).toBe(3);
+  expect(limits.find(l => l.kind === "transaction_count")).toMatchObject({ count: 50 });
+  expect(limits.find(l => l.kind === "transaction_count")).not.toHaveProperty("amount");
+});
 it("replaces extracted provenance and fee variants with explicit static values through review", () => {
   const a = adapter(),
     doc = document();

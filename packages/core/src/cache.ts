@@ -141,8 +141,9 @@ export function filterDirectory(rows: DirectoryRow[], f: Filter) {
 }
 export function applicable(
   scope: ScopeData,
-  context: { country?: string; currency?: string; tierId?: string; cardType?: "physical" | "virtual"; cardOrder?: "first" | "additional"; paymentRail?: string },
+  context: { country?: string; currency?: string; tierId?: string; cardType?: "physical" | "virtual"; cardOrder?: "first" | "additional"; paymentRail?: string; dayOfWeek?: NonNullable<ScopeData["daysOfWeek"]>[number] },
 ) {
+  if (scope.daysOfWeek && (!context.dayOfWeek || !scope.daysOfWeek.includes(context.dayOfWeek))) return false;
   if (scope.cardTypes && (!context.cardType || !scope.cardTypes.includes(context.cardType))) return false;
   if (scope.cardOrder && scope.cardOrder !== context.cardOrder) return false;
   if (scope.paymentRails && (!context.paymentRail || !scope.paymentRails.includes(context.paymentRail))) return false;
@@ -188,7 +189,7 @@ export function applicable(
 export function sortFees(
   rows: DirectoryRow[],
   kind: FeeData["kind"],
-  context: { country: string; currency: string; cardType?: "physical" | "virtual"; cardOrder?: "first" | "additional"; paymentRail?: string },
+  context: { country: string; currency: string; cardType?: "physical" | "virtual"; cardOrder?: "first" | "additional"; paymentRail?: string; dayOfWeek?: NonNullable<ScopeData["daysOfWeek"]>[number] },
   calculation: "percentage" | "fixed" = "percentage",
 ) {
   const val = (r: DirectoryRow) => {

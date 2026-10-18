@@ -2,7 +2,7 @@ import { z } from "zod";
 import countries from "i18n-iso-countries";
 import { compareDecimals } from "./serialize";
 
-export const SCHEMA_VERSION = "2";
+export const SCHEMA_VERSION = "3";
 export const Id = z
   .string()
   .regex(/^[a-z0-9][a-z0-9-]*$/)
@@ -21,6 +21,7 @@ export const Money = z
   })
   .strict();
 export const Period = z.enum(["day", "week", "month", "year"]);
+export const Weekday = z.enum(["mon", "tue", "wed", "thu", "fri", "sat", "sun"]);
 export const Evidence = z
   .object({
     url: z.string().url(),
@@ -48,6 +49,7 @@ export const Scope = z
     cardTypes: z.array(z.enum(["physical", "virtual"])).optional(),
     cardOrder: z.enum(["first", "additional"]).optional(),
     paymentRails: z.array(Id).optional(),
+    daysOfWeek: z.array(Weekday).optional(),
   })
   .strict();
 const RuleBase = {
@@ -63,6 +65,8 @@ const FeeBase = {
     "fx",
     "conversion",
     "atm",
+    "atm_decline",
+    "atm_balance_inquiry",
     "monthly",
     "annual",
     "issuance",
@@ -71,7 +75,11 @@ const FeeBase = {
     "replacement",
     "inactivity",
     "refund",
-  ]).describe("fx is fiat currency exchange; conversion is crypto/asset conversion. refund applies only to processing a refund, not ordinary purchases."),
+    "delivery",
+    "cross_border",
+    "late_payment",
+    "returned_payment",
+  ]).describe("fx is fiat currency exchange; conversion is crypto/asset conversion. atm is withdrawal; atm_decline and atm_balance_inquiry are separate services. refund applies only to processing a refund. delivery is shipping, separate from issuance. cross_border, late_payment and returned_payment are separate from ordinary purchase transaction fees."),
   minFee: Money.optional(),
   maxFee: Money.optional(),
   allowance: z.object({ amount: Money, period: Period }).strict().optional(),
@@ -174,15 +182,30 @@ export const RewardRule = z
         message: "Non-calculable reward requires description",
       });
   });
-export const LimitRule = z
-  .object({
+const LimitPeriod = Period.or(z.literal("transaction"));
+export const LimitRule = z.union([
+  z.object({
     ...RuleBase,
     kind: z.enum(["spending", "atm"]),
     amount: Money,
+    period: LimitPeriod,
+    calculable: z.literal(true),
+  }).strict(),
+  z.object({
+    ...RuleBase,
+    kind: z.literal("transaction_count"),
+    count: z.number().int().nonnegative(),
     period: Period,
     calculable: z.literal(true),
-  })
-  .strict();
+  }).strict(),
+  z.object({
+    ...RuleBase,
+    kind: z.enum(["spending", "atm", "transaction_count"]),
+    period: LimitPeriod.optional(),
+    description: z.string().min(1),
+    calculable: z.literal(false),
+  }).strict(),
+]);
 export const FeatureShape = {
   network: z.enum(["visa", "mastercard", "other"]).nullable().optional(),
   issuer: z
