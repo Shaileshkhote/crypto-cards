@@ -50,6 +50,8 @@ pnpm cards reject <review-id> --reviewer 'name@example.com'
 pnpm cards cache
 ```
 
+The reviewer flag is optional and defaults to the operating-system account; provide an explicit identity for clearer audit records.
+
 `sync` creates and executes a tracked job. The UI enqueues the same kind of job for the worker. Failed or budget-exhausted subsets result in a failed job and nonzero CLI exit status. Force creates a new candidate; it does not bypass review.
 
 ## Checks

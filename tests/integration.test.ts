@@ -1,3 +1,5 @@
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { executeJob } from "@cards/core/runner";
 import { beforeAll, beforeEach, afterAll, describe, it, expect } from "vitest";
 import { db, closeDb, publish, transaction, type CardRow } from "@cards/db";
@@ -182,5 +184,26 @@ describe.skipIf(!enabled)(
       await rebuildCache();
       expect(await readCache("cards")).toBeTruthy();
     });
+    it("approves from the CLI without an extra required reviewer flag", async () => {
+      await run();
+      await run(2);
+      const [review] = await listReviews();
+      const result = await promisify(execFile)(
+        process.execPath,
+        ["--import", "tsx", "apps/worker/src/cli.ts", "approve", review.id],
+        {
+          cwd: process.cwd(),
+          env: { ...process.env, DATABASE_URL: process.env.TEST_DATABASE_URL },
+          encoding: "utf8",
+        },
+      );
+      expect(JSON.parse(result.stdout)).toMatchObject({
+        cardId: "example", version: 2, cacheUpdated: true,
+      });
+      expect((await read()).products?.[0].tiers?.[0].fees?.[0]).toMatchObject({
+        ratePercent: 2,
+      });
+    });
+
   },
 );

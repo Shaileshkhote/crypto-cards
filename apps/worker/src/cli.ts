@@ -1,3 +1,4 @@
+import { userInfo } from "node:os";
 import { executeJob } from "@cards/core/runner";
 import { db, closeDb, type JobRow } from "@cards/db";
 import { loadAdapters } from "@cards/core/adapters";
@@ -10,8 +11,8 @@ const usage = `Usage:
  pnpm cards sync <provider> [--force] | sync --all [--force]
  pnpm cards status
  pnpm cards review [provider]
- pnpm cards approve <review-id> --reviewer <name>
- pnpm cards reject <review-id> --reviewer <name>
+ pnpm cards approve <review-id> [--reviewer <name>]
+ pnpm cards reject <review-id> [--reviewer <name>]
  pnpm cards cache
  pnpm db:migrate
 `;
@@ -44,9 +45,9 @@ export async function main(args = process.argv.slice(2)) {
   }
   if (command === "approve" || command === "reject") {
     const i = args.indexOf("--reviewer");
-    const reviewer = i >= 0 ? args[i + 1] : undefined;
+    const reviewer = i >= 0 ? args[i + 1] : userInfo().username;
     if (!arg || !reviewer)
-      throw new Error("Review ID and --reviewer <name> required");
+      throw new Error("Review ID required; --reviewer must have a name when supplied");
     const r = await (command === "approve" ? approveReview : rejectReview)(
       arg,
       reviewer,
