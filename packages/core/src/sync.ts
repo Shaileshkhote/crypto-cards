@@ -195,7 +195,10 @@ export async function syncAdapter(
       }
       const built = candidate(adapter, extractions, accepted, snapshots);
       const unconfirmed = accepted
-        ? markUnconfirmed(accepted, pending, extractions, built.data)
+        ? markUnconfirmed(accepted, [
+            ...pending,
+            ...prior.filter(source => !inventory.includes(source.url) && source.snapshot).map(source => source.snapshot!),
+          ], extractions, built.data)
         : undefined;
       const merged = merge(unconfirmed, built.data);
       if (accepted && unconfirmed)

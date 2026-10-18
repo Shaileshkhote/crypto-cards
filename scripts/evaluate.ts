@@ -3,7 +3,7 @@ import { loadAdapters } from "@cards/core/adapters";
 import { Budget, extract, extractionSettings } from "@cards/core/agent";
 import { documentFromText } from "@cards/core/crawler";
 
-interface Claim { field: string; value?: unknown; rule?: unknown }
+interface Claim { field: string; productId?: string; tierId?: string; value?: unknown; rule?: unknown }
 interface Golden {
   id: string; provider: string; url: string; text: string; preserveLayout?: boolean;
   expected: Claim[]; forbidden: Claim[];
@@ -28,6 +28,8 @@ async function run() {
       const { extraction } = await extract(adapter, [doc], budget);
       const matches = (claim: Claim) => extraction.facts.some(f =>
         f.field === claim.field &&
+        (claim.productId === undefined || f.productId === claim.productId) &&
+        (claim.tierId === undefined || f.tierId === claim.tierId) &&
         (claim.value === undefined || contains(f.value, claim.value)) &&
         (claim.rule === undefined || (Array.isArray(f.value) && f.value.some(r => contains(r, claim.rule)))),
       );
@@ -42,7 +44,7 @@ async function run() {
   }
   await mkdir(".local", { recursive: true });
   const report = { settings: extractionSettings(), results, costUsd: budget.spent };
-  await writeFile(".local/evaluation.json", JSON.stringify(report,null,2), { mode: 0o600 });
+  await writeFile(process.env.EVALUATION_REPORT || ".local/evaluation.json", JSON.stringify(report,null,2), { mode: 0o600 });
   console.log(`${results.filter(r => r.passed).length}/${results.length} real-source cases passed; $${budget.spent.toFixed(6)}`);
   if (results.some(r => !r.passed)) process.exitCode = 1;
 }

@@ -141,7 +141,7 @@ describe.skipIf(!enabled)(
           })
         ).status,
       ).toBe("failed");
-      for (const mode of ["evidence", "incomplete", "budget"]) {
+      for (const mode of ["evidence", "incomplete", "scope", "budget"]) {
         const r = await run(2, async (_a, docs, b) => {
           if (mode === "budget") {
             b.reserve(6);
@@ -149,6 +149,7 @@ describe.skipIf(!enabled)(
           }
           const e = extraction(docs[0], 2);
           if (mode === "evidence") e.facts[0].evidence.quote = "fabricated";
+          else if (mode === "scope") (e.facts[0].value as { scope: { tierIds?: string[] } }[])[0].scope.tierIds = ["luxe"];
           else e.complete = false;
           return { extraction: e, documents: docs, issues: [] };
         });
@@ -157,6 +158,23 @@ describe.skipIf(!enabled)(
           before?.payload,
         );
       }
+    });
+    it("retains values and source history when an adapter replaces a source URL", async () => {
+      await run();
+      const a = adapter();
+      a.sources.urls = ["https://example.com/replacement"];
+      const doc = { ...document(), url: a.sources.urls[0] };
+      const result = await syncAdapter(a, new Budget(), {
+        fetch: async () => doc,
+        extract: async () => ({ extraction: { complete: true, products: [], tiers: [], facts: [] }, documents: [doc], issues: [] }),
+      });
+      expect(result.status).toBe("review");
+      const tier = (await read()).products![0].tiers![0];
+      expect(tier.fees![0]).toMatchObject({ ratePercent: 1.5, status: "unconfirmed" });
+      expect(tier.unconfirmedFields).toContain("fees");
+      const sources = (await db().query("SELECT url,snapshot FROM card_sources WHERE card_id='example'")).rows;
+      expect(sources).toHaveLength(2);
+      expect(sources.find(source => source.url === "https://example.com/fees")?.snapshot).toBeTruthy();
     });
     it("static-only changes require no model request and sensitive changes remain pending", async () => {
       await run();

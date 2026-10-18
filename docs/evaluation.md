@@ -10,7 +10,7 @@ Run the inexpensive live evaluation with a securely injected key:
 pnpm evaluate
 ```
 
-Its default shared cap is $0.40; `MAX_RUN_COST_USD` can lower or override it, up to the core $5 maximum. Reports containing extracted public passages go to ignored `.local/evaluation.json`. Unit tests use simulated model responses and require no key.
+Its default shared cap is $0.40; `MAX_RUN_COST_USD` can lower or override it, up to the core $4.99 maximum. Reports containing extracted public passages go to ignored `.local/evaluation.json`. Unit tests use simulated model responses and require no key.
 
 For a complete source-to-database check, use a dedicated benchmark database, functioning DNS and access to the provider's public documentation:
 

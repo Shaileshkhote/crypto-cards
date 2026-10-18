@@ -4,7 +4,7 @@ Production acceptance remains open. The implementation and fixes are in draft PR
 
 ## Current checks
 
-- Node 24 / pnpm 11.25.0 frozen dependency installation and adapter validation pass: 36 providers, 436 configured URLs, three data-only adapter files per provider.
+- Node 24 / pnpm 11.25.0 frozen dependency installation and adapter validation pass: 36 providers, 433 configured URLs, three data-only adapter files per provider.
 - TypeScript, ESLint and all 66 automated tests pass with a dedicated PostgreSQL database. Coverage includes immutable review proposals, stale approval, failure preservation, exact evidence, deterministic publication, scoped sorting, service-specific fees, money versus count limits, PDF extraction and robots response handling.
 - The Next.js production build passes. GitHub CI runs the same checks and the full Compose smoke test, including database migrations, authenticated HTTP, cache jobs, restart persistence and dump/restore. See the PR checks for the current commit's result.
 - Model selection passed 8/8 labeled real-source cases. This is a small regression corpus, not a complete accuracy measurement. See [evaluation](evaluation.md).

@@ -22,7 +22,7 @@ The current cache rebuild scans all published providers; for a directory of roug
 
 A single worker claims jobs with `FOR UPDATE SKIP LOCKED`. PostgreSQL advisory locks serialize active jobs and per-provider syncs, including direct CLI invocations. The worker writes health heartbeats during long work. Interrupted jobs become failed after ten minutes and require an explicit retry; they are not silently recharged.
 
-Each sync invocation owns one Budget capped at $5 (or a smaller configured limit). The agent fetches current model prices, reserves a conservative byte-based input and maximum-output cost before each request, and settles returned usage/cost. Requests with missing usage or uncertain network outcomes consume their reservation conservatively. No automatic retries or provider fallback chain is used. A provider billing discrepancy stops the run; application estimates do not establish an absolute provider-side billing cap. Configure OpenRouter account/key spend limits too.
+Each sync invocation owns one shared Budget: $4.50 by default, with a hard ceiling of $4.99 even when a larger override is supplied. The agent fetches current model prices, reserves a conservative byte-based input and maximum-output cost before each request, and settles returned usage/cost. Requests with missing usage or uncertain network outcomes consume their reservation conservatively. No automatic retries or provider fallback chain is used. A provider billing discrepancy stops the run; application estimates do not establish an absolute provider-side billing cap. Configure OpenRouter account/key spend limits too.
 
 ## Operational boundaries
 

@@ -5,7 +5,6 @@ export default {
     "https://help.wirexapp.com/article/benefits-of-the-wirex-card-explained-1301",
     "https://help.wirexapp.com/article/how-to-add-your-wirex-card-to-apple-pay-eea-uk-1663",
     "https://help.wirexapp.com/article/how-to-add-your-wirex-card-to-google-pay-australia-1474",
-    "https://help.wirexapp.com/article/supported-countries-1189",
     "https://help.wirexapp.com/article/uk-cryptoback-reward-limits-for-the-metal-cards-users-1494",
     "https://help.wirexapp.com/article/wirex-metal-card-faq-1490",
     "https://help.wirexapp.com/article/wirex-metal-card-premium-features-and-exclusive-benefits-1488",
@@ -15,7 +14,7 @@ export default {
     "https://wirexone.freshdesk.com/support/solutions/articles/76000088362-wirex-one-membership-how-it-works",
     "https://wirexone.freshdesk.com/support/solutions/articles/76000088364-membership-levels-benefits",
     "https://wirexone.freshdesk.com/support/solutions/articles/76000088366-how-cashback-works",
-    "https://wirexone.freshdesk.com/support/solutions/articles/76000088412-your-wirex-one-card",
+    "https://wirexone.freshdesk.com/support/solutions/articles/76000088412-wirex-one-card-supported-countries",
     "https://wirexone.freshdesk.com/support/solutions/articles/76000088413-card-limits-and-fees",
   ],
   allowedDomains: ["help.wirexapp.com", "wirexone.freshdesk.com"],
@@ -39,12 +38,6 @@ export default {
       kind: "help-article",
       scope: ["australia", "united_kingdom", "eea"],
       topics: ["integrations", "card_type"],
-    },
-    {
-      url: "https://help.wirexapp.com/article/supported-countries-1189",
-      productIds: ["wirex-one"],
-      kind: "availability",
-      topics: ["countries", "card_type", "product_status"],
     },
     {
       url: "https://help.wirexapp.com/article/uk-cryptoback-reward-limits-for-the-metal-cards-users-1494",
@@ -105,7 +98,7 @@ export default {
       topics: ["rewards", "requirements"],
     },
     {
-      url: "https://wirexone.freshdesk.com/support/solutions/articles/76000088412-your-wirex-one-card",
+      url: "https://wirexone.freshdesk.com/support/solutions/articles/76000088412-wirex-one-card-supported-countries",
       productIds: ["wirex-one"],
       kind: "availability",
       topics: [

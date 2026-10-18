@@ -19,7 +19,9 @@
             ],
             "cardOrder": "first"
           }
-        }
+        },
+        "productId": "avici",
+        "tierId": "avici--global--platinum"
       },
       {
         "field": "fees",
@@ -34,7 +36,9 @@
             ],
             "cardOrder": "additional"
           }
-        }
+        },
+        "productId": "avici",
+        "tierId": "avici--global--platinum"
       },
       {
         "field": "fees",
@@ -48,7 +52,9 @@
               "physical"
             ]
           }
-        }
+        },
+        "productId": "avici",
+        "tierId": "avici--global--platinum"
       }
     ],
     "forbidden": []
@@ -256,5 +262,48 @@
       }
     ],
     "preserveLayout": true
+  },
+  {
+    "id": "mexc-money-and-count-limits",
+    "provider": "mexc",
+    "url": "https://www.mexc.com/learn/article/mexc-card-fees-and-limits-global-card-and-mexc-card-apac-compared/1",
+    "verifiedAt": "2026-10-19",
+    "text": "Per transaction — 80,000 USD on the Global Card, 50,000 USD on the MEXC Card (APAC).\nPer day — 1,000,000 USD on the Global Card, 50,000 USD on the MEXC Card (APAC).\nThe APAC card also caps transaction count at 1,040 per year, which works out to about twenty purchases a week.",
+    "expected": [
+      {
+        "field": "limits",
+        "productId": "mexc-global",
+        "rule": {
+          "kind": "spending",
+          "amount": {
+            "amount": "80000",
+            "currency": "USD"
+          },
+          "period": "transaction"
+        }
+      },
+      {
+        "field": "limits",
+        "productId": "mexc-global",
+        "rule": {
+          "kind": "spending",
+          "amount": {
+            "amount": "1000000",
+            "currency": "USD"
+          },
+          "period": "day"
+        }
+      },
+      {
+        "field": "limits",
+        "productId": "mexc-apac",
+        "rule": {
+          "kind": "transaction_count",
+          "count": 1040,
+          "period": "year"
+        }
+      }
+    ],
+    "forbidden": []
   }
 ]

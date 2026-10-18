@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   candidate,
+  markUnconfirmed,
   merge,
   applyChanges,
   publicationHash,
@@ -8,7 +9,42 @@ import {
 import { canonical } from "@cards/core/serialize";
 import { adapter, document, extraction } from "./helpers";
 import { Card } from "@cards/core/schema";
+import { documentFromText } from "@cards/core/crawler";
 describe("deterministic merge and protection", () => {
+  it("keeps separately cited narrative clauses and detects a missing contributing source", () => {
+    const a = adapter(), first = document(), second = documentFromText("https://example.com/eligibility", "Applicants must be adults.");
+    const evidence = (doc: typeof first) => ({ url: doc.url, blockId: doc.blocks[0].id, quote: doc.blocks[0].text });
+    const e = extraction(first);
+    e.facts = [first, second].map((doc, i) => ({ field: "requirements", inherit: false, productId: "card", tierId: null, value: [i ? "Must be an adult" : "Verification required"], evidence: evidence(doc) }));
+    const out = candidate(a, [e], undefined, [first, second]).data;
+    expect(out.products![0].requirements).toEqual(["Must be an adult", "Verification required"]);
+    expect(out.products![0].fieldSources!.requirements).toEqual([evidence(second), evidence(first)]);
+    const regrouped = e.facts.map(f => ({ ...e, facts: [f] })).reverse();
+    expect(canonical(candidate(a, regrouped, undefined, [first, second]).data)).toBe(canonical(out));
+    const partial = { ...e, facts: e.facts.slice(0, 1) };
+    expect(markUnconfirmed(out, [first, second], [partial]).products![0].unconfirmedFields).toContain("requirements");
+  });
+  it("preserves cash and points rewards independently while rejecting conflicting rates in one asset", () => {
+    const a = adapter(), doc = document(), e = extraction(doc);
+    const reward = { id: "reward", scope: {}, ratePercent: 2, rewardAsset: "USD", calculable: true };
+    e.facts[0] = { ...e.facts[0], field: "rewards", value: [reward, { ...reward, rewardAsset: "Points" }] };
+    const out = candidate(a, [e], undefined, [doc]).data;
+    expect(out.products![0].tiers![0].rewards).toHaveLength(2);
+    e.facts[0].value = [reward, { ...reward, ratePercent: 3 }];
+    expect(() => candidate(a, [e], undefined, [doc])).toThrow("Ambiguous rewards");
+  });
+  it("rejects rules scoped to a different tier than their fact target", () => {
+    const a = adapter(), doc = document(), e = extraction(doc);
+    const rule = (e.facts[0].value as { scope: { tierIds?: string[] } }[])[0];
+    rule.scope.tierIds = ["luxe"];
+    expect(() => candidate(a, [e], undefined, [doc])).toThrow("Rule tier scope differs");
+    rule.scope.tierIds = ["missing-tier"];
+    expect(() => candidate(a, [e], undefined, [doc])).toThrow("Unknown tier");
+    a.config.aliases["legacy-core"] = "core";
+    rule.scope.tierIds = ["legacy-core"];
+    const out = candidate(a, [e], undefined, [doc]).data;
+    expect(out.products![0].tiers![0].fees![0].scope.tierIds).toEqual(["core"]);
+  });
   it("keeps lifecycle and retirement metadata owned by adapter configuration", () => {
     const a = adapter(), doc = document(), e = extraction(doc);
     a.config.products[0].lifecycle = "retired";

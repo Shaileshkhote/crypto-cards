@@ -17,8 +17,6 @@ export default {
     "https://help.tria.so/en/articles/14056678-how-to-get-a-tria-card",
     "https://help.tria.so/en/articles/14780504-atm-withdrawals",
     "https://help.tria.so/en/articles/15494728-welcome-to-tria-season-3-points-mystery-boxes",
-    "https://www.tria.so/",
-    "https://www.tria.so/en/blogs/season-3-referral-tiers",
   ],
   allowedDomains: [
     "app.tria.so",
@@ -139,18 +137,6 @@ export default {
       url: "https://help.tria.so/en/articles/15494728-welcome-to-tria-season-3-points-mystery-boxes",
       productIds: ["tria"],
       kind: "help-article",
-      topics: ["rewards"],
-    },
-    {
-      url: "https://www.tria.so/",
-      productIds: ["tria"],
-      kind: "product-page",
-      topics: ["integrations"],
-    },
-    {
-      url: "https://www.tria.so/en/blogs/season-3-referral-tiers",
-      productIds: ["tria"],
-      kind: "product-page",
       topics: ["rewards"],
     },
   ],

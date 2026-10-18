@@ -8,7 +8,7 @@ import {
 } from "./schema";
 import { canonical, hash, slug } from "./serialize";
 import { verifyEvidence } from "./evidence";
-export const MERGE_VERSION = "2";
+export const MERGE_VERSION = "3";
 type ObjectValue = Record<string, unknown>;
 const isObject = (v: unknown): v is ObjectValue =>
   !!v && typeof v === "object" && !Array.isArray(v);
@@ -187,6 +187,7 @@ function rules(
     const id = `${field.slice(0, -1)}-${hash({
       target,
       kind: obj.kind || "cashback",
+      rewardAsset: field === "rewards" ? obj.rewardAsset : undefined,
       period: field === "limits" ? obj.period : undefined,
       scope: ordered(obj.scope || {}),
     }).slice(0, 20)}`;
@@ -344,11 +345,29 @@ export function candidate(
       const target = [adapter.config.id, productId, tierId]
         .filter(Boolean)
         .join("/");
-      const value = rules(fact.value, fact.field, target, fact.evidence);
+      const scoped = Array.isArray(fact.value) && ["fees", "rewards", "limits"].includes(fact.field)
+        ? fact.value.map((item) => {
+            const rule = item as ObjectValue, scope = rule.scope as ObjectValue;
+            if (!Array.isArray(scope.tierIds)) return rule;
+            const ids = [...new Set(scope.tierIds.map(id => tierMap.get(String(id)) || adapter.config.aliases[String(id)] || String(id)))].sort();
+            const products = p ? [p] : (data.products || []) as ObjectValue[];
+            const allowed = new Set(products.flatMap(product => ((product.tiers || []) as ObjectValue[]).map(t => t.id)));
+            if (ids.some(id => !allowed.has(id)))
+              throw new Error(`Unknown tier in ${target}/${fact.field} rule scope; use the configured tier IDs`);
+            if (tierId && (ids.length !== 1 || ids[0] !== tierId))
+              throw new Error(`Rule tier scope differs from fact target ${target}; emit each tier's rules on its own target`);
+            return { ...rule, scope: { ...scope, tierIds: ids } };
+          })
+        : fact.value;
+      const value = rules(scoped, fact.field, target, fact.evidence);
       const factKey = `${target}/${fact.field}`;
       const earlier = factsSeen.get(factKey);
+      // Narrative clauses from separate cited blocks are additive. Financial
+      // rules and eligibility lists still require compatible values/scopes.
+      const narrative = ["terms", "requirements"].includes(fact.field) && Array.isArray(value);
       if (
         earlier !== undefined &&
+        !narrative &&
         !compatible(
           earlier,
           value,
@@ -358,10 +377,17 @@ export function candidate(
         throw new Error(
           `Conflicting extracted facts: ${factKey}; published values retained`,
         );
-      factsSeen.set(factKey, overlay(earlier, value));
+      const combinedValue = narrative && Array.isArray(earlier)
+        ? ordered([...earlier, ...value as unknown[]])
+        : overlay(earlier, value);
+      factsSeen.set(factKey, combinedValue);
       const currentTarget = tierId
         ? (p?.tiers as ObjectValue[]).find((t) => t.id === tierId)
         : p || data;
+      const priorOrigin = (currentTarget?.fieldSources as ObjectValue | undefined)?.[fact.field];
+      const origin = narrative && priorOrigin
+        ? [...new Map([...(Array.isArray(priorOrigin) ? priorOrigin : [priorOrigin]), fact.evidence].map(e => [canonical(e), e])).values()]
+        : fact.evidence;
       const fields = {
         ...(fact.inherit
           ? {
@@ -373,8 +399,8 @@ export function candidate(
               ],
             }
           : {}),
-        [fact.field]: value,
-        fieldSources: { [fact.field]: fact.evidence },
+        [fact.field]: combinedValue,
+        fieldSources: { [fact.field]: origin },
       };
       const patch = productId
         ? {
@@ -485,12 +511,11 @@ export function markUnconfirmed(
     for (const [field, origin] of Object.entries(
       (v.fieldSources || {}) as ObjectValue,
     ))
-      if (
-        isObject(origin) &&
-        typeof origin.url === "string" &&
-        changed.has(origin.url)
-      ) {
-        if (!seen.has(`${product}/${tier}/${field}/${origin.url}`))
+      {
+        const origins = (Array.isArray(origin) ? origin : [origin]).filter(isObject);
+        const affected = origins.filter(o => typeof o.url === "string" && changed.has(o.url));
+        if (!affected.length) continue;
+        if (affected.some(o => !seen.has(`${product}/${tier}/${field}/${o.url}`)))
           unconfirmed.add(field);
         else unconfirmed.delete(field);
       }

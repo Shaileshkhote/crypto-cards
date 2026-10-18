@@ -7,15 +7,17 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 it("shares a conservative request budget across adapters", () => {
-  const b = new Budget(5);
+  const b = new Budget(4.99);
   b.reserve(3);
   expect(() => b.reserve(3)).toThrow("Budget exhausted");
   b.settle(3, 2, 100, 20);
-  b.reserve(3);
-  b.settle(3, 2);
+  b.reserve(2.99);
+  b.settle(2.99, 2);
   expect(b.spent).toBe(4);
   expect(() => b.reserve(2)).toThrow();
-  expect(new Budget(100).max).toBe(5);
+  expect(new Budget(25).max).toBe(4.99);
+  expect(() => new Budget(-1)).toThrow("Invalid MAX_RUN_COST_USD");
+  expect(() => new Budget(Number.NaN)).toThrow("Invalid MAX_RUN_COST_USD");
 });
 it("runs one three-tool loop and validates its final evidence", async () => {
   vi.stubEnv("OPENROUTER_API_KEY", "fixture-not-a-real-key");
@@ -118,6 +120,20 @@ it("does not send a paid request without a key", async () => {
   await expect(extract(adapter(), [document()], new Budget())).rejects.toThrow(
     "OPENROUTER_API_KEY",
   );
+});
+it("can finish a provider after reading multiple substantial pages", async () => {
+  vi.stubEnv("OPENROUTER_API_KEY", "fixture-not-a-real-key");
+  const docs = Array.from({ length: 12 }, (_, i) => documentFromText(`https://example.com/page-${i}`, Array.from({ length: 35 }, (_, j) => `Clause ${j}: ${"Eligible card purchases and exclusions. ".repeat(15)}`).join("\n")));
+  let calls = 0;
+  vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+    if (url.endsWith("/models")) return Response.json({ data: [{ id: modelName(), pricing: { prompt: "0.0000004", completion: "0.0000016" }, supported_parameters: ["tools", "structured_outputs"] }] });
+    if (++calls === 2) expect(Buffer.byteLength(String(init?.body))).toBeGreaterThan(256_000);
+    return Response.json({ usage: { cost: 0.001 }, choices: [{ finish_reason: calls === 1 ? "tool_calls" : "stop", message: calls === 1
+      ? { content: null, tool_calls: docs.map((d, i) => ({ id: `read-${i}`, function: { name: "readPage", arguments: JSON.stringify({ url: d.url, offset: 0 }) } })) }
+      : { content: JSON.stringify({ complete: true, products: [], tiers: [], facts: [] }) } }] });
+  }));
+  await expect(extract(adapter(), docs, new Budget())).resolves.toMatchObject({ extraction: { complete: true } });
+  expect(calls).toBe(2);
 });
 it("searches later sources even when a long first page contains many matches", async () => {
   vi.stubEnv("OPENROUTER_API_KEY", "fixture-not-a-real-key");

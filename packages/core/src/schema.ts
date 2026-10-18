@@ -2,7 +2,7 @@ import { z } from "zod";
 import countries from "i18n-iso-countries";
 import { compareDecimals } from "./serialize";
 
-export const SCHEMA_VERSION = "3";
+export const SCHEMA_VERSION = "4";
 export const Id = z
   .string()
   .regex(/^[a-z0-9][a-z0-9-]*$/)
@@ -266,7 +266,7 @@ const Metadata = {
       ),
     )
     .optional(),
-  fieldSources: z.record(Origin).optional(),
+  fieldSources: z.record(z.union([Origin, z.array(Origin).min(1)])).optional(),
   unconfirmedFields: z.array(z.string()).optional(),
 };
 const Identity = {
