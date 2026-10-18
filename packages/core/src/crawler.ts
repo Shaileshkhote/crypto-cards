@@ -87,6 +87,19 @@ async function http(
   }
   throw new Error("Too many redirects");
 }
+function tableBlocks(rows: string[]) {
+  const chunks: string[] = [];
+  let chunk = rows.slice(0, 1);
+  for (const row of rows.slice(1)) {
+    if ([...chunk, row].join(" ; ").length > 1400 && chunk.length > 1) {
+      chunks.push(chunk.join(" ; "));
+      chunk = rows.slice(0, 1);
+    }
+    chunk.push(row);
+  }
+  if (chunk.length) chunks.push(chunk.join(" ; "));
+  return chunks;
+}
 export function documentFromText(
   url: string,
   text: string,
@@ -95,9 +108,16 @@ export function documentFromText(
   preserveLayout = false,
 ): Document {
   const content = normalize(text, preserveLayout);
-  const lines = content
-    .split("\n")
-    .flatMap((line) => {
+  const originalLines = content.split("\n"), tableLines: string[] = [];
+  for (let i = 0; i < originalLines.length; i++) {
+    if (!preserveLayout && originalLines[i].includes("|") && /^\s*\|?\s*:?-{3,}:?\s*(?:\|\s*:?-{3,}:?\s*)+\|?\s*$/.test(originalLines[i + 1] || "")) {
+      const rows = [originalLines[i]];
+      i++;
+      while (originalLines[i + 1]?.includes("|")) rows.push(originalLines[++i]);
+      tableLines.push(...tableBlocks(rows));
+    } else tableLines.push(originalLines[i]);
+  }
+  const lines = tableLines.flatMap((line) => {
       const parts: string[] = [];
       while (line.length > 1600) {
         const space = line.lastIndexOf(" ", 1600);
@@ -155,17 +175,7 @@ export function parseHtml(url: string, html: string): Document {
       .get();
     // Keep table headers with their rows in bounded, citable blocks. Splitting
     // every cell row from its header lost plan/currency/period context.
-    const chunks: string[] = [];
-    let chunk = rows.slice(0, 1);
-    for (const row of rows.slice(1)) {
-      if ([...chunk, row].join(" ; ").length > 1400 && chunk.length > 1) {
-        chunks.push(chunk.join(" ; "));
-        chunk = rows.slice(0, 1);
-      }
-      chunk.push(row);
-    }
-    if (chunk.length) chunks.push(chunk.join(" ; "));
-    $(table).replaceWith(`\n${chunks.join("\n")}\n`);
+    $(table).replaceWith(`\n${tableBlocks(rows).join("\n")}\n`);
   });
   $("h1,h2,h3,h4,p,li,div,section,header,footer,br").each((_, el) => {
     $(el).prepend("\n");

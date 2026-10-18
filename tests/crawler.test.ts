@@ -49,6 +49,17 @@ it("checks quote, URL and block together", () => {
     ),
   ).toBe(false);
 });
+it("keeps Markdown plan headers with every fee row, including later bounded chunks", () => {
+  const header = "| Fee | Platinum | Signature |";
+  const rows = Array.from({ length: 70 }, (_, i) => `| ATM service ${i} | $1 + 0.65% | $0 |`);
+  const doc = documentFromText("https://example.com/fees", [header, "| --- | --- | --- |", ...rows, "Conditions apply."].join("\n"));
+  const tables = doc.blocks.filter(block => block.text.includes("ATM service"));
+  expect(tables.length).toBeGreaterThan(1);
+  expect(tables.every(block => block.text.startsWith(header) && block.text.length <= 1600)).toBe(true);
+  for (const row of rows) expect(tables.some(block => block.text.includes(row))).toBe(true);
+  expect(doc.content).toContain("| --- | --- | --- |");
+  expect(doc.blocks.at(-1)?.text).toBe("Conditions apply.");
+});
 it("preserves PDF column alignment for wrapped table headers", () => {
   const text = "                  Premium    Metal\nMonthly fee       $9.99      $16.99";
   const doc = documentFromText("https://example.com/fees.pdf", text, "Fees", [], true);
