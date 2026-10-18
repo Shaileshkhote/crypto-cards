@@ -13,6 +13,7 @@ it("preserves table headings, rows, caveats and effective dates while removing n
   );
   expect(doc.content).toContain("Tier | FX");
   expect(doc.content).toContain("Core | 1.5%");
+  expect(doc.blocks.some(b => b.text.includes("Tier | FX") && b.text.includes("Core | 1.5%"))).toBe(true);
   expect(doc.content).toContain("2026-09-01");
   expect(doc.content).not.toContain("Ignore");
   expect(doc.hash).toBe(
@@ -21,6 +22,13 @@ it("preserves table headings, rows, caveats and effective dates while removing n
       "<title>Fees</title><nav>Changed navigation</nav><h1>Effective 2026-09-01</h1><table><tr><th>Tier</th><th>FX</th></tr><tr><td>Core</td><td>1.5%</td></tr></table><p>Excludes cash withdrawals.</p>",
     ).hash,
   );
+});
+it("repeats table headers across bounded blocks without losing rows", () => {
+  const rows = Array.from({ length: 80 }, (_, i) => `<tr><td>Country ${i}</td><td>Available</td></tr>`).join("");
+  const doc = parseHtml("https://example.com/countries", `<table><tr><th>Country</th><th>Eligibility</th></tr>${rows}</table>`);
+  expect(doc.blocks.length).toBeGreaterThan(1);
+  expect(doc.blocks.every(b => b.text.startsWith("Country | Eligibility") && b.text.length <= 1600)).toBe(true);
+  for (let i = 0; i < 80; i++) expect(doc.content).toContain(`Country ${i} | Available`);
 });
 it("checks quote, URL and block together", () => {
   const doc = documentFromText("https://example.com", "FX: 0%.");
@@ -46,6 +54,7 @@ it("preserves PDF column alignment for wrapped table headers", () => {
   const doc = documentFromText("https://example.com/fees.pdf", text, "Fees", [], true);
   expect(doc.content).toBe(text);
   expect(doc.blocks[0].text.indexOf("Premium")).toBe(18);
+  expect(doc.blocks[0].text).toContain("Monthly fee");
 });
 it("rejects untrusted redirects, credentials and private addresses", async () => {
   expect(() => trustedUrl("https://evil.example", ["example.com"])).toThrow();

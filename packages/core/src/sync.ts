@@ -13,6 +13,7 @@ import {
   fingerprint,
   modelName,
   Budget,
+  RunError,
   type Extractor,
 } from "./agent";
 import {
@@ -36,6 +37,7 @@ export interface SyncResult {
   inputTokens: number;
   outputTokens: number;
   error?: string;
+  haltRun?: boolean;
   issues?: string[];
 }
 interface Dependencies {
@@ -289,6 +291,7 @@ export async function syncAdapter(
     } catch (e) {
       result.status = "failed";
       result.error = e instanceof Error ? e.message : String(e);
+      if (e instanceof RunError) result.haltRun = true;
     }
     result.costUsd = budget.spent - start.cost;
     result.inputTokens = budget.inputTokens - start.input;

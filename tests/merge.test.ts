@@ -11,6 +11,65 @@ import { adapter, document, extraction } from "./helpers";
 import { Card } from "@cards/core/schema";
 import { documentFromText } from "@cards/core/crawler";
 describe("deterministic merge and protection", () => {
+  it("retains opaque source statements without choosing a price and still rejects conflicting numeric bounds", () => {
+    const a = adapter(), one = documentFromText("https://example.com/fees", "ATM fee: minimum $1 plus 0.65%."), two = documentFromText("https://example.com/help", "ATM fee: minimum $2 plus 1%.");
+    const first = extraction(one), second = extraction(two);
+    for (const [index, e] of [first, second].entries()) e.facts[0].value = [{ id: "atm", kind: "atm", calculation: "unknown", calculable: false, scope: {}, description: index ? two.content : one.content }];
+    const rule = candidate(a, [first, second], undefined, [one, two]).data.products![0].tiers![0].fees![0];
+    expect(rule).toMatchObject({ calculation: "unknown", calculable: false });
+    expect(rule.description).toContain(one.content);
+    expect(rule.description).toContain(two.content);
+    for (const [index, e] of [first, second].entries()) (e.facts[0].value as Record<string, unknown>[])[0].minFee = { amount: String(index + 1), currency: "USD" };
+    expect(() => candidate(a, [first, second], undefined, [one, two])).toThrow("Conflicting extracted facts");
+  });
+  it("deduplicates equal charges in one source block while preserving descriptions", () => {
+    const a = adapter(), doc = documentFromText("https://example.com/fees", "ATM withdrawals: $0; international ATM withdrawals: $0. Operator fees may apply."), e = extraction(doc);
+    const fee = { id: "atm", kind: "atm" as const, calculation: "fixed" as const, fixed: { amount: "0", currency: "USD" }, scope: {}, calculable: true as const };
+    e.facts[0].value = [{ ...fee, description: "ATM withdrawals; operator fees may apply." }, { ...fee, description: "International ATM withdrawals; operator fees may apply." }];
+    const fees = candidate(a, [e], undefined, [doc]).data.products![0].tiers![0].fees!;
+    expect(fees).toHaveLength(1);
+    expect(fees[0].description).toContain("International ATM");
+    expect(fees[0].description).toContain("ATM withdrawals; operator");
+  });
+  it("retains every source for equivalent charges across pages and marks missing evidence unconfirmed", () => {
+    const a = adapter(), one = documentFromText("https://example.com/fees", "ATM withdrawal fee: 1.5%."), two = documentFromText("https://example.com/help", "ATM withdrawals cost 1.50%.");
+    const first = extraction(one), second = extraction(two);
+    for (const [index, e] of [first, second].entries()) e.facts[0].value = [{ id: "atm", kind: "atm", calculation: "percentage", ratePercent: 1.5, scope: {}, description: index ? "ATM withdrawals." : "ATM withdrawal charge.", calculable: true }];
+    const out = candidate(a, [first, second], undefined, [one, two]).data;
+    const rule = out.products![0].tiers![0].fees![0];
+    expect(out.products![0].tiers![0].fees).toHaveLength(1);
+    expect(rule.source).toHaveLength(2);
+    expect(rule.description).toContain("ATM withdrawals.");
+    expect(rule.description).toContain("ATM withdrawal charge.");
+    expect(canonical(candidate(a, [second, first], undefined, [one, two]).data)).toBe(canonical(out));
+    const absent = { ...first, facts: [] };
+    expect(markUnconfirmed(out, [one, two], [absent], candidate(a, [absent], undefined, [one, two]).data).products![0].tiers![0].fees![0].status).toBe("unconfirmed");
+  });
+  it("assembles country rows from one source while rejecting different complete source lists", () => {
+    const a = adapter(), doc = documentFromText("https://example.com/countries", "Germany\nFrance"), e = extraction(doc);
+    e.facts = ["DE", "FR"].map((country, i) => ({ ...e.facts[0], field: "residentCountries", value: [country], evidence: { url: doc.url, blockId: doc.blocks[i].id, quote: doc.blocks[i].text } }));
+    const out = candidate(a, [e], undefined, [doc]).data;
+    expect(out.products![0].tiers![0].residentCountries).toEqual(["DE", "FR"]);
+    const empty = { ...e, facts: [...e.facts, { ...e.facts[0], value: [] }] };
+    expect(() => candidate(a, [empty], undefined, [doc])).toThrow("Explicit empty list conflicts");
+    const different = { ...doc, url: "https://example.com/other" };
+    e.facts.push({ ...e.facts[0], evidence: { ...e.facts[0].evidence, url: different.url } });
+    expect(() => candidate(a, [e], undefined, [doc, different])).toThrow("Conflicting extracted lists");
+  });
+  it("does not invent fixed-money currency for a zero percentage", () => {
+    const a = adapter(), doc = documentFromText("https://example.com/fees", "Top-up fee: 0%."), e = extraction(doc);
+    e.facts[0].value = [{ id: "topup", kind: "topup", scope: {}, calculation: "fixed", fixed: { amount: "0", currency: "USD" }, calculable: true }];
+    expect(() => candidate(a, [e], undefined, [doc])).toThrow("Money currency USD is absent");
+    e.facts[0].value = [{ id: "topup", kind: "topup", scope: {}, calculation: "percentage", ratePercent: 0, calculable: true }];
+    expect(candidate(a, [e], undefined, [doc]).data.products![0].tiers![0].fees![0]).toMatchObject({ ratePercent: 0 });
+  });
+  it("rejects a real citation to the wrong financial row and accepts explicit scaled amounts", () => {
+    const a = adapter(), doc = documentFromText("https://example.com/limits", "Per purchase: 1.5k USD.\nAnnual transaction count: 1,040."), e = extraction(doc);
+    e.facts[0] = { ...e.facts[0], field: "limits", value: [{ id: "count", kind: "transaction_count", count: 1040, period: "year", scope: {}, calculable: true }] };
+    expect(() => candidate(a, [e], undefined, [doc])).toThrow("1040 is absent");
+    e.facts[0].value = [{ id: "spend", kind: "spending", amount: { amount: "1500", currency: "USD" }, period: "transaction", scope: {}, calculable: true }];
+    expect(candidate(a, [e], undefined, [doc]).data.products![0].tiers![0].limits![0]).toMatchObject({ amount: { amount: "1500" } });
+  });
   it("keeps separately cited narrative clauses and detects a missing contributing source", () => {
     const a = adapter(), first = document(), second = documentFromText("https://example.com/eligibility", "Applicants must be adults.");
     const evidence = (doc: typeof first) => ({ url: doc.url, blockId: doc.blocks[0].id, quote: doc.blocks[0].text });
@@ -25,11 +84,19 @@ describe("deterministic merge and protection", () => {
     expect(markUnconfirmed(out, [first, second], [partial]).products![0].unconfirmedFields).toContain("requirements");
   });
   it("preserves cash and points rewards independently while rejecting conflicting rates in one asset", () => {
-    const a = adapter(), doc = document(), e = extraction(doc);
+    const a = adapter(), doc = documentFromText("https://example.com/rewards", "Rewards: 2% USD and 2% Points; another advertised USD rate is 3%."), e = extraction(doc);
     const reward = { id: "reward", scope: {}, ratePercent: 2, rewardAsset: "USD", calculable: true };
     e.facts[0] = { ...e.facts[0], field: "rewards", value: [reward, { ...reward, rewardAsset: "Points" }] };
     const out = candidate(a, [e], undefined, [doc]).data;
     expect(out.products![0].tiers![0].rewards).toHaveLength(2);
+    e.facts[0].value = [reward, { ...reward, ratePercent: 3 }];
+    expect(() => candidate(a, [e], undefined, [doc])).toThrow("Ambiguous rewards");
+  });
+  it("keeps conditional reward rates separate and rejects different rates for the same conditions", () => {
+    const a = adapter(), doc = documentFromText("https://example.com/rewards", "Rewards: 2% with 100 USD staked; 3% with 500 USD staked."), e = extraction(doc);
+    const reward = { id: "reward", scope: {}, ratePercent: 2, rewardAsset: "USD", requirements: ["Stake 100 USD"], calculable: true };
+    e.facts[0] = { ...e.facts[0], field: "rewards", value: [reward, { ...reward, ratePercent: 3, requirements: ["Stake 500 USD"] }] };
+    expect(candidate(a, [e], undefined, [doc]).data.products![0].tiers![0].rewards).toHaveLength(2);
     e.facts[0].value = [reward, { ...reward, ratePercent: 3 }];
     expect(() => candidate(a, [e], undefined, [doc])).toThrow("Ambiguous rewards");
   });
@@ -199,7 +266,7 @@ it("refuses conflicting interpretations from two valid source quotes", () => {
 });
 it("gives daily and monthly limits separate identities without value-based IDs", () => {
   const a = adapter(),
-    doc = document(),
+    doc = documentFromText("https://example.com/limits", "Spending limits: 100 USD daily; 1,000 USD monthly."),
     e = extraction(doc);
   e.facts[0].field = "limits";
   e.facts[0].value = [
@@ -226,7 +293,7 @@ it("gives daily and monthly limits separate identities without value-based IDs",
   ).toBe(2);
 });
 it("keeps actual card services as separate charges rather than generic transactions", () => {
-  const a = adapter(), doc = document(), e = extraction(doc);
+  const a = adapter(), doc = documentFromText("https://example.com/fees", "ATM, declines, balance inquiries, cross-border, late payments, returned payments and delivery each cost 0.60 USD."), e = extraction(doc);
   e.facts[0].value = (["atm", "atm_decline", "atm_balance_inquiry", "cross_border", "late_payment", "returned_payment", "delivery"] as const).map(kind => ({
     id: kind, kind,
     calculation: "fixed" as const, fixed: { amount: "0.6", currency: "USD" },
@@ -236,7 +303,7 @@ it("keeps actual card services as separate charges rather than generic transacti
   expect(new Set(fees.map(f => f.id)).size).toBe(7);
 });
 it("distinguishes per-purchase, daily-money and daily-count limits", () => {
-  const a = adapter(), doc = document(), e = extraction(doc);
+  const a = adapter(), doc = documentFromText("https://example.com/limits", "Spending: 80,000 USD per purchase; 1,000,000 USD daily; 50 transactions daily."), e = extraction(doc);
   e.facts[0].field = "limits";
   e.facts[0].value = [
     { id: "purchase", kind: "spending", amount: { amount: "80000", currency: "USD" }, period: "transaction", scope: {}, calculable: true },

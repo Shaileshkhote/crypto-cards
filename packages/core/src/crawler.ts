@@ -95,7 +95,7 @@ export function documentFromText(
   preserveLayout = false,
 ): Document {
   const content = normalize(text, preserveLayout);
-  const blocks = content
+  const lines = content
     .split("\n")
     .flatMap((line) => {
       const parts: string[] = [];
@@ -107,13 +107,20 @@ export function documentFromText(
       }
       if (line) parts.push(line);
       return parts;
-    })
-    .map((text) => ({ id: hash(text).slice(0, 24), text }));
+    });
+  const passages: string[] = [];
+  for (const line of lines) {
+    const last = passages.length - 1;
+    if (preserveLayout && last >= 0 && passages[last].length + line.length + 1 <= 1600)
+      passages[last] += `\n${line}`;
+    else passages.push(line);
+  }
+  const blocks = passages.map(text => ({ id: hash(text).slice(0, 24), text }));
   return {
     url,
     title,
     content,
-    hash: hash({ url, content }),
+    hash: hash({ url, content, blocks: blocks.map(block => block.id) }),
     blocks,
     links: [...new Set(links)].sort(),
     status: "ok",
@@ -146,7 +153,19 @@ export function parseHtml(url: string, html: string): Document {
           .join(" | "),
       )
       .get();
-    $(table).replaceWith(`\n${rows.join("\n")}\n`);
+    // Keep table headers with their rows in bounded, citable blocks. Splitting
+    // every cell row from its header lost plan/currency/period context.
+    const chunks: string[] = [];
+    let chunk = rows.slice(0, 1);
+    for (const row of rows.slice(1)) {
+      if ([...chunk, row].join(" ; ").length > 1400 && chunk.length > 1) {
+        chunks.push(chunk.join(" ; "));
+        chunk = rows.slice(0, 1);
+      }
+      chunk.push(row);
+    }
+    if (chunk.length) chunks.push(chunk.join(" ; "));
+    $(table).replaceWith(`\n${chunks.join("\n")}\n`);
   });
   $("h1,h2,h3,h4,p,li,div,section,header,footer,br").each((_, el) => {
     $(el).prepend("\n");

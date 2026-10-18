@@ -4,7 +4,7 @@
     "provider": "avici",
     "url": "https://docs.avici.money/getting-started/secured-credit-cards/fees-and-limits",
     "verifiedAt": "2026-10-18",
-    "text": "### Card Purchase Fees\n#### Virtual Cards–\n* Platinum– First card costs $15. Subsequent cards: $10 one-time fee, no recurring charges.\n#### Physical Cards–\n* Platinum– $50 basic card fee, one-time, no recurring charges",
+    "text": "### Card Purchase Fees\n#### Virtual Cards\u2013\n* Platinum\u2013 First card costs $15. Subsequent cards: $10 one-time fee, no recurring charges.\n#### Physical Cards\u2013\n* Platinum\u2013 $50 basic card fee, one-time, no recurring charges",
     "expected": [
       {
         "field": "fees",
@@ -198,7 +198,19 @@
         }
       }
     ],
-    "forbidden": []
+    "forbidden": [
+      {
+        "field": "fees",
+        "rule": {
+          "kind": "topup",
+          "calculation": "fixed",
+          "fixed": {
+            "amount": "0",
+            "currency": "USD"
+          }
+        }
+      }
+    ]
   },
   {
     "id": "etherfi-reward-asset",
@@ -222,7 +234,7 @@
     "provider": "revolut",
     "url": "https://assets.revolut.com/legal/terms/%5B2026.1%5D%20Revolut%20Consumer%20Prepaid%20Cardholder%20Agreement%20Effective%20April%2030%2C%202026.pdf",
     "verifiedAt": "2026-10-18",
-    "text": "      Revolut Prepaid Visa® and Revolut Prepaid Mastercard® Cardholder Agreement\n\n                                Revolut – Kids &                                                      Metal\n                                                       Standard Plan        Premium Plan\n                                     Teens                                                            Plan\n\n Plan Fee (paying monthly)             $0.00                $0.00                $9.99                $16.99",
+    "text": "      Revolut Prepaid Visa\u00ae and Revolut Prepaid Mastercard\u00ae Cardholder Agreement\n\nYou may only purchase and store in connection with the Program the limited currencies that are provided in the Revolut mobile application and the default currency is U.S. Dollars.\n\n                                Revolut \u2013 Kids &                                                      Metal\n                                                       Standard Plan        Premium Plan\n                                     Teens                                                            Plan\n\n Plan Fee (paying monthly)             $0.00                $0.00                $9.99                $16.99",
     "expected": [
       {
         "field": "fees",
@@ -232,7 +244,9 @@
             "amount": "9.99",
             "currency": "USD"
           }
-        }
+        },
+        "productId": "revolut",
+        "tierId": "revolut--united-states--premium"
       },
       {
         "field": "fees",
@@ -242,7 +256,9 @@
             "amount": "16.99",
             "currency": "USD"
           }
-        }
+        },
+        "productId": "revolut",
+        "tierId": "revolut--united-states--metal"
       }
     ],
     "forbidden": [
@@ -268,7 +284,7 @@
     "provider": "mexc",
     "url": "https://www.mexc.com/learn/article/mexc-card-fees-and-limits-global-card-and-mexc-card-apac-compared/1",
     "verifiedAt": "2026-10-19",
-    "text": "Per transaction — 80,000 USD on the Global Card, 50,000 USD on the MEXC Card (APAC).\nPer day — 1,000,000 USD on the Global Card, 50,000 USD on the MEXC Card (APAC).\nThe APAC card also caps transaction count at 1,040 per year, which works out to about twenty purchases a week.",
+    "text": "Per transaction \u2014 80,000 USD on the Global Card, 50,000 USD on the MEXC Card (APAC).\nPer day \u2014 1,000,000 USD on the Global Card, 50,000 USD on the MEXC Card (APAC).\nThe APAC card also caps transaction count at 1,040 per year, which works out to about twenty purchases a week.",
     "expected": [
       {
         "field": "limits",

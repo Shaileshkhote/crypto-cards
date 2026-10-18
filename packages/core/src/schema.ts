@@ -2,7 +2,7 @@ import { z } from "zod";
 import countries from "i18n-iso-countries";
 import { compareDecimals } from "./serialize";
 
-export const SCHEMA_VERSION = "4";
+export const SCHEMA_VERSION = "5";
 export const Id = z
   .string()
   .regex(/^[a-z0-9][a-z0-9-]*$/)
@@ -35,6 +35,7 @@ export const Origin = z.union([
     .object({ origin: z.literal("static"), note: z.string().optional() })
     .strict(),
 ]);
+export const Origins = z.union([Origin, z.array(Origin).min(1)]);
 export const Scope = z
   .object({
     residentCountries: z.array(Country).nullable().optional(),
@@ -56,7 +57,7 @@ const RuleBase = {
   id: Id,
   scope: Scope,
   description: z.string().optional(),
-  source: Origin.optional(),
+  source: Origins.optional(),
   status: z.enum(["verified", "unconfirmed"]).optional(),
 };
 const FeeBase = {
@@ -266,7 +267,7 @@ const Metadata = {
       ),
     )
     .optional(),
-  fieldSources: z.record(z.union([Origin, z.array(Origin).min(1)])).optional(),
+  fieldSources: z.record(Origins).optional(),
   unconfirmedFields: z.array(z.string()).optional(),
 };
 const Identity = {

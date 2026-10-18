@@ -7,8 +7,8 @@ import {
   Features,
 } from "./schema";
 import { canonical, hash, slug } from "./serialize";
-import { verifyEvidence } from "./evidence";
-export const MERGE_VERSION = "3";
+import { verifyEvidence, verifyFinancialEvidence } from "./evidence";
+export const MERGE_VERSION = "7";
 type ObjectValue = Record<string, unknown>;
 const isObject = (v: unknown): v is ObjectValue =>
   !!v && typeof v === "object" && !Array.isArray(v);
@@ -173,32 +173,39 @@ function identity(
     );
   return matches[0]?.id || slug(id || name);
 }
-function rules(
-  value: unknown,
-  field: string,
-  target: string,
-  origin: unknown,
-): unknown {
-  if (!Array.isArray(value) || !["fees", "rewards", "limits"].includes(field))
-    return value;
-  const seen = new Map<string, string>();
-  return value.map((r) => {
-    const obj = r as ObjectValue;
+function combinedOrigins(...values: unknown[]) {
+  const origins = [...new Map(values.flatMap(value => Array.isArray(value) ? value : [value]).filter(value => value !== undefined).map(value => [canonical(value), value])).entries()]
+    .sort(([a], [b]) => a.localeCompare(b)).map(([, value]) => value);
+  return origins.length === 1 ? origins[0] : origins;
+}
+function coalesceRules(values: ObjectValue[], field: string) {
+  const seen = new Map<string, ObjectValue>(), descriptions = new Map<string, Set<string>>();
+  for (const rule of values) {
+    const id = String(rule.id), earlier = seen.get(id);
+    if (earlier && !compatible(earlier, rule))
+      throw new Error(`Ambiguous ${field} identity; conflicting rules share a scope`);
+    const notes = descriptions.get(id) || new Set<string>();
+    if (typeof rule.description === "string") notes.add(rule.description);
+    descriptions.set(id, notes);
+    seen.set(id, earlier ? { ...overlay(earlier, rule) as ObjectValue, source: combinedOrigins(earlier.source, rule.source) } : rule);
+  }
+  return [...seen.entries()].map(([id, rule]) => descriptions.get(id)!.size
+    ? { ...rule, description: [...descriptions.get(id)!].sort().join("\n") }
+    : rule);
+}
+function rules(value: unknown, field: string, target: string, origin: unknown): unknown {
+  if (!Array.isArray(value) || !["fees", "rewards", "limits"].includes(field)) return value;
+  return coalesceRules(value.map(r => {
+    const obj = ordered(r) as ObjectValue;
     const id = `${field.slice(0, -1)}-${hash({
-      target,
-      kind: obj.kind || "cashback",
+      target, kind: obj.kind || "cashback",
       rewardAsset: field === "rewards" ? obj.rewardAsset : undefined,
+      requirements: field === "rewards" ? ordered(obj.requirements) : undefined,
       period: field === "limits" ? obj.period : undefined,
       scope: ordered(obj.scope || {}),
     }).slice(0, 20)}`;
-    const next = { ...obj, id, source: origin, status: "verified" };
-    if (seen.has(id) && seen.get(id) !== canonical(next))
-      throw new Error(
-        `Ambiguous ${field} identity; conflicting rules share a scope`,
-      );
-    seen.set(id, canonical(next));
-    return next;
-  });
+    return { ...obj, scope: ordered(obj.scope || {}), id, source: origin, status: "verified" };
+  }), field);
 }
 function staticOrigin(v: unknown, path = "provider"): unknown {
   if (Array.isArray(v)) return v.map((x) => staticOrigin(x, path));
@@ -220,7 +227,7 @@ function staticOrigin(v: unknown, path = "provider"): unknown {
 function compatible(left: unknown, right: unknown, ruleArray = false): boolean {
   if (isObject(left) && isObject(right))
     return Object.keys(right)
-      .filter((k) => !["source", "status", "id"].includes(k))
+      .filter((k) => !["source", "status", "id"].includes(k) && !(k === "description" && typeof left.calculable === "boolean" && left.calculable === right.calculable))
       .every((k) => !(k in left) || compatible(left[k], right[k]));
   if (
     Array.isArray(left) &&
@@ -263,6 +270,7 @@ export function candidate(
       : {}),
   };
   const factsSeen = new Map<string, unknown>();
+  const collectionSources = new Map<string, Map<string, Set<string>>>();
   const combined: ExtractionData = {
     complete: extractions.every((e) => e.complete),
     products: extractions
@@ -320,6 +328,7 @@ export function candidate(
     for (const fact of extraction.facts) {
       if (!verifyEvidence(fact.evidence, documents))
         throw new Error(`Invalid evidence: ${fact.field}`);
+      verifyFinancialEvidence(fact);
       if (fact.tierId && !fact.productId)
         throw new Error("Tier fact requires productId");
       const productId = fact.productId
@@ -362,12 +371,22 @@ export function candidate(
       const value = rules(scoped, fact.field, target, fact.evidence);
       const factKey = `${target}/${fact.field}`;
       const earlier = factsSeen.get(factKey);
-      // Narrative clauses from separate cited blocks are additive. Financial
-      // rules and eligibility lists still require compatible values/scopes.
+      // Assemble cited collection rows before comparing complete lists from
+      // different sources. Financial rule conflicts still fail immediately.
       const narrative = ["terms", "requirements"].includes(fact.field) && Array.isArray(value);
+      const collection = !["fees", "rewards", "limits"].includes(fact.field) && Array.isArray(value) && value.every(item => typeof item === "string");
+      if (collection && Array.isArray(earlier) && (earlier.length === 0) !== (value.length === 0))
+        throw new Error(`Explicit empty list conflicts with extracted values: ${factKey}; published values retained`);
+      if (collection && !narrative) {
+        const sources = collectionSources.get(factKey) || new Map<string, Set<string>>();
+        const items = sources.get(fact.evidence.url) || new Set<string>();
+        for (const item of value as string[]) items.add(item);
+        sources.set(fact.evidence.url, items);
+        collectionSources.set(factKey, sources);
+      }
       if (
         earlier !== undefined &&
-        !narrative &&
+        !collection &&
         !compatible(
           earlier,
           value,
@@ -377,17 +396,17 @@ export function candidate(
         throw new Error(
           `Conflicting extracted facts: ${factKey}; published values retained`,
         );
-      const combinedValue = narrative && Array.isArray(earlier)
+      const combinedValue = collection && Array.isArray(earlier)
         ? ordered([...earlier, ...value as unknown[]])
-        : overlay(earlier, value);
+        : Array.isArray(earlier) && ["fees", "rewards", "limits"].includes(fact.field)
+          ? coalesceRules([...earlier, ...value as ObjectValue[]], fact.field)
+          : overlay(earlier, value);
       factsSeen.set(factKey, combinedValue);
       const currentTarget = tierId
         ? (p?.tiers as ObjectValue[]).find((t) => t.id === tierId)
         : p || data;
       const priorOrigin = (currentTarget?.fieldSources as ObjectValue | undefined)?.[fact.field];
-      const origin = narrative && priorOrigin
-        ? [...new Map([...(Array.isArray(priorOrigin) ? priorOrigin : [priorOrigin]), fact.evidence].map(e => [canonical(e), e])).values()]
-        : fact.evidence;
+      const origin = priorOrigin ? combinedOrigins(priorOrigin, fact.evidence) : fact.evidence;
       const fields = {
         ...(fact.inherit
           ? {
@@ -414,6 +433,11 @@ export function candidate(
         : fields;
       data = overlay(data, patch) as ObjectValue;
     }
+  }
+  for (const [key, sources] of collectionSources) {
+    const lists = [...sources.values()].map(items => canonical([...items].sort()));
+    if (lists.some(list => list !== lists[0]))
+      throw new Error(`Conflicting extracted lists: ${key}; published values retained`);
   }
   const { note: _note, sourceDate: _date, ...staticData } = adapter.static;
   const staticWithOrigin = staticOrigin(staticData, adapter.config.id);
@@ -528,12 +552,8 @@ export function markUnconfirmed(
     for (const field of ["fees", "rewards", "limits"])
       if (Array.isArray(v[field])) {
         out[field] = (v[field] as ObjectValue[]).map((rule) => {
-          const source = rule.source;
-          if (
-            !isObject(source) ||
-            typeof source.url !== "string" ||
-            !changed.has(source.url)
-          )
+          const origins = (Array.isArray(rule.source) ? rule.source : [rule.source]).filter(isObject);
+          if (!origins.some(source => typeof source.url === "string" && changed.has(source.url)))
             return rule;
           const present =
             isObject(fresh) &&

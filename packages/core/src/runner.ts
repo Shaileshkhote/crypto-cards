@@ -41,11 +41,7 @@ export async function executeJob(job: JobRow) {
             }
           : await syncAdapter(adapter, budget, { force: job.force });
         results.push(result);
-        if (
-          result.error?.toLowerCase().includes("budget") ||
-          result.error?.includes("reservation")
-        )
-          exhausted = true;
+        if (result.haltRun) exhausted = true;
         await db().query(
           "UPDATE jobs SET progress=$2,cost_usd=$3,heartbeat_at=now() WHERE id=$1",
           [

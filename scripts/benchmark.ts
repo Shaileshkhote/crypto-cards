@@ -5,10 +5,13 @@ import { syncAdapter } from "@cards/core/sync";
 import { closeDb } from "@cards/db";
 async function run() {
   const ids = process.argv.slice(2);
-  const selected = ids.length
+  const all = await loadAdapters();
+  if (ids.includes("--all") && ids.length !== 1)
+    throw new Error("Use --all alone or list provider IDs");
+  const selected = ids[0] === "--all" ? all.map(a => a.config.id) : ids.length
     ? ids
     : ["etherfi", "avici", "mexc", "gnosis-pay", "nexo-card", "revolut"];
-  const adapters = (await loadAdapters()).filter((x) =>
+  const adapters = all.filter((x) =>
     selected.includes(x.config.id),
   );
   if (adapters.length !== selected.length)

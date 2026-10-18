@@ -1,24 +1,26 @@
 # Extraction evaluation
 
-The default model is `openai/gpt-5.4-mini`, selected after comparing live extractions with six synthetic scenarios and eight labeled real-source cases. The real-source selection run passed **8/8** cases, including the shared publication validator, with $0.104764 of returned usage cost. Earlier `gpt-4.1-mini` and `gpt-5-mini` runs missed supported facts or inferred unsupported values. There is one configured model, with no fallback chain.
+The default is `openai/gpt-6-luna` with medium reasoning when supported, schema 5 / prompt 18. The final selection run passed **9/9** labeled real-source cases, including the shared publication validator, for **$0.007728205** of returned usage cost. Repeated medium-reasoning runs also passed all nine cases. There is one configured model and no fallback chain.
 
-The checked-in corpus is `tests/fixtures/live-providers.json`: short verified passages from Avici, Ready, Plasma One, SafePal, EtherFi and Revolut. It checks issuance scope, contractual maximums, paused issuance, KYC/custody, payment rails, non-USD FX/refunds, reward assets and aligned PDF plan columns. Positive and negative labels are checked against typed facts. These passages establish regression coverage, not full-provider precision or recall. They are source data, never executable instructions.
+The checked-in corpus is `tests/fixtures/live-providers.json`: verified passages from Avici, Ready, Plasma One, SafePal, EtherFi, Revolut and MEXC. Positive and negative labels check tier-specific issuance, contractual maximums, paused issuance, KYC/custody, payment rails, non-USD FX/refunds, reward assets, aligned PDF plan columns, per-purchase limits and transaction counts. The Revolut labels include explicit product/tier targets. These short passages establish regression coverage, not full-provider precision or recall. Source text is data, never executable instructions.
 
-Run the inexpensive live evaluation with a securely injected key:
+Other tested routes included GPT-6 Sol/Astra, GPT-5.4 Mini, Claude Haiku, Gemini and DeepSeek. Some passed earlier corpus versions; others rejected the schema or missed labels. Those runs used different prompt/schema revisions and do not establish a controlled model ranking. Luna was retained for its final corpus result and measured low cost; the full-provider run remains the acceptance test.
+
+Run the live evaluation with a securely injected key:
 
 ```sh
-pnpm evaluate
+MAX_RUN_COST_USD=0.10 pnpm evaluate
 ```
 
-Its default shared cap is $0.40; `MAX_RUN_COST_USD` can lower or override it, up to the core $4.99 maximum. Reports containing extracted public passages go to ignored `.local/evaluation.json`. Unit tests use simulated model responses and require no key.
+The script defaults to a shared $1 cap. The core clamps every invocation to at most $4.99. It stops on a fatal model configuration or budget error and reports unrun cases separately. Reports go to ignored `.local/evaluation.json`; unit tests use simulated model responses and require no key.
 
-For a complete source-to-database check, use a dedicated benchmark database, functioning DNS and access to the provider's public documentation:
+Use a dedicated database, functioning DNS and accessible official sources for the complete source-to-database benchmark:
 
 ```sh
 pnpm db:migrate
-pnpm benchmark etherfi avici mexc gnosis-pay nexo-card revolut
+pnpm benchmark --all
 ```
 
-Forced and unchanged passes share one budget. Unchanged snapshots must make zero model requests. Inspect successful outputs against source context and exact scopes; a valid quote proves the passage exists, not that the interpretation is right. Do not extrapolate 50-provider cost from failed or incomplete runs. The selection run used schema 2 / prompt 6. Schema 3 / prompt 7 adds service-specific fees, weekday/weekend scope, per-transaction and count limits after the full replay exposed those gaps. Regression tests cover the additions; full live acceptance of that revision is pending. The latest full-inventory replay and access restrictions are recorded in [live validation](live-validation.md).
+Forced and unchanged passes share one budget. Unchanged snapshots must make zero model requests. Inspect successful outputs against source context and exact scopes: a valid citation and numeric checks do not prove interpretation or completeness. Do not extrapolate a successful 50-provider cost from failed or incomplete runs. See [live validation](live-validation.md) for measured outcomes and spending.
 
-This cloud machine's native DNS resolver returns EAI_AGAIN. Proxy-fetched source snapshots test parsing, model extraction, publication and cache reuse, but cannot prove the native crawler or production deployment. Explicit robots restrictions remain enforced. Production credentials belong in deployment environment bindings, never Git or reports.
+This cloud machine's native DNS resolver returns EAI_AGAIN. The approved HTTPS proxy supports source snapshots and OpenRouter calls (`NODE_USE_ENV_PROXY=1` with Node 24). Snapshot replays exercise the shared parser, extractor, PostgreSQL publication and cache reuse, but do not prove the native crawler or deployment. Explicit robots restrictions remain enforced. Production credentials belong in deployment environment bindings, never Git or reports.

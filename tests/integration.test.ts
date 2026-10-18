@@ -1,17 +1,19 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { executeJob } from "@cards/core/runner";
-import { beforeAll, beforeEach, afterAll, describe, it, expect } from "vitest";
+import { beforeAll, beforeEach, afterAll, describe, it, expect, vi } from "vitest";
 import { db, closeDb, publish, transaction, type CardRow } from "@cards/db";
 import { migrate } from "../packages/db/src/migrate";
 import { syncAdapter } from "@cards/core/sync";
-import { Budget, type Extractor } from "@cards/core/agent";
+import * as syncFunctions from "@cards/core/sync";
+import { Budget, RunError, type Extractor } from "@cards/core/agent";
 import { listReviews, approveReview, rejectReview } from "@cards/core/review";
 import { readCache, rebuildCache } from "@cards/core/cache";
 import { publicationHash } from "@cards/core/merge";
 import { enqueue, claimJob } from "@cards/core/jobs";
 import { adapter, document, extraction } from "./helpers";
 import { Card } from "@cards/core/schema";
+import { loadAdapters } from "@cards/core/adapters";
 const enabled = !!process.env.TEST_DATABASE_URL;
 describe.skipIf(!enabled)(
   "PostgreSQL sync, review, history, jobs and public cache",
@@ -141,19 +143,22 @@ describe.skipIf(!enabled)(
           })
         ).status,
       ).toBe("failed");
-      for (const mode of ["evidence", "incomplete", "scope", "budget"]) {
+      for (const mode of ["evidence", "incomplete", "scope", "number", "budget", "configuration"]) {
         const r = await run(2, async (_a, docs, b) => {
           if (mode === "budget") {
             b.reserve(6);
             throw new Error("unreachable");
           }
+          if (mode === "configuration") throw new RunError("OpenRouter HTTP 401: invalid credentials");
           const e = extraction(docs[0], 2);
           if (mode === "evidence") e.facts[0].evidence.quote = "fabricated";
           else if (mode === "scope") (e.facts[0].value as { scope: { tierIds?: string[] } }[])[0].scope.tierIds = ["luxe"];
+          else if (mode === "number") (e.facts[0].value as { ratePercent: number }[])[0].ratePercent = 99;
           else e.complete = false;
           return { extraction: e, documents: docs, issues: [] };
         });
         expect(r.status).toBe("failed");
+        expect(r.haltRun).toBe(["budget", "configuration"].includes(mode) ? true : undefined);
         expect((await readCache("cards/example"))?.payload).toBe(
           before?.payload,
         );
@@ -217,6 +222,22 @@ describe.skipIf(!enabled)(
       expect((await executeJob(claimed!)).status).toBe("completed");
       await rebuildCache();
       expect(await readCache("cards")).toBeTruthy();
+    });
+    it("continues all-adapter work after an accounted timeout, but halts on budget exhaustion", async () => {
+      for (const haltRun of [false, true]) {
+        const mocked = vi.spyOn(syncFunctions, "syncAdapter").mockImplementation(async (a) => ({
+          cardId: a.config.id, status: "failed", changed: 0, reused: 0, proposed: 0, costUsd: 0, inputTokens: 0, outputTokens: 0,
+          error: haltRun ? "Budget exhausted: no new OpenRouter request sent" : "OpenRouter response timed out; reservation retained conservatively", haltRun,
+        }));
+        try {
+          const id = await enqueue("sync");
+          const claimed = await claimJob();
+          expect(claimed?.id).toBe(id);
+          const result = await executeJob(claimed!);
+          expect(result.status).toBe("failed");
+          expect(mocked.mock.calls.length).toBe(haltRun ? 1 : (await loadAdapters()).length);
+        } finally { mocked.mockRestore(); }
+      }
     });
     it("approves from the CLI without an extra required reviewer flag", async () => {
       await run();
