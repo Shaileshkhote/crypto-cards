@@ -67,3 +67,13 @@ it("extracts text PDFs and leaves textless PDFs pending transcription", async ()
   );
   expect(blank.status).toBe("pending_transcription");
 }, 30000);
+it("keeps meaningful article header dates and footer caveats", () => {
+  const doc = parseHtml(
+    "https://example.com/terms",
+    '<header><h1>Effective 2026-10-01</h1></header><p>Cashback: 3%.</p><footer><p>Only eligible EUR purchases; cash withdrawals are excluded.</p></footer>',
+  );
+  expect(doc.content).toContain("Effective 2026-10-01");
+  expect(doc.content).toContain(
+    "Only eligible EUR purchases; cash withdrawals are excluded.",
+  );
+});

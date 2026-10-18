@@ -118,7 +118,7 @@ export function parseHtml(url: string, html: string): Document {
     .get()
     .filter(Boolean);
   $(
-    'script,style,nav,header,footer,noscript,svg,[aria-hidden="true"]',
+    'script,style,nav,[role="navigation"],noscript,svg,[aria-hidden="true"]',
   ).remove();
   $("table").each((_, table) => {
     const rows = $(table)
@@ -133,7 +133,7 @@ export function parseHtml(url: string, html: string): Document {
       .get();
     $(table).replaceWith(`\n${rows.join("\n")}\n`);
   });
-  $("h1,h2,h3,h4,p,li,div,section,br").each((_, el) => {
+  $("h1,h2,h3,h4,p,li,div,section,header,footer,br").each((_, el) => {
     $(el).prepend("\n");
     $(el).append("\n");
   });

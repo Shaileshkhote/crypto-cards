@@ -85,6 +85,8 @@ Public read-only endpoints:
 
 Cache responses have canonical key ordering, content ETags and CDN cache headers. Unknown lists are `null` or omitted; confirmed empty lists remain `[]`. No FX conversion or cross-currency money comparison occurs.
 
+Read the [validation report](docs/validation.md) for verified checks and remaining deployment prerequisites.
+
 Read [architecture](docs/architecture.md), [adapters](docs/adapters.md), [schema](docs/schema.md), [deployment](docs/deployment.md), and [the original Phase 1 plan](docs/implementation-plan.md).
 
 Licensed under MIT; see [LICENSE](LICENSE).
