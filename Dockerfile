@@ -29,14 +29,16 @@ CMD ["pnpm","--filter","@cards/admin","start"]
 # Keep OS/browser installation independent of application source changes.
 FROM base AS browser
 ENV CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium
+# Bootstrap HTTPS trust before the slim image installs its OS CA package.
 RUN --mount=type=secret,id=build_ca,mode=0444 \
     sed -i 's|http://deb.debian.org|https://deb.debian.org|g' /etc/apt/sources.list.d/debian.sources && \
+    node -p "require('tls').rootCertificates.join('\n')" > /tmp/cards-apt-ca.pem && \
     if [ -f /run/secrets/build_ca ]; then \
-      printf 'Acquire::https::CaInfo "/run/secrets/build_ca";\n' > /tmp/cards-apt.conf; \
-      export APT_CONFIG=/tmp/cards-apt.conf; \
-    fi; \
-    apt-get update && apt-get install -y --no-install-recommends chromium ca-certificates && \
-    rm -rf /var/lib/apt/lists/* /tmp/cards-apt.conf
+      cat /run/secrets/build_ca >> /tmp/cards-apt-ca.pem; \
+    fi && \
+    apt-get -o Acquire::https::CaInfo=/tmp/cards-apt-ca.pem update && \
+    apt-get -o Acquire::https::CaInfo=/tmp/cards-apt-ca.pem install -y --no-install-recommends chromium ca-certificates && \
+    rm -rf /var/lib/apt/lists/* /tmp/cards-apt-ca.pem
 
 FROM browser AS worker
 COPY --from=dependencies --chown=node:node /app /app

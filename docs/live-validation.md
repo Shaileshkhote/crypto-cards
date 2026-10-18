@@ -93,4 +93,6 @@ Repair or replace stale source inventories with verified public sources, use a m
 
 Fresh Docker images after these fixes and a complete three-service Compose run remain unverified because the earlier full build exhausted the cloud machine’s 32 GB VFS filesystem. Individual image checks predate these fixes. Coolify deployment, HTTPS routing, real Cloudflare Access, off-host backups and a production restore remain untested.
 
+GitHub CI also exposed an HTTPS CA bootstrap failure in the worker image. The browser stage now uses Node's bundled trusted roots, plus the optional build proxy CA, until the OS CA package is installed. TLS and APT package signatures remain verified; the fix is being checked in CI.
+
 Raw source snapshots, detailed model usage, synthetic outputs and benchmark database bindings remain in ignored `.local` artifacts. They are not committed. Reproduce the native workflow with `pnpm benchmark` against a dedicated database once DNS/source access works; cold and warm passes share one capped budget.
