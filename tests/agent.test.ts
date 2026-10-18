@@ -19,6 +19,18 @@ it("shares a conservative request budget across adapters", () => {
 it("runs one three-tool loop and validates its final evidence", async () => {
   vi.stubEnv("OPENROUTER_API_KEY", "fixture-not-a-real-key");
   const doc = document();
+  const wireExtraction = extraction(doc);
+  const fee = wireExtraction.facts[0].value as Record<string, unknown>[];
+  fee[0].scope = {
+    residentCountries: null,
+    excludedResidentCountries: null,
+    regions: null,
+    transactionCountries: [],
+  };
+  wireExtraction.facts.push({
+    inherit: false, productId: null, tierId: null, field: "regions",
+    value: null, evidence: wireExtraction.facts[0].evidence,
+  });
   let requests = 0;
   const mocked = vi.fn(async (input: string, init?: RequestInit) => {
     if (input.endsWith("/models"))
@@ -37,6 +49,13 @@ it("runs one three-tool loop and validates its final evidence", async () => {
       body.tools.map((x: { function: { name: string } }) => x.function.name),
     ).toEqual(["listPages", "searchDocs", "readPage"]);
     expect(body.response_format.json_schema.strict).toBe(true);
+    // A live OpenAI route rejects this unsupported format before generation.
+    expect(JSON.stringify(body.response_format.json_schema.schema)).not.toContain(
+      '"format":"uri"',
+    );
+    expect(JSON.stringify(body.response_format.json_schema.schema)).toContain(
+      '"pattern":"^[A-Z]{2}$"',
+    );
     return Response.json({
       usage: { prompt_tokens: 50, completion_tokens: 20, cost: 0.0001 },
       choices: [
@@ -58,7 +77,7 @@ it("runs one three-tool loop and validates its final evidence", async () => {
             }
           : {
               finish_reason: "stop",
-              message: { content: JSON.stringify(extraction(doc)) },
+              message: { content: JSON.stringify(wireExtraction) },
             },
       ],
     });
@@ -66,9 +85,18 @@ it("runs one three-tool loop and validates its final evidence", async () => {
   vi.stubGlobal("fetch", mocked);
   const b = new Budget();
   const r = await extract(adapter(), [doc], b);
-  expect(r.extraction.facts).toHaveLength(1);
+  expect(r.extraction.facts).toHaveLength(2);
+  expect((r.extraction.facts[0].value as Record<string, unknown>[])[0].scope).toEqual({
+    residentCountries: null, transactionCountries: [],
+  });
+  expect(r.extraction.facts[1].value).toBeNull();
   expect(b.requests).toBe(2);
   expect(b.spent).toBe(0.0002);
+  // Removing the provider's URI hint must not relax runtime URL validation.
+  wireExtraction.facts[0].evidence.url = "not-a-url";
+  await expect(extract(adapter(), [doc], new Budget())).rejects.toThrow(
+    "Invalid url",
+  );
 });
 it("does not send a paid request without a key", async () => {
   vi.stubEnv("OPENROUTER_API_KEY", "");

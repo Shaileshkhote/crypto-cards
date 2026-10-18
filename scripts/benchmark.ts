@@ -13,15 +13,18 @@ async function run() {
   );
   if (adapters.length !== selected.length)
     throw new Error("Unknown benchmark provider");
-  const cold = new Budget(),
-    warm = new Budget();
+  // Cold and warm passes share the run's cap, including changed warm sources.
+  const budget = new Budget();
+  let coldUsd = 0, warmUsd = 0;
   const started = Date.now();
   const results = [];
   for (const a of adapters) {
     const at = Date.now();
-    const first = await syncAdapter(a, cold, { force: true });
+    const first = await syncAdapter(a, budget, { force: true });
+    coldUsd += first.costUsd;
     const second =
-      first.status === "failed" ? null : await syncAdapter(a, warm);
+      first.status === "failed" ? null : await syncAdapter(a, budget);
+    warmUsd += second?.costUsd || 0;
     results.push({
       provider: a.config.id,
       cold: first,
@@ -33,9 +36,13 @@ async function run() {
     settings: extractionSettings(),
     results,
     elapsedMs: Date.now() - started,
-    coldUsd: cold.spent,
-    warmUsd: warm.spent,
-    estimateFor50Providers: (cold.spent / adapters.length) * 50,
+    coldUsd,
+    warmUsd,
+    totalUsd: budget.spent,
+    maxUsd: budget.max,
+    estimateFor50Providers: results.every((r) => r.cold.status !== "failed")
+      ? (coldUsd / adapters.length) * 50
+      : null,
     accuracy:
       "NOT EVALUATED: manually compare source quotes and label expected values before selecting a model",
   };

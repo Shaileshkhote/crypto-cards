@@ -274,48 +274,38 @@ export async function documentFromPdf(
   url: string,
   bytes: Buffer,
 ): Promise<Document> {
-  const { getDocument } = await import("pdfjs-dist/legacy/build/pdf.mjs");
-  const task = getDocument({
-    data: new Uint8Array(bytes),
-    useSystemFonts: true,
-    disableFontFace: true,
+  const { Worker } = await import("node:worker_threads");
+  // PDF font/content parsing can loop on malformed files. A separate thread
+  // lets us enforce a deadline even while the parser consumes CPU synchronously.
+  const text = await new Promise<string>((resolve, reject) => {
+    const worker = new Worker(new URL("./pdf-worker.ts", import.meta.url), {
+      workerData: new Uint8Array(bytes),
+    });
+    let settled = false;
+    const finish = (error?: Error, text = "") => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      void worker.terminate();
+      if (error) reject(error);
+      else resolve(text);
+    };
+    const timer = setTimeout(
+      () => finish(new Error("PDF parsing timed out after 20 seconds")),
+      20_000,
+    );
+    worker.once("message", (result: { text?: string; error?: string }) =>
+      result.error
+        ? finish(new Error(result.error))
+        : finish(undefined, result.text),
+    );
+    worker.once("error", (error) => finish(error));
+    worker.once("exit", (code) => {
+      if (!settled) finish(new Error(`PDF parser exited before returning text (${code})`));
+    });
   });
-  const parsed = await task.promise;
-  try {
-    const pages: string[] = [];
-    for (let i = 1; i <= parsed.numPages; i++) {
-      const page = await parsed.getPage(i);
-      const content = await page.getTextContent();
-      let line = "",
-        y: number | undefined;
-      const lines: string[] = [];
-      for (const item of content.items) {
-        if (!("str" in item)) continue;
-        const nextY = item.transform[5];
-        if (y !== undefined && Math.abs(nextY - y) > 2) {
-          lines.push(line);
-          line = "";
-        }
-        line += (line ? " | " : "") + item.str;
-        y = nextY;
-        if (item.hasEOL) {
-          lines.push(line);
-          line = "";
-          y = undefined;
-        }
-      }
-      if (line) lines.push(line);
-      pages.push(lines.join("\n"));
-    }
-    const doc = documentFromText(url, pages.join("\n"));
-    return doc.content.length < 30
-      ? {
-          ...doc,
-          status: "pending_transcription",
-          error: "PDF has no usable text; transcription required",
-        }
-      : doc;
-  } finally {
-    await task.destroy();
-  }
+  const doc = documentFromText(url, text);
+  return doc.content.length < 30
+    ? { ...doc, status: "pending_transcription", error: "PDF has no usable text; transcription required" }
+    : doc;
 }

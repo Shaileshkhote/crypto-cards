@@ -39,6 +39,11 @@ describe("typed canonical schema", () => {
     expect(Scope.safeParse({ residentCountries: ["Europe"] }).success).toBe(
       false,
     );
+    for (const region of ["EU", "EEA", "APAC", "UK"])
+      expect(Scope.safeParse({ residentCountries: [region] }).success).toBe(false);
+    expect(Scope.parse({ residentCountries: ["GB"], regions: ["EEA"] })).toEqual({
+      residentCountries: ["GB"], regions: ["EEA"],
+    });
     expect(Money.safeParse({ amount: 1, currency: "USD" }).success).toBe(false);
   });
   it("validates tiered inclusion, thresholds, currency, period and behavior", () => {

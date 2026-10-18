@@ -9,10 +9,12 @@ export const Id = z
   .max(180);
 export const Country = z
   .string()
+  .regex(/^[A-Z]{2}$/)
   .refine(
     (v) => countries.isValid(v) && /^[A-Z]{2}$/.test(v),
     "Expected ISO 3166-1 alpha-2 country",
-  );
+  )
+  .describe("ISO 3166-1 alpha-2 country code, such as US, DE or GB. Region labels such as EU, EEA and APAC belong in regions, never country arrays.");
 const currencyCodes = new Set(Intl.supportedValuesOf("currency"));
 export const Currency = z
   .string()

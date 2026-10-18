@@ -8,7 +8,7 @@
 
 1. Validate all adapter files and source trust boundaries.
 2. Fetch configured sources with robots checks, bounded global concurrency and per-domain serialization/delay. Discovery is disabled by default. Network failures update source health and preserve the last successful snapshot.
-3. Normalize documents into stable content hashes and quoted blocks. HTML tables preserve headings and rows; text PDFs use PDF.js. Image PDFs remain pending transcription. Browser rendering is explicit and restricts scripts to trusted domains and content requests to configured URLs.
+3. Normalize documents into stable content hashes and quoted blocks. HTML tables preserve headings and rows; text PDFs use PDF.js in a separate thread with a 20-second deadline and bounded text output. Image PDFs remain pending transcription. Browser rendering is explicit and restricts scripts to trusted domains and content requests to configured URLs.
 4. Look up per-source extraction fingerprints including model, provider, prompt, schema, parameters, adapter hints, and effective URL inventory. Static data is excluded, so static edits do not invalidate model work.
 5. Run one bounded agent on the changed/missing extraction set. Its only tools are listPages, searchDocs, readPage. Discovery requests go through the crawler, and discovered URLs are retained with source snapshots. Invalid, conflicting, incomplete, or over-budget output is rejected.
 6. Verify evidence against stored document blocks, resolve known identities, and normalize rule IDs from provider/product/tier/kind/scope. Assemble source facts in deterministic order, then apply explicit static values.
