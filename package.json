@@ -18,6 +18,7 @@
     "db:migrate": "tsx packages/db/src/migrate.ts",
     "check": "pnpm typecheck && pnpm lint && pnpm test",
     "benchmark": "tsx scripts/benchmark.ts",
+    "evaluate": "tsx scripts/evaluate.ts",
     "cloud:dev": "node scripts/cloud-dev.mjs"
   },
   "dependencies": {

@@ -100,6 +100,22 @@ describe.skipIf(!enabled)(
       expect((await run(2)).status).toBe("unchanged");
       expect(await listReviews()).toHaveLength(0);
     });
+    it("supersedes an older proposal without allowing approval from an outdated screen", async () => {
+      await run();
+      const before = await readCache("cards/example");
+      await run(2);
+      const [older] = await listReviews();
+      await run(3);
+      const [current] = await listReviews();
+      expect(await listReviews()).toHaveLength(1);
+      expect(current.id).not.toBe(older.id);
+      await expect(approveReview(older.id, "admin")).rejects.toThrow("Pending review not found");
+      expect((await readCache("cards/example"))?.payload).toBe(before?.payload);
+      await run(3);
+      expect((await listReviews()).map(r => r.id)).toEqual([current.id]);
+      await approveReview(current.id, "admin");
+      expect((await read()).products?.[0].tiers?.[0].fees?.[0]).toMatchObject({ ratePercent: 3 });
+    });
     it("rejects stale approvals after a concurrent publication", async () => {
       await run();
       await run(2);

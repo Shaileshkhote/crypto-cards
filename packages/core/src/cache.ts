@@ -141,8 +141,12 @@ export function filterDirectory(rows: DirectoryRow[], f: Filter) {
 }
 export function applicable(
   scope: ScopeData,
-  context: { country?: string; currency?: string; tierId?: string },
+  context: { country?: string; currency?: string; tierId?: string; cardType?: "physical" | "virtual"; cardOrder?: "first" | "additional"; paymentRail?: string },
 ) {
+  if (scope.cardTypes && (!context.cardType || !scope.cardTypes.includes(context.cardType))) return false;
+  if (scope.cardOrder && scope.cardOrder !== context.cardOrder) return false;
+  if (scope.paymentRails && (!context.paymentRail || !scope.paymentRails.includes(context.paymentRail))) return false;
+  if (scope.excludedTransactionCurrencies && (!context.currency || scope.excludedTransactionCurrencies.includes(context.currency))) return false;
   if (scope.residentCountries === null) return false;
   if (
     scope.residentCountries &&
@@ -184,7 +188,7 @@ export function applicable(
 export function sortFees(
   rows: DirectoryRow[],
   kind: FeeData["kind"],
-  context: { country: string; currency: string },
+  context: { country: string; currency: string; cardType?: "physical" | "virtual"; cardOrder?: "first" | "additional"; paymentRail?: string },
   calculation: "percentage" | "fixed" = "percentage",
 ) {
   const val = (r: DirectoryRow) => {

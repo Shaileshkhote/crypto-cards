@@ -1,8 +1,16 @@
 import { describe, it, expect } from "vitest";
 import { Card } from "@cards/core/schema";
-import { directory, sortFees, filterDirectory } from "@cards/core/cache";
+import { directory, sortFees, filterDirectory, applicable } from "@cards/core/cache";
 import { REGIONS } from "@cards/core/regions";
 describe("directory scope and sorting", () => {
+  it("requires the real card/issuance/payment-rail context before applying a scoped fee", () => {
+    const scope = { cardTypes: ["virtual" as const], cardOrder: "additional" as const, paymentRails: ["ach"] };
+    expect(applicable(scope, {})).toBe(false);
+    expect(applicable(scope, { cardType: "physical", cardOrder: "additional", paymentRail: "ach" })).toBe(false);
+    expect(applicable(scope, { cardType: "virtual", cardOrder: "first", paymentRail: "ach" })).toBe(false);
+    expect(applicable(scope, { cardType: "virtual", cardOrder: "additional", paymentRail: "wire" })).toBe(false);
+    expect(applicable(scope, { cardType: "virtual", cardOrder: "additional", paymentRail: "ach" })).toBe(true);
+  });
   const card = Card.parse({
     id: "example",
     name: "Example",

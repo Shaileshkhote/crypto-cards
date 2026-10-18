@@ -27,6 +27,8 @@ describe("typed canonical schema", () => {
     expect(card.fees?.[0].calculation).toBe("fixed");
   });
   it("rejects missing numeric calculation inputs and prose countries", () => {
+    expect(Money.parse({ amount: "0.00", currency: "EUR" }).amount).toBe("0");
+    expect(Money.parse({ amount: "200.5000", currency: "EUR" }).amount).toBe("200.5");
     expect(
       FeeRule.safeParse({
         id: "x",

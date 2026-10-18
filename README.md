@@ -2,11 +2,11 @@
 
 A TypeScript pnpm monorepo for extracting, reviewing, and publishing source-backed crypto card data. PostgreSQL is authoritative. The public JSON cache contains committed publications only. No spend simulator is included.
 
-The supplied adapter archive was migrated into **36 providers, 446 source URLs**, with exactly `config.ts`, `sources.ts`, and `static.ts` per provider. See [the import inventory](docs/adapter-import.md) for what was retained and which legacy assumptions require review. Imported adapters are not claims that their sources or financial values have been verified.
+The supplied adapter archive was migrated into **36 providers, 446 source URLs**, with exactly `config.ts`, `sources.ts`, and `static.ts` per provider. See [the import inventory](docs/adapter-import.md) for what was retained and which legacy assumptions require review. The maintained inventory now has 436 URLs after verified source updates; see [source maintenance](docs/source-maintenance.md). Imported adapters are not claims that their sources or financial values have been verified.
 
 ## Develop in the cloud
 
-Use Node 24 and pnpm 11.25.0. Use the existing checkout; a cloud task is already isolated.
+Use Node 24, pnpm 11.25.0 and Poppler (`pdftotext`, provided by `poppler-utils` on Debian/Ubuntu). Use the existing checkout; a cloud task is already isolated.
 
 ```sh
 corepack enable
@@ -64,7 +64,7 @@ pnpm build
 POSTGRES_PASSWORD=temporary DATABASE_URL=postgresql://cards:temporary@postgres/cards docker compose config --quiet
 ```
 
-GitHub Actions runs these checks against disposable PostgreSQL and builds both Docker targets. No model key is needed for CI.
+GitHub Actions runs these checks against disposable PostgreSQL, then builds and runs all three Compose services, checks authenticated HTTP and cache persistence across restart, and restores a database dump. No model key is needed for CI.
 
 Unit tests exercise canonical schema, normalization, evidence, shared budget, scoped sorting, adapter discovery, and deterministic merge. Integration tests **truncate their dedicated database**:
 

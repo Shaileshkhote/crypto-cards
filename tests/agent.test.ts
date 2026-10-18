@@ -1,6 +1,7 @@
 import { afterEach, it, expect, vi } from "vitest";
-import { Budget, extract } from "@cards/core/agent";
+import { Budget, extract, modelName } from "@cards/core/agent";
 import { adapter, document, extraction } from "./helpers";
+import { documentFromText } from "@cards/core/crawler";
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.unstubAllEnvs();
@@ -37,7 +38,7 @@ it("runs one three-tool loop and validates its final evidence", async () => {
       return Response.json({
         data: [
           {
-            id: "openai/gpt-4.1-mini",
+            id: modelName(),
             pricing: { prompt: "0.0000004", completion: "0.0000016" },
             supported_parameters: ["tools", "structured_outputs"],
           },
@@ -54,8 +55,22 @@ it("runs one three-tool loop and validates its final evidence", async () => {
       '"format":"uri"',
     );
     expect(JSON.stringify(body.response_format.json_schema.schema)).toContain(
-      '"pattern":"^[A-Z]{2}$"',
+      '"GB"',
     );
+    const schema = body.response_format.json_schema.schema;
+    let enumValues = 0;
+    const checkSchema = (value: unknown) => {
+      if (!value || typeof value !== "object") return;
+      const obj = value as Record<string, unknown>;
+      if (typeof obj.$ref === "string") {
+        const target = obj.$ref.slice(2).split("/").reduce((node: Record<string, unknown>, key: string) => node[key] as Record<string, unknown>, schema);
+        expect(target).toBeDefined();
+      }
+      if (Array.isArray(obj.enum)) enumValues += obj.enum.length;
+      Object.values(obj).forEach(checkSchema);
+    };
+    checkSchema(schema);
+    expect(enumValues).toBeLessThan(1000);
     return Response.json({
       usage: { prompt_tokens: 50, completion_tokens: 20, cost: 0.0001 },
       choices: [
@@ -104,6 +119,37 @@ it("does not send a paid request without a key", async () => {
     "OPENROUTER_API_KEY",
   );
 });
+it("searches later sources even when a long first page contains many matches", async () => {
+  vi.stubEnv("OPENROUTER_API_KEY", "fixture-not-a-real-key");
+  const first = documentFromText("https://example.com/legal", Array.from({ length: 60 }, (_, i) => `Fee section ${i}: conditions apply.`).join("\n"));
+  const last = documentFromText("https://example.com/issuer", "Card issuer: Example Bank.");
+  let requests = 0;
+  vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+    if (url.endsWith("/models")) return Response.json({ data: [{ id: modelName(), pricing: { prompt: "0.0000004", completion: "0.0000016" }, supported_parameters: ["tools", "structured_outputs"] }] });
+    const body = JSON.parse(String(init?.body));
+    if (++requests === 2) {
+      const result = JSON.parse(body.messages.at(-1).content);
+      expect(result.find((p: { url: string }) => p.url === last.url).blocks[0].text).toContain("Example Bank");
+    }
+    return Response.json({ usage: { cost: 0.001 }, choices: [{ finish_reason: requests === 1 ? "tool_calls" : "stop", message: requests === 1
+      ? { content: null, tool_calls: [{ id: "search", function: { name: "searchDocs", arguments: '{"query":"fee issuer"}' } }] }
+      : { content: JSON.stringify({ complete: true, products: [], tiers: [], facts: [{ field: "issuer", inherit: false, productId: null, tierId: null, value: { id: "example-bank", name: "Example Bank" }, evidence: { url: last.url, blockId: "p2b1" } }] }) } }] });
+  }));
+  const result = await extract(adapter(), [first, last], new Budget());
+  expect(result.extraction.facts[0].evidence.url).toBe(last.url);
+});
+it("copies citations from selected source blocks instead of model-generated quotes", async () => {
+  vi.stubEnv("OPENROUTER_API_KEY", "fixture-not-a-real-key");
+  const doc = document();
+  const facts = extraction(doc).facts.map(f => ({ ...f, evidence: { url: doc.url, blockId: "p1b1" } }));
+  vi.stubGlobal("fetch", vi.fn(async (url: string) => url.endsWith("/models")
+    ? Response.json({ data: [{ id: modelName(), pricing: { prompt: "0.0000004", completion: "0.0000016" }, supported_parameters: ["tools", "structured_outputs"] }] })
+    : Response.json({ usage: { cost: 0.001 }, choices: [{ finish_reason: "stop", message: { content: JSON.stringify({ complete: true, products: [], tiers: [], facts }) } }] })));
+  const result = await extract(adapter(), [doc], new Budget());
+  expect(result.extraction.facts[0].evidence).toEqual({
+    url: doc.url, blockId: doc.blocks[0].id, quote: doc.blocks[0].text,
+  });
+});
 it("retains a conservative charge when a paid response has invalid JSON", async () => {
   vi.stubEnv("OPENROUTER_API_KEY", "fixture-not-a-real-key");
   vi.stubGlobal(
@@ -113,7 +159,7 @@ it("retains a conservative charge when a paid response has invalid JSON", async 
         ? Response.json({
             data: [
               {
-                id: "openai/gpt-4.1-mini",
+                id: modelName(),
                 pricing: { prompt: "0.0000004", completion: "0.0000016" },
                 supported_parameters: ["tools", "structured_outputs"],
               },

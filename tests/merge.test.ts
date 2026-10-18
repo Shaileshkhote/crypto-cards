@@ -9,6 +9,18 @@ import { canonical } from "@cards/core/serialize";
 import { adapter, document, extraction } from "./helpers";
 import { Card } from "@cards/core/schema";
 describe("deterministic merge and protection", () => {
+  it("keeps lifecycle and retirement metadata owned by adapter configuration", () => {
+    const a = adapter(), doc = document(), e = extraction(doc);
+    a.config.products[0].lifecycle = "retired";
+    a.config.products[0].retiredAt = "2026-08-29";
+    a.config.tiers[0].lifecycle = "retired";
+    a.config.tiers[0].retiredAt = "2026-08-29";
+    e.products = [{ id: "card", name: "Card", lifecycle: "active", retiredAt: null }];
+    e.tiers = [{ id: "core", name: "Core", productId: "card", lifecycle: "active", retiredAt: null }];
+    const product = candidate(a, [e], undefined, [doc]).data.products![0];
+    expect(product).toMatchObject({ lifecycle: "retired", retiredAt: "2026-08-29" });
+    expect(product.tiers?.find(t => t.id === "core")).toMatchObject({ lifecycle: "retired", retiredAt: "2026-08-29" });
+  });
   it("produces byte-identical data for the same accepted snapshot", () => {
     const a = adapter(),
       doc = document(),

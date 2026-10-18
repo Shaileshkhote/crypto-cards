@@ -41,6 +41,12 @@ it("checks quote, URL and block together", () => {
     ),
   ).toBe(false);
 });
+it("preserves PDF column alignment for wrapped table headers", () => {
+  const text = "                  Premium    Metal\nMonthly fee       $9.99      $16.99";
+  const doc = documentFromText("https://example.com/fees.pdf", text, "Fees", [], true);
+  expect(doc.content).toBe(text);
+  expect(doc.blocks[0].text.indexOf("Premium")).toBe(18);
+});
 it("rejects untrusted redirects, credentials and private addresses", async () => {
   expect(() => trustedUrl("https://evil.example", ["example.com"])).toThrow();
   expect(() =>
@@ -67,6 +73,11 @@ it("extracts text PDFs and leaves textless PDFs pending transcription", async ()
   );
   expect(blank.status).toBe("pending_transcription");
 }, 30000);
+it("rejects malformed PDF input without hanging the caller", async () => {
+  const { documentFromPdf } = await import("@cards/core/crawler");
+  await expect(documentFromPdf("https://example.com/bad.pdf", Buffer.from("%PDF broken")))
+    .rejects.toThrow("PDF text extraction failed");
+});
 it("keeps meaningful article header dates and footer caveats", () => {
   const doc = parseHtml(
     "https://example.com/terms",

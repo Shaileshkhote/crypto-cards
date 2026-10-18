@@ -222,6 +222,12 @@ export async function syncAdapter(
             [id, version, JSON.stringify(merged.changes)],
           );
           if (duplicate.rows[0]?.status === "rejected") proposed = 0;
+          // A review is immutable: a new proposal supersedes the old one so
+          // a previously opened screen cannot approve unseen changed content.
+          await c.query(
+            "UPDATE card_reviews SET status='superseded',resolved_at=now() WHERE card_id=$1 AND status='pending' AND ($2::uuid IS NULL OR id<>$2)",
+            [id, duplicate.rows[0]?.status === "pending" ? duplicate.rows[0].id : null],
+          );
           if (!duplicate.rowCount)
             await c.query(
               "INSERT INTO card_reviews(id,card_id,base_version,changes,context) VALUES($1,$2,$3,$4,$5)",
@@ -257,6 +263,8 @@ export async function syncAdapter(
               ],
             );
         }
+        if (!merged.changes.length)
+          await c.query("UPDATE card_reviews SET status='superseded',resolved_at=now() WHERE card_id=$1 AND status='pending'", [id]);
         return version;
       });
       result.proposed = proposed;

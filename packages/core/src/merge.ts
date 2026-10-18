@@ -8,7 +8,7 @@ import {
 } from "./schema";
 import { canonical, hash, slug } from "./serialize";
 import { verifyEvidence } from "./evidence";
-export const MERGE_VERSION = "1";
+export const MERGE_VERSION = "2";
 type ObjectValue = Record<string, unknown>;
 const isObject = (v: unknown): v is ObjectValue =>
   !!v && typeof v === "object" && !Array.isArray(v);
@@ -298,7 +298,7 @@ export function candidate(
     for (const p of extraction.products) {
       const id = identity(p.id, p.name, knownProducts, adapter.config.aliases);
       productMap.set(p.id, id);
-      data = overlay(data, { products: [{ ...p, id }] }) as ObjectValue;
+      data = overlay(data, { products: [{ id, name: p.name }] }) as ObjectValue;
     }
     for (const t of extraction.tiers) {
       const productId = productMap.get(t.productId) || t.productId;
@@ -312,9 +312,8 @@ export function candidate(
       ];
       const id = identity(t.id, t.name, known, adapter.config.aliases);
       tierMap.set(t.id, id);
-      const { productId: _productId, ...tier } = t;
       data = overlay(data, {
-        products: [{ id: productId, tiers: [{ ...tier, id }] }],
+        products: [{ id: productId, tiers: [{ id, name: t.name }] }],
       }) as ObjectValue;
     }
     for (const fact of extraction.facts) {

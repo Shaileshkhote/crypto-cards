@@ -40,6 +40,7 @@ export default async function Cards({
     rows = sortFees(rows, "fx", {
       country: filter.country,
       currency: filter.currency,
+      cardType: filter.cardType,
     });
   return (
     <>

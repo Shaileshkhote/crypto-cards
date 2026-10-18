@@ -37,7 +37,7 @@ RUN --mount=type=secret,id=build_ca,mode=0444 \
       cat /run/secrets/build_ca >> /tmp/cards-apt-ca.pem; \
     fi && \
     apt-get -o Acquire::https::CaInfo=/tmp/cards-apt-ca.pem update && \
-    apt-get -o Acquire::https::CaInfo=/tmp/cards-apt-ca.pem install -y --no-install-recommends chromium ca-certificates && \
+    apt-get -o Acquire::https::CaInfo=/tmp/cards-apt-ca.pem install -y --no-install-recommends chromium poppler-utils ca-certificates && \
     rm -rf /var/lib/apt/lists/* /tmp/cards-apt-ca.pem
 
 FROM browser AS worker

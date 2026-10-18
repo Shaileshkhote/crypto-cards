@@ -1,7 +1,7 @@
 import type { CardSources } from "@cards/core/schema";
 
 export default {
-  urls: [
+  "urls": [
     "https://intercom.help/plasma-6c43763cd799/en/articles/14285201-what-documents-do-i-need-for-identity-verification",
     "https://intercom.help/plasma-6c43763cd799/en/articles/14703938-which-countries-and-us-states-is-plasma-one-available-in",
     "https://intercom.help/plasma-6c43763cd799/en/articles/15180615-where-do-i-find-my-virtual-bank-account-details",
@@ -9,7 +9,6 @@ export default {
     "https://intercom.help/plasma-6c43763cd799/en/articles/15506768-cashback-rates-and-spend-bands-by-tier",
     "https://intercom.help/plasma-6c43763cd799/en/articles/15506864-overview-of-plasma-one-perks-and-benefits",
     "https://intercom.help/plasma-6c43763cd799/en/articles/16042025-how-does-the-platinum-referral-boost-work",
-    "https://intercom.help/plasma-6c43763cd799/en/articles/16169845-how-do-i-get-the-10-referral-bonus",
     "https://www.plasma.org/",
     "https://www.plasma.org/personal",
     "https://www.plasma.org/personal/core",
@@ -18,165 +17,229 @@ export default {
     "https://www.plasma.org/plasma-one-international-card-terms",
     "https://www.plasma.org/plasma-one-rewards",
     "https://www.plasma.org/plasma-one-us-card-terms",
-    "https://www.plasma.org/platinum-referral-rewards",
+    "https://www.plasma.org/platinum-referral-rewards"
   ],
-  allowedDomains: ["intercom.help", "www.plasma.org"],
-  metadata: [
+  "allowedDomains": [
+    "intercom.help",
+    "www.plasma.org"
+  ],
+  "metadata": [
     {
-      url: "https://intercom.help/plasma-6c43763cd799/en/articles/14285201-what-documents-do-i-need-for-identity-verification",
-      productIds: ["plasma-one"],
-      kind: "help-article",
-      topics: ["requirements"],
+      "url": "https://intercom.help/plasma-6c43763cd799/en/articles/14285201-what-documents-do-i-need-for-identity-verification",
+      "productIds": [
+        "plasma-one"
+      ],
+      "kind": "help-article",
+      "topics": [
+        "requirements"
+      ]
     },
     {
-      url: "https://intercom.help/plasma-6c43763cd799/en/articles/14703938-which-countries-and-us-states-is-plasma-one-available-in",
-      productIds: ["plasma-one"],
-      kind: "help-article",
-      topics: ["countries"],
+      "url": "https://intercom.help/plasma-6c43763cd799/en/articles/14703938-which-countries-and-us-states-is-plasma-one-available-in",
+      "productIds": [
+        "plasma-one"
+      ],
+      "kind": "help-article",
+      "topics": [
+        "countries"
+      ]
     },
     {
-      url: "https://intercom.help/plasma-6c43763cd799/en/articles/15180615-where-do-i-find-my-virtual-bank-account-details",
-      productIds: ["plasma-one"],
-      kind: "help-article",
-      topics: ["integrations"],
+      "url": "https://intercom.help/plasma-6c43763cd799/en/articles/15180615-where-do-i-find-my-virtual-bank-account-details",
+      "productIds": [
+        "plasma-one"
+      ],
+      "kind": "help-article",
+      "topics": [
+        "integrations"
+      ]
     },
     {
-      url: "https://intercom.help/plasma-6c43763cd799/en/articles/15506070-what-are-the-fees-on-plasma-one",
-      productIds: ["plasma-one"],
-      kind: "fee-schedule",
-      scope: ["lite_tier", "core_tier", "platinum_tier"],
-      topics: ["fees"],
+      "url": "https://intercom.help/plasma-6c43763cd799/en/articles/15506070-what-are-the-fees-on-plasma-one",
+      "productIds": [
+        "plasma-one"
+      ],
+      "kind": "fee-schedule",
+      "scope": [
+        "lite_tier",
+        "core_tier",
+        "platinum_tier"
+      ],
+      "topics": [
+        "fees"
+      ]
     },
     {
-      url: "https://intercom.help/plasma-6c43763cd799/en/articles/15506768-cashback-rates-and-spend-bands-by-tier",
-      productIds: ["plasma-one"],
-      kind: "rewards-terms",
-      scope: ["lite_tier", "core_tier", "platinum_tier"],
-      topics: ["rewards"],
+      "url": "https://intercom.help/plasma-6c43763cd799/en/articles/15506768-cashback-rates-and-spend-bands-by-tier",
+      "productIds": [
+        "plasma-one"
+      ],
+      "kind": "rewards-terms",
+      "scope": [
+        "lite_tier",
+        "core_tier",
+        "platinum_tier"
+      ],
+      "topics": [
+        "rewards"
+      ]
     },
     {
-      url: "https://intercom.help/plasma-6c43763cd799/en/articles/15506864-overview-of-plasma-one-perks-and-benefits",
-      productIds: ["plasma-one"],
-      kind: "rewards-terms",
-      scope: ["core_tier", "platinum_tier"],
-      topics: ["rewards", "card_type"],
+      "url": "https://intercom.help/plasma-6c43763cd799/en/articles/15506864-overview-of-plasma-one-perks-and-benefits",
+      "productIds": [
+        "plasma-one"
+      ],
+      "kind": "rewards-terms",
+      "scope": [
+        "core_tier",
+        "platinum_tier"
+      ],
+      "topics": [
+        "rewards",
+        "card_type"
+      ]
     },
     {
-      url: "https://intercom.help/plasma-6c43763cd799/en/articles/16042025-how-does-the-platinum-referral-boost-work",
-      productIds: ["plasma-one"],
-      kind: "rewards-terms",
-      scope: "platinum_tier",
-      topics: ["rewards", "requirements"],
+      "url": "https://intercom.help/plasma-6c43763cd799/en/articles/16042025-how-does-the-platinum-referral-boost-work",
+      "productIds": [
+        "plasma-one"
+      ],
+      "kind": "rewards-terms",
+      "scope": "platinum_tier",
+      "topics": [
+        "rewards",
+        "requirements"
+      ]
     },
     {
-      url: "https://intercom.help/plasma-6c43763cd799/en/articles/16169845-how-do-i-get-the-10-referral-bonus",
-      productIds: ["plasma-one"],
-      kind: "help-article",
-      topics: ["rewards"],
+      "url": "https://www.plasma.org/",
+      "productIds": [
+        "plasma-one"
+      ],
+      "kind": "product-page",
+      "topics": [
+        "card_type",
+        "product_status",
+        "rewards"
+      ]
     },
     {
-      url: "https://www.plasma.org/",
-      productIds: ["plasma-one"],
-      kind: "product-page",
-      topics: ["card_type", "product_status", "rewards"],
-    },
-    {
-      url: "https://www.plasma.org/personal",
-      productIds: ["plasma-one"],
-      kind: "product-page",
-      scope: "tiered",
-      topics: [
+      "url": "https://www.plasma.org/personal",
+      "productIds": [
+        "plasma-one"
+      ],
+      "kind": "product-page",
+      "scope": "tiered",
+      "topics": [
         "rewards",
         "fees",
         "requirements",
         "card_type",
-        "product_status",
-      ],
+        "product_status"
+      ]
     },
     {
-      url: "https://www.plasma.org/personal/core",
-      productIds: ["plasma-one"],
-      kind: "product-page",
-      topics: [
+      "url": "https://www.plasma.org/personal/core",
+      "productIds": [
+        "plasma-one"
+      ],
+      "kind": "product-page",
+      "topics": [
         "rewards",
         "fees",
         "requirements",
         "crypto",
         "card_type",
-        "product_status",
-      ],
+        "product_status"
+      ]
     },
     {
-      url: "https://www.plasma.org/personal/lite",
-      productIds: ["plasma-one"],
-      kind: "product-page",
-      scope: "lite_tier",
-      topics: [
+      "url": "https://www.plasma.org/personal/lite",
+      "productIds": [
+        "plasma-one"
+      ],
+      "kind": "product-page",
+      "scope": "lite_tier",
+      "topics": [
         "rewards",
         "fees",
         "requirements",
         "card_type",
-        "product_status",
-      ],
+        "product_status"
+      ]
     },
     {
-      url: "https://www.plasma.org/personal/platinum",
-      productIds: ["plasma-one"],
-      kind: "product-page",
-      scope: "platinum_tier",
-      topics: [
+      "url": "https://www.plasma.org/personal/platinum",
+      "productIds": [
+        "plasma-one"
+      ],
+      "kind": "product-page",
+      "scope": "platinum_tier",
+      "topics": [
         "rewards",
         "fees",
         "requirements",
         "crypto",
         "card_type",
-        "product_status",
-      ],
+        "product_status"
+      ]
     },
     {
-      url: "https://www.plasma.org/plasma-one-international-card-terms",
-      productIds: ["plasma-one"],
-      kind: "cardholder-agreement",
-      scope: "international",
-      topics: [
+      "url": "https://www.plasma.org/plasma-one-international-card-terms",
+      "productIds": [
+        "plasma-one"
+      ],
+      "kind": "cardholder-agreement",
+      "scope": "international",
+      "topics": [
         "fees",
         "requirements",
         "card_type",
         "atm",
         "limits",
-        "countries",
-      ],
+        "countries"
+      ]
     },
     {
-      url: "https://www.plasma.org/plasma-one-rewards",
-      productIds: ["plasma-one"],
-      kind: "rewards-terms",
-      topics: [
+      "url": "https://www.plasma.org/plasma-one-rewards",
+      "productIds": [
+        "plasma-one"
+      ],
+      "kind": "rewards-terms",
+      "topics": [
         "rewards",
         "requirements",
         "crypto",
         "card_type",
-        "product_status",
-      ],
+        "product_status"
+      ]
     },
     {
-      url: "https://www.plasma.org/plasma-one-us-card-terms",
-      productIds: ["plasma-one"],
-      kind: "cardholder-agreement",
-      topics: [
+      "url": "https://www.plasma.org/plasma-one-us-card-terms",
+      "productIds": [
+        "plasma-one"
+      ],
+      "kind": "cardholder-agreement",
+      "topics": [
         "fees",
         "requirements",
         "card_type",
         "atm",
         "limits",
-        "countries",
-      ],
+        "countries"
+      ]
     },
     {
-      url: "https://www.plasma.org/platinum-referral-rewards",
-      productIds: ["plasma-one"],
-      kind: "product-page",
-      topics: ["rewards", "card_type", "product_status"],
-    },
-  ],
+      "url": "https://www.plasma.org/platinum-referral-rewards",
+      "productIds": [
+        "plasma-one"
+      ],
+      "kind": "product-page",
+      "topics": [
+        "rewards",
+        "card_type",
+        "product_status"
+      ]
+    }
+  ]
 } satisfies CardSources;

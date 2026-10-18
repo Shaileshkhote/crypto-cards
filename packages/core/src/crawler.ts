@@ -7,12 +7,17 @@ import type { Adapter, Document } from "./schema";
 import { hash } from "./serialize";
 
 const AGENT = "CryptoCardsBot";
-export const normalize = (s: string) =>
+class HttpError extends Error {
+  constructor(readonly status: number) {
+    super(`HTTP ${status}${status === 429 ? " (rate limited; retry later)" : ""}`);
+  }
+}
+export const normalize = (s: string, preserveLayout = false) =>
   s
     .normalize("NFKC")
     .replace(/\r/g, "")
     .split("\n")
-    .map((x) => x.replace(/\s+/g, " ").trim())
+    .map((x) => preserveLayout ? x.trimEnd() : x.replace(/\s+/g, " ").trim())
     .filter(Boolean)
     .join("\n");
 export function normalizeUrl(input: string) {
@@ -46,7 +51,7 @@ export async function assertPublic(input: string, domains: string[]) {
 async function http(
   url: string,
   domains: string[],
-  accept = "text/html,text/plain,application/pdf",
+  accept = "*/*",
 ) {
   for (let i = 0; i < 5; i++) {
     await assertPublic(url, domains);
@@ -64,9 +69,7 @@ async function http(
     }
     if (!r.ok) {
       await r.body?.cancel();
-      throw new Error(
-        `HTTP ${r.status}${r.status === 429 ? " (rate limited; retry later)" : ""}`,
-      );
+      throw new HttpError(r.status);
     }
     const bytes: Uint8Array[] = [];
     let size = 0;
@@ -89,10 +92,22 @@ export function documentFromText(
   text: string,
   title = url,
   links: string[] = [],
+  preserveLayout = false,
 ): Document {
-  const content = normalize(text);
+  const content = normalize(text, preserveLayout);
   const blocks = content
     .split("\n")
+    .flatMap((line) => {
+      const parts: string[] = [];
+      while (line.length > 1600) {
+        const space = line.lastIndexOf(" ", 1600);
+        const end = space > 800 ? space : 1600;
+        parts.push(line.slice(0, end));
+        line = line.slice(end).trimStart();
+      }
+      if (line) parts.push(line);
+      return parts;
+    })
     .map((text) => ({ id: hash(text).slice(0, 24), text }));
   return {
     url,
@@ -153,11 +168,14 @@ export class Crawler {
             const r = await http(
               `${u.origin}/robots.txt`,
               this.adapter.sources.allowedDomains,
-              "text/plain",
+              "*/*",
             );
             return robotsParser(`${u.origin}/robots.txt`, r.bytes.toString());
           } catch (e) {
-            if (e instanceof Error && /^HTTP 404/.test(e.message))
+            // RFC 9309 §2.3.1.3: a 4xx robots response means no available
+            // robots policy. Explicit disallow rules and server/rate failures
+            // still block crawling; fetching the actual resource must succeed.
+            if (e instanceof HttpError && e.status >= 400 && e.status < 500 && e.status !== 429)
               return robotsParser(`${u.origin}/robots.txt`, "");
             throw new Error(
               `Cannot verify robots.txt: ${e instanceof Error ? e.message : String(e)}`,
@@ -274,37 +292,21 @@ export async function documentFromPdf(
   url: string,
   bytes: Buffer,
 ): Promise<Document> {
-  const { Worker } = await import("node:worker_threads");
-  // PDF font/content parsing can loop on malformed files. A separate thread
-  // lets us enforce a deadline even while the parser consumes CPU synchronously.
+  const { execFile } = await import("node:child_process");
+  // Poppler handles the embedded fonts that stalled PDF.js on real card terms.
   const text = await new Promise<string>((resolve, reject) => {
-    const worker = new Worker(new URL("./pdf-worker.ts", import.meta.url), {
-      workerData: new Uint8Array(bytes),
-    });
-    let settled = false;
-    const finish = (error?: Error, text = "") => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      void worker.terminate();
-      if (error) reject(error);
-      else resolve(text);
-    };
-    const timer = setTimeout(
-      () => finish(new Error("PDF parsing timed out after 20 seconds")),
-      20_000,
+    const child = execFile(
+      "pdftotext", ["-layout", "-enc", "UTF-8", "-", "-"],
+      { timeout: 20_000, killSignal: "SIGKILL", maxBuffer: 5_000_000, encoding: "utf8" },
+      (error, stdout) => {
+        if (error) reject(new Error(`PDF text extraction failed: ${error.message}`));
+        else resolve(stdout);
+      },
     );
-    worker.once("message", (result: { text?: string; error?: string }) =>
-      result.error
-        ? finish(new Error(result.error))
-        : finish(undefined, result.text),
-    );
-    worker.once("error", (error) => finish(error));
-    worker.once("exit", (code) => {
-      if (!settled) finish(new Error(`PDF parser exited before returning text (${code})`));
-    });
+    child.stdin!.on("error", () => {}); // A rejected PDF may close stdin early.
+    child.stdin!.end(bytes);
   });
-  const doc = documentFromText(url, text);
+  const doc = documentFromText(url, text, url, [], true);
   return doc.content.length < 30
     ? { ...doc, status: "pending_transcription", error: "PDF has no usable text; transcription required" }
     : doc;

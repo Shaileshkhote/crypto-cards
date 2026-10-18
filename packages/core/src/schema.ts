@@ -2,27 +2,21 @@ import { z } from "zod";
 import countries from "i18n-iso-countries";
 import { compareDecimals } from "./serialize";
 
-export const SCHEMA_VERSION = "1";
+export const SCHEMA_VERSION = "2";
 export const Id = z
   .string()
   .regex(/^[a-z0-9][a-z0-9-]*$/)
   .max(180);
 export const Country = z
-  .string()
-  .regex(/^[A-Z]{2}$/)
-  .refine(
-    (v) => countries.isValid(v) && /^[A-Z]{2}$/.test(v),
-    "Expected ISO 3166-1 alpha-2 country",
-  )
+  .enum(Object.keys(countries.getAlpha2Codes()) as [string, ...string[]])
   .describe("ISO 3166-1 alpha-2 country code, such as US, DE or GB. Region labels such as EU, EEA and APAC belong in regions, never country arrays.");
-const currencyCodes = new Set(Intl.supportedValuesOf("currency"));
 export const Currency = z
-  .string()
-  .regex(/^[A-Z]{3}$/)
-  .refine((v) => currencyCodes.has(v), "Expected ISO 4217 currency");
+  .enum(Intl.supportedValuesOf("currency") as [string, ...string[]])
+  .describe("ISO 4217 currency code. Offshore aliases such as CNH are not ISO codes; preserve unsupported currencies in an unknown rule's description, never substitute another currency.");
 export const Money = z
   .object({
-    amount: z.string().regex(/^(0|[1-9]\d*)(\.\d+)?$/),
+    amount: z.string().regex(/^(0|[1-9]\d*)(\.\d+)?$/)
+      .transform(value => value.replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "")),
     currency: Currency,
   })
   .strict();
@@ -47,9 +41,13 @@ export const Scope = z
     regions: z.array(z.string()).optional(),
     transactionCountries: z.array(Country).optional(),
     transactionCurrencies: z.array(Currency).optional(),
+    excludedTransactionCurrencies: z.array(Currency).optional(),
     fundingCurrencies: z.array(Currency).optional(),
     merchantCategories: z.array(z.string()).optional(),
     tierIds: z.array(Id).optional(),
+    cardTypes: z.array(z.enum(["physical", "virtual"])).optional(),
+    cardOrder: z.enum(["first", "additional"]).optional(),
+    paymentRails: z.array(Id).optional(),
   })
   .strict();
 const RuleBase = {
@@ -72,7 +70,8 @@ const FeeBase = {
     "topup",
     "replacement",
     "inactivity",
-  ]),
+    "refund",
+  ]).describe("fx is fiat currency exchange; conversion is crypto/asset conversion. refund applies only to processing a refund, not ordinary purchases."),
   minFee: Money.optional(),
   maxFee: Money.optional(),
   allowance: z.object({ amount: Money, period: Period }).strict().optional(),
@@ -201,6 +200,7 @@ export const FeatureShape = {
       virtual: z.boolean().nullable().optional(),
     })
     .strict()
+    .describe("Supported card formats, regardless of a temporary ordering/issuance pause. A pause does not mean physical=false or virtual=false; omit unknown format support.")
     .nullable()
     .optional(),
   iban: z

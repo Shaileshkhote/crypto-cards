@@ -1,19 +1,24 @@
-# Evaluation status
+# Extraction evaluation
 
-The candidate `openai/gpt-4.1-mini` has been live-tested through OpenRouter's OpenAI route and **has not met production acceptance**. The latest prompt passes five of six labeled synthetic cases, missing an explicit issuer fact. Real-provider snapshot runs expose incomplete output, schema violations, invalid citations and an unsupported inference in a technically successful publication. See [live validation](live-validation.md). No real-provider accuracy or 50-provider budget claim is approved. The uploaded archive contains source inventories and legacy code, not a hand-verified extraction corpus. Legacy conditional parsing results are not ground truth.
+The default model is `openai/gpt-5.4-mini`, selected after comparing live extractions with six synthetic scenarios and eight labeled real-source cases. The real-source selection run passed **8/8** cases, including the shared publication validator, with $0.104764 of returned usage cost. Earlier `gpt-4.1-mini` and `gpt-5-mini` runs missed supported facts or inferred unsupported values. There is one configured model, with no fallback chain.
 
-Six synthetic regression scenarios cover regional percentages, zero fees/false features, tiered ATM allowances, capped rewards, unknown calculation, and multiple tiers. Unit and PostgreSQL tests validate preservation, evidence, cache identity and review behavior. Mock model calls test tool schemas, bounded steps and usage accounting; their costs are simulated and are not OpenRouter charges.
+The checked-in corpus is `tests/fixtures/live-providers.json`: short verified passages from Avici, Ready, Plasma One, SafePal, EtherFi and Revolut. It checks issuance scope, contractual maximums, paused issuance, KYC/custody, payment rails, non-USD FX/refunds, reward assets and aligned PDF plan columns. Positive and negative labels are checked against typed facts. These passages establish regression coverage, not full-provider precision or recall. They are source data, never executable instructions.
 
-Before selecting a production model, label 5–8 varied real providers. Suggested imported seeds: EtherFi, Avici, MEXC, Gnosis Pay, Nexo and Revolut. Include actual HTML, text/image PDFs, JavaScript pages, country scopes, tier names, fees, caps and exact evidence blocks, with source URLs and verification dates. Human labels must distinguish real source facts from the archive's dataset policies.
-
-With source network access, a dedicated benchmark database and a securely injected OpenRouter key:
+Run the inexpensive live evaluation with a securely injected key:
 
 ```sh
+pnpm evaluate
+```
+
+Its default shared cap is $0.40; `MAX_RUN_COST_USD` can lower or override it, up to the core $5 maximum. Reports containing extracted public passages go to ignored `.local/evaluation.json`. Unit tests use simulated model responses and require no key.
+
+For a complete source-to-database check, use a dedicated benchmark database, functioning DNS and access to the provider's public documentation:
+
+```sh
+pnpm db:migrate
 pnpm benchmark etherfi avici mexc gnosis-pay nexo-card revolut
 ```
 
-The command runs forced and warm syncs through the real shared core, writes `.local/benchmark.json`, and reports measured token/cost/status/latency. Both passes share one $5 run budget; failed adapters are reported, and the 50-provider estimate is omitted when any cold sync fails. It may generate review records and publications, so use a dedicated database. Compare successful outputs manually with the labeled corpus, record precision/recall by field and scope, and record the actual model/provider route. Estimate total cost only from completed representative runs; failed runs and unextracted pages invalidate blanket claims. Set provider-side spend controls because application reservations cannot guarantee billing behavior.
+Forced and unchanged passes share one budget. Unchanged snapshots must make zero model requests. Inspect successful outputs against source context and exact scopes; a valid quote proves the passage exists, not that the interpretation is right. Do not extrapolate 50-provider cost from failed or incomplete runs. The latest full-inventory replay and access restrictions are recorded in [live validation](live-validation.md).
 
-On this cloud machine, `NODE_USE_ENV_PROXY=1` enables the OpenRouter HTTPS transport. The machine's DNS resolver still returns `EAI_AGAIN`, so native crawler public-address validation cannot complete. Proxy-fetched source snapshots were tested separately; they do not establish a complete native crawl. Use a machine with functioning DNS for the native benchmark.
-
-Production deployment, a complete native benchmark, off-host backup configuration and a production backup restore require operator access and are separate from the local implementation checks. The validation report records the checks actually run in this cloud task.
+This cloud machine's native DNS resolver returns EAI_AGAIN. Proxy-fetched source snapshots test parsing, model extraction, publication and cache reuse, but cannot prove the native crawler or production deployment. Explicit robots restrictions remain enforced. Production credentials belong in deployment environment bindings, never Git or reports.
