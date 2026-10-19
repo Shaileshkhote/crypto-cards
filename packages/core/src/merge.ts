@@ -8,7 +8,7 @@ import {
 } from "./schema";
 import { canonical, hash, slug } from "./serialize";
 import { verifyEvidence, verifyFinancialEvidence } from "./evidence";
-export const MERGE_VERSION = "10";
+export const MERGE_VERSION = "11";
 type ObjectValue = Record<string, unknown>;
 const isObject = (v: unknown): v is ObjectValue =>
   !!v && typeof v === "object" && !Array.isArray(v);
@@ -609,22 +609,25 @@ export function markUnconfirmed(
 }
 export const publicationHash = (card: CardData) => hash(ordered(card));
 
-export function unconfirmedChanges(
-  before: CardData,
-  after: CardData,
-): Change[] {
-  return diff(before, after)
-    .filter(
-      (c) =>
-        c.path.at(-1) === "unconfirmedFields" &&
-        Array.isArray(c.after) &&
-        c.after.length > 0,
-    )
-    .map((c) => ({
-      ...c,
-      reason:
-        "Accepted facts were not found in changed source text; values retained for review",
-    }));
+export function unconfirmedChanges(card: CardData): Change[] {
+  const changes: Change[] = [];
+  const visit = (node: ObjectValue, path: string[]) => {
+    if (Array.isArray(node.unconfirmedFields) && node.unconfirmedFields.length)
+      changes.push({
+        path: [...path, "unconfirmedFields"],
+        // Uncertainty is already published safely. Review acknowledges the
+        // retained facts; derive it from current state so a warm pass keeps
+        // the same proposal instead of losing a transient before/after delta.
+        before: node.unconfirmedFields,
+        after: node.unconfirmedFields,
+        reason: "Accepted facts were not found in changed source text; values retained for review",
+      });
+    for (const field of ["products", "tiers"])
+      for (const child of (node[field] || []) as ObjectValue[])
+        visit(child, [...path, field, String(child.id)]);
+  };
+  visit(card as ObjectValue, []);
+  return changes;
 }
 export function describeChange(card: CardData, change: Change) {
   const path = change.path;

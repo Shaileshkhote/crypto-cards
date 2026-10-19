@@ -208,7 +208,7 @@ export async function syncAdapter(
         : undefined;
       const merged = merge(unconfirmed, built.data);
       if (accepted && unconfirmed)
-        merged.changes.push(...unconfirmedChanges(accepted, unconfirmed));
+        merged.changes.push(...unconfirmedChanges(unconfirmed));
       let proposed = merged.changes.length;
       const version = await transaction(async (c) => {
         await c.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", [
@@ -227,10 +227,10 @@ export async function syncAdapter(
         );
         if (merged.changes.length) {
           const duplicate = await c.query(
-            "SELECT id,status FROM card_reviews WHERE card_id=$1 AND base_version=$2 AND status IN ('pending','rejected') AND changes=$3::jsonb",
+            "SELECT id,status FROM card_reviews WHERE card_id=$1 AND base_version=$2 AND status IN ('pending','rejected','approved') AND changes=$3::jsonb",
             [id, version, JSON.stringify(merged.changes)],
           );
-          if (duplicate.rows[0]?.status === "rejected") proposed = 0;
+          if (["rejected", "approved"].includes(duplicate.rows[0]?.status)) proposed = 0;
           // A review is immutable: a new proposal supersedes the old one so
           // a previously opened screen cannot approve unseen changed content.
           await c.query(

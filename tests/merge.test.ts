@@ -104,10 +104,18 @@ describe("deterministic merge and protection", () => {
     expect(candidate(a, [e], undefined, [doc]).data.products![0].tiers![0].fees![0]).toMatchObject({ ratePercent: 0 });
   });
   it("does not treat a possible or refused waiver as an explicit free charge", () => {
-    for (const text of ["The fee is not waived.", "The fee may be waived.", "An additional fee applies."]) {
+    for (const text of ["The fee is not waived.", "The fee may be waived.", "An additional fee applies.", "Monthly, annual, or inactivity card fees may be waived.", "The bank may not charge fees.", "The bank will not waive the fee."]) {
       const doc = documentFromText("https://example.com/fees", text), e = extraction(doc, 0);
       expect(() => candidate(adapter(), [e], undefined, [doc])).toThrow("Financial value 0 is absent");
     }
+  });
+  it("accepts an explicit no-charge list with commas and conjunctions", () => {
+    const doc = documentFromText("https://example.com/card", "Enjoy daily spending with no monthly, annual, or inactivity card fees."), e = extraction(doc, 0);
+    e.facts[0].value = (["monthly", "annual", "inactivity"] as const).map(kind => ({ id: kind, kind, scope: {}, calculation: "percentage" as const, ratePercent: 0, calculable: true as const }));
+    expect(candidate(adapter(), [e], undefined, [doc]).data.products![0].tiers![0].fees).toHaveLength(3);
+    const contract = documentFromText("https://example.com/contract", "The issuer will not charge fees for overdraft or attempted overdraft."), statement = extraction(contract, 0);
+    statement.facts[0].value = [{ id: "overdraft", kind: "other", serviceId: "overdraft", scope: {}, calculation: "percentage", ratePercent: 0, calculable: true }];
+    expect(candidate(adapter(), [statement], undefined, [contract]).data.products![0].tiers![0].fees![0]).toMatchObject({ serviceId: "overdraft", ratePercent: 0 });
   });
   it("rejects a real citation to the wrong financial row and accepts explicit scaled amounts", () => {
     const a = adapter(), doc = documentFromText("https://example.com/limits", "Per purchase: 1.5k USD.\nAnnual transaction count: 1,040."), e = extraction(doc);

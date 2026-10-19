@@ -332,9 +332,10 @@
           ]
         },
         "description": "Withdrawing CASH with standard ACH is free.",
-        "kind": "transaction",
+        "kind": "other",
         "calculation": "percentage",
-        "ratePercent": 0
+        "ratePercent": 0,
+        "serviceId": "ach-withdrawal"
       },
       {
         "id": "fast-ach-withdrawal",
@@ -347,8 +348,9 @@
           ]
         },
         "description": "Withdrawing CASH with fast ACH costs $1.00 flat plus 0.75%, with a $1.50 minimum.",
-        "kind": "transaction",
-        "calculation": "unknown"
+        "kind": "other",
+        "calculation": "unknown",
+        "serviceId": "ach-withdrawal"
       }
     ]
   },

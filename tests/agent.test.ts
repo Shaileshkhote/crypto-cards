@@ -366,3 +366,50 @@ it("reports every missing financial scope in a single correction without assumin
   expect((await extract(adapter(), [doc], new Budget(0))).extraction).toEqual(good);
   expect(calls).toBe(2);
 });
+
+it("keeps source text and tool reasoning while omitting opaque final-draft reasoning from a correction", async () => {
+  vi.stubEnv("OPENROUTER_API_KEY", "offline-fixture-not-a-key");
+  const doc = document(), good = extraction(doc), bad = structuredClone(good);
+  delete (bad.facts[0].value as Record<string, unknown>[])[0].scope;
+  const toolReasoning = [{ type: "reasoning.encrypted", data: "tool-continuation-state" }];
+  let calls = 0;
+  vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+    if (url.endsWith("/models")) return Response.json({ data: [{ id: modelName(), pricing: { prompt: "0", completion: "0" }, supported_parameters: ["tools", "structured_outputs"] }] });
+    const turn = ++calls, body = JSON.parse(String(init?.body));
+    if (turn === 3) {
+      const assistants = body.messages.filter((m: { role: string }) => m.role === "assistant");
+      expect(assistants[0].reasoning_details).toEqual(toolReasoning);
+      expect(assistants[1].content).toBe(JSON.stringify(bad));
+      expect(assistants[1].reasoning_details).toBeUndefined();
+      const source = body.messages.find((m: { role: string }) => m.role === "tool");
+      expect(JSON.parse(source.content).blocks[0].text).toBe(doc.blocks[0].text);
+      expect(Buffer.byteLength(String(init?.body))).toBeLessThan(512_000);
+    }
+    const message = turn === 1
+      ? { content: null, tool_calls: [{ id: "read", function: { name: "readPage", arguments: JSON.stringify({ url: doc.url, offset: 0 }) } }], reasoning_details: toolReasoning }
+      : { content: JSON.stringify(turn === 2 ? bad : good), reasoning_details: [{ type: "reasoning.encrypted", data: "x".repeat(520_000) }] };
+    return Response.json({ usage: { cost: 0 }, choices: [{ finish_reason: turn === 1 ? "tool_calls" : "stop", message }] });
+  }));
+  expect((await extract(adapter(), [doc], new Budget(0))).extraction).toEqual(good);
+  expect(calls).toBe(3);
+});
+
+it("reports the short source selector and wrong cited text when a financial row needs correction", async () => {
+  vi.stubEnv("OPENROUTER_API_KEY", "offline-fixture-not-a-key");
+  const doc = documentFromText("https://example.com/fees", "FX fee: 1.5%.\nCollateral can be increased voluntarily.");
+  const good = extraction(doc), bad = structuredClone(good);
+  bad.facts[0].evidence = { url: doc.url, blockId: "p1b2" } as typeof bad.facts[0]["evidence"];
+  let calls = 0;
+  vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+    if (url.endsWith("/models")) return Response.json({ data: [{ id: modelName(), pricing: { prompt: "0", completion: "0" }, supported_parameters: ["tools", "structured_outputs"] }] });
+    if (++calls === 2) {
+      const feedback = JSON.parse(String(init?.body)).messages.at(-1).content;
+      expect(feedback).toContain(`${doc.url}#p1b2`);
+      expect(feedback).toContain("Collateral can be increased voluntarily");
+      expect(feedback).not.toContain(doc.blocks[1].id);
+    }
+    return Response.json({ usage: { cost: 0 }, choices: [{ finish_reason: "stop", message: { content: JSON.stringify(calls === 1 ? bad : good) } }] });
+  }));
+  expect((await extract(adapter(), [doc], new Budget(0))).extraction).toEqual(good);
+  expect(calls).toBe(2);
+});

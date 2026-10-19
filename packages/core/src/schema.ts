@@ -94,7 +94,9 @@ const FeeBase = {
   minFee: Money.optional(),
   serviceId: Id.describe("Required only for kind other: stable kebab-case name of the charged service. Omit for known kinds.").optional(),
   maxFee: Money.optional(),
-  allowance: z.object({ amount: Money, period: Period }).strict().optional(),
+  allowance: z.object({ amount: Money, period: Period }).strict()
+    .describe("Explicit fee-free monetary amount per period. Preserve it here even when a withdrawal-count condition also applies; put the count and whichever-first condition in scope.conditions.")
+    .optional(),
 };
 export const FeeRule = z
   .discriminatedUnion("calculation", [

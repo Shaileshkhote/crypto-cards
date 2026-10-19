@@ -23,7 +23,8 @@ export function verifyFinancialEvidence(fact: ExtractionData["facts"][number]) {
     const digits = whole + fraction + "0".repeat(scale), split = whole.length + scale;
     return `${digits.slice(0, split)}.${digits.slice(split) || "0"}`;
   });
-  if (/\b(free|zero|none|(?:no|without) (?:[\w-]+\s+){0,3}(?:fees?|charges?|cost|markup))\b/i.test(quote) ||
+  if (/\b(free|zero|none|(?:no|without) (?:[\w-]+(?:,\s*|\s+)){0,5}(?:fees?|charges?|cost|markup))\b/i.test(quote) ||
+      /\b(?:will|shall|do|does)\s+not\s+charge\s+(?:(?:a|any)\s+)?(?:[\w-]+\s+){0,3}fees?\b/i.test(quote) ||
       /\b(?:fees?|charges?|cost)\s+(?:is\s+)?(?:currently\s+)?waived\b/i.test(quote)) numbers.push("0");
   const errors: string[] = [];
   const visit = (value: unknown, path: string, ruleId?: string) => {
@@ -45,5 +46,5 @@ export function verifyFinancialEvidence(fact: ExtractionData["facts"][number]) {
     }
   };
   visit(fact.value, fact.field);
-  if (errors.length) throw new Error(errors.join("\n"));
+  if (errors.length) throw new Error(`${errors.join("\n")} Cited text: ${quote.slice(0, 240)}`);
 }

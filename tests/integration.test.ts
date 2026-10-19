@@ -241,6 +241,25 @@ describe.skipIf(!enabled)(
       const card = await read();
       expect(card.products?.[0].tiers?.[0].fees).toHaveLength(1);
       expect(card.products?.[0].tiers?.[0].unconfirmedFields).toContain("fees");
+      const pending = (await listReviews())[0];
+      const cached = await readCache("cards/example");
+      const warm = await syncAdapter(adapter(), new Budget(0), {
+        fetch: async () => doc,
+        extract: async () => { throw new Error("Unchanged source must use its cached extraction"); },
+      });
+      expect(warm).toMatchObject({ status: "review", changed: 0, proposed: r.proposed, costUsd: 0 });
+      expect((await listReviews())[0]).toEqual(pending);
+      expect((await readCache("cards/example"))?.payload).toBe(cached?.payload);
+      // Acknowledging missing evidence leaves the retained fee unconfirmed and
+      // must not create a fresh identical review on every scheduled warm run.
+      await approveReview(pending.id, "reviewer@example.com");
+      const acknowledged = await syncAdapter(adapter(), new Budget(0), {
+        fetch: async () => doc,
+        extract: async () => { throw new Error("Unchanged source must use its cached extraction"); },
+      });
+      expect(acknowledged).toMatchObject({ status: "unchanged", proposed: 0, costUsd: 0 });
+      expect(await listReviews()).toHaveLength(0);
+      expect((await read()).products?.[0].tiers?.[0].fees![0].status).toBe("unconfirmed");
     });
     it("executes a queued job through the same core across SQL claim boundaries", async () => {
       await run();
