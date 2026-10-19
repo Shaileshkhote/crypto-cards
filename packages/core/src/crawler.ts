@@ -168,7 +168,15 @@ export function parseHtml(url: string, html: string): Document {
       .map((_, tr) =>
         $(tr)
           .find("th,td")
-          .map((_, td) => normalize($(td).text()).replaceAll("\n", " "))
+          .map((_, td) => {
+            const cell = $(td).clone();
+            cell.find("br").replaceWith(" ");
+            cell.find("p,div,section").each((_, el) => {
+              $(el).prepend("\n");
+              $(el).append("\n");
+            });
+            return normalize(cell.text()).replaceAll("\n", " ");
+          })
           .get()
           .join(" | "),
       )

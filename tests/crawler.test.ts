@@ -31,6 +31,15 @@ it("repeats table headers across bounded blocks without losing rows", () => {
   expect(doc.blocks.every(b => b.text.startsWith("Country | Eligibility") && b.text.length <= 1600)).toBe(true);
   for (let i = 0; i < 80; i++) expect(doc.content).toContain(`Country ${i} | Available`);
 });
+it("preserves line breaks and paragraph boundaries inside financial table cells", () => {
+  const doc = parseHtml("https://example.com/limits", "<table><tr><th>Service</th><th>Basic</th></tr><tr><td>Free ATM<br>withdrawals</td><td><p>USD 200</p><p>per month</p></td></tr><tr><td>ATM<br>withdrawals cap</td><td>USD 5000<br>per month</td></tr></table>");
+  expect(doc.content).toContain("Free ATM withdrawals | USD 200 per month");
+  expect(doc.content).toContain("ATM withdrawals cap | USD 5000 per month");
+  const block = doc.blocks.find(b => b.text.includes("Free ATM"))!;
+  const fact = { field: "limits" as const, productId: "card", tierId: "basic", inherit: false, value: [{ id: "atm", kind: "atm", scope: {}, amount: { amount: "200", currency: "USD" }, period: "month", calculable: true }], evidence: { url: doc.url, blockId: block.id, quote: block.text } };
+  expect(() => verifyFinancialEvidence(fact)).toThrow("is an allowance, not a hard withdrawal limit");
+  expect(() => verifyFinancialEvidence({ ...fact, value: [{ ...fact.value[0], amount: { amount: "5000", currency: "USD" } }] })).not.toThrow();
+});
 it("keeps an introductory paragraph with bounded list rows without leaking free context into later charges", () => {
   const rows = Array.from({ length: 80 }, (_, i) => `<li><p>Tier ${i}:</p><p>up to ${100 + i} EUR</p></li>`).join("");
   const doc = parseHtml("https://example.com/allowances", `<p>Free ATM withdrawals per month by tier:</p><ul>${rows}</ul><p>After the allowance: 2% fee.</p>`);
