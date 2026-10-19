@@ -8,7 +8,7 @@ import {
 } from "./schema";
 import { canonical, hash, slug } from "./serialize";
 import { verifyEvidence, verifyFinancialEvidence } from "./evidence";
-export const MERGE_VERSION = "9";
+export const MERGE_VERSION = "10";
 type ObjectValue = Record<string, unknown>;
 const isObject = (v: unknown): v is ObjectValue =>
   !!v && typeof v === "object" && !Array.isArray(v);
@@ -188,7 +188,7 @@ function coalesceRules(values: ObjectValue[], field: string) {
   for (const rule of values) {
     const id = String(rule.id), earlier = seen.get(id);
     if (earlier && !compatible(earlier, rule))
-      throw new Error(`Ambiguous ${field} identity; conflicting rules share a scope`);
+      throw new Error(`Ambiguous ${field} identity; conflicting rules share a scope: ${conflictDetails(earlier, rule)}`);
     const notes = descriptions.get(id) || new Set<string>();
     if (typeof rule.description === "string") notes.add(rule.description);
     descriptions.set(id, notes);
@@ -247,6 +247,20 @@ function compatible(left: unknown, right: unknown, ruleArray = false): boolean {
       return !old || compatible(old, r);
     });
   return canonical(ordered(left)) === canonical(ordered(right));
+}
+function conflictDetails(first: unknown, second: unknown): string {
+  if (keyed(first) && keyed(second)) {
+    const right = second.find(rule => first.some(old => old.id === rule.id && !compatible(old, rule)));
+    if (right) return conflictDetails(first.find(old => old.id === right.id), right);
+  }
+  const summary = (value: unknown): unknown => {
+    if (Array.isArray(value)) return value.map(summary);
+    if (!isObject(value)) return value;
+    return Object.fromEntries(Object.entries(value)
+      .filter(([key]) => !["source", "status"].includes(key))
+      .map(([key, item]) => [key, key === "description" && typeof item === "string" ? item.slice(0, 300) : summary(item)]));
+  };
+  return canonical({ first: summary(first), second: summary(second) }).slice(0, 4000);
 }
 export function candidate(
   adapter: Adapter,
@@ -379,11 +393,11 @@ export function candidate(
       const earlier = factsSeen.get(factKey);
       // Assemble cited collection rows before comparing complete lists from
       // different sources. Financial rule conflicts still fail immediately.
-      const narrative = ["terms", "requirements"].includes(fact.field) && Array.isArray(value);
+      const additive = ["terms", "requirements", "features"].includes(fact.field) && Array.isArray(value);
       const collection = !["fees", "rewards", "limits"].includes(fact.field) && Array.isArray(value) && value.every(item => typeof item === "string");
       if (collection && Array.isArray(earlier) && (earlier.length === 0) !== (value.length === 0))
         throw new Error(`Explicit empty list conflicts with extracted values: ${factKey}; published values retained`);
-      if (collection && !narrative) {
+      if (collection && !additive) {
         const sources = collectionSources.get(factKey) || new Map<string, Set<string>>();
         const items = sources.get(fact.evidence.url) || new Set<string>();
         for (const item of value as string[]) items.add(item);
@@ -400,7 +414,7 @@ export function candidate(
         )
       )
         throw new Error(
-          `Conflicting extracted facts: ${factKey}; published values retained`,
+          `Conflicting extracted facts: ${factKey}; published values retained. Observations: ${conflictDetails(earlier, value)}`,
         );
       const combinedValue = collection && Array.isArray(earlier)
         ? ordered([...earlier, ...value as unknown[]])

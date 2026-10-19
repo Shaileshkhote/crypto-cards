@@ -3,6 +3,14 @@ import { Card } from "@cards/core/schema";
 import { directory, sortFees, filterDirectory, applicable } from "@cards/core/cache";
 import { REGIONS } from "@cards/core/regions";
 describe("directory scope and sorting", () => {
+  it("keeps prices with unevaluated source conditions out of numeric sorting", () => {
+    expect(applicable({ conditions: ["Plastic Companion Cards"] }, { country: "US", currency: "USD" })).toBe(false);
+    const cards = [
+      { id: "a", ratePercent: 5, scope: {} },
+      { id: "z", ratePercent: 0, scope: { conditions: ["First 30 days"] } },
+    ].map(({ id, ratePercent, scope }) => Card.parse({ id, name: id, website: "https://example.com", fees: [{ id: "fx", kind: "fx", calculation: "percentage", ratePercent, scope, calculable: true }] }));
+    expect(sortFees(directory(cards), "fx", { country: "US", currency: "USD" }).map(row => row.providerId)).toEqual(["a", "z"]);
+  });
   it("does not compare prices for unrelated uncommon services", () => {
     const cards = [
       { id: "z", serviceId: "account-letter", amount: "1" },

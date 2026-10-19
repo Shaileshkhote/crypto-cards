@@ -88,12 +88,26 @@ describe("deterministic merge and protection", () => {
     e.facts.push({ ...e.facts[0], evidence: { ...e.facts[0].evidence, url: different.url } });
     expect(() => candidate(a, [e], undefined, [doc, different])).toThrow("Conflicting extracted lists");
   });
+  it("combines complementary feature observations across pages without weakening eligibility checks", () => {
+    const first = documentFromText("https://example.com/card", "Contactless payments supported."), second = documentFromText("https://example.com/benefits", "Travel insurance included.");
+    const e = extraction(first);
+    e.facts = [first, second].map((doc, index) => ({ productId: "card", tierId: null, inherit: false, field: "features", value: [index ? "Travel insurance" : "Contactless payments"], evidence: { url: doc.url, blockId: doc.blocks[0].id, quote: doc.blocks[0].text } }));
+    const card = candidate(adapter(), [e], undefined, [first, second]).data;
+    expect(card.products![0].features).toEqual(["Contactless payments", "Travel insurance"]);
+    expect(card.products![0].fieldSources!.features).toHaveLength(2);
+  });
   it("does not invent fixed-money currency for a zero percentage", () => {
     const a = adapter(), doc = documentFromText("https://example.com/fees", "Top-up fee: 0%."), e = extraction(doc);
     e.facts[0].value = [{ id: "topup", kind: "topup", scope: {}, calculation: "fixed", fixed: { amount: "0", currency: "USD" }, calculable: true }];
     expect(() => candidate(a, [e], undefined, [doc])).toThrow("Money currency USD is absent");
     e.facts[0].value = [{ id: "topup", kind: "topup", scope: {}, calculation: "percentage", ratePercent: 0, calculable: true }];
     expect(candidate(a, [e], undefined, [doc]).data.products![0].tiers![0].fees![0]).toMatchObject({ ratePercent: 0 });
+  });
+  it("does not treat a possible or refused waiver as an explicit free charge", () => {
+    for (const text of ["The fee is not waived.", "The fee may be waived.", "An additional fee applies."]) {
+      const doc = documentFromText("https://example.com/fees", text), e = extraction(doc, 0);
+      expect(() => candidate(adapter(), [e], undefined, [doc])).toThrow("Financial value 0 is absent");
+    }
   });
   it("rejects a real citation to the wrong financial row and accepts explicit scaled amounts", () => {
     const a = adapter(), doc = documentFromText("https://example.com/limits", "Per purchase: 1.5k USD.\nAnnual transaction count: 1,040."), e = extraction(doc);

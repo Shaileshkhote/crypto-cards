@@ -143,6 +143,8 @@ export function applicable(
   scope: ScopeData,
   context: { country?: string; currency?: string; tierId?: string; cardType?: "physical" | "virtual"; cardOrder?: "first" | "additional"; paymentRail?: string; dayOfWeek?: NonNullable<ScopeData["daysOfWeek"]>[number] },
 ) {
+  // Free-text conditions cannot be established by the directory's sort context.
+  if (scope.conditions?.length) return false;
   if (scope.daysOfWeek && (!context.dayOfWeek || !scope.daysOfWeek.includes(context.dayOfWeek))) return false;
   if (scope.cardTypes && (!context.cardType || !scope.cardTypes.includes(context.cardType))) return false;
   if (scope.cardOrder && scope.cardOrder !== context.cardOrder) return false;

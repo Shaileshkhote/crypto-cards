@@ -2,7 +2,7 @@ import { z } from "zod";
 import countries from "i18n-iso-countries";
 import { compareDecimals } from "./serialize";
 
-export const SCHEMA_VERSION = "7";
+export const SCHEMA_VERSION = "8";
 export const Id = z
   .string()
   .regex(/^[a-z0-9][a-z0-9-]*$/)
@@ -15,8 +15,8 @@ export const Currency = z
   .describe("ISO 4217 currency code. Offshore aliases such as CNH are not ISO codes; preserve unsupported currencies in an unknown rule's description, never substitute another currency.");
 export const Money = z
   .object({
-    amount: z.string().regex(/^(0|[1-9]\d*)(\.\d+)?$/)
-      .transform(value => value.replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "")),
+    amount: z.string().regex(/^\d+(\.\d+)?$/)
+      .transform(value => value.replace(/^0+(?=\d)/, "").replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "")),
     currency: Currency,
   })
   .strict();
@@ -49,8 +49,12 @@ export const Scope = z
     tierIds: z.array(Id).optional(),
     cardTypes: z.array(z.enum(["physical", "virtual"])).optional(),
     cardOrder: z.enum(["first", "additional"]).optional(),
-    paymentRails: z.array(Id).optional(),
+    paymentRails: z.array(z.string().regex(/^[a-z0-9][a-z0-9_-]*$/i)
+      .transform(value => value.toLowerCase().replaceAll("_", "-")).pipe(Id)).optional(),
     daysOfWeek: z.array(Weekday).optional(),
+    conditions: z.array(z.string().min(1)).min(1)
+      .describe("Explicit source conditions not represented by another scope field, such as metal/plastic material, asset conversion or spending bands. Preserve the condition; never invent one to resolve conflicting prices.")
+      .optional(),
   })
   .strict();
 const RuleBase = {
@@ -66,6 +70,7 @@ const FeeBase = {
     "fx",
     "conversion",
     "atm",
+    "cash_advance",
     "atm_decline",
     "atm_balance_inquiry",
     "monthly",
@@ -171,6 +176,9 @@ export const FeeRule = z
 export const RewardRule = z
   .object({
     ...RuleBase,
+    kind: z.enum(["cashback", "salary_match", "yield", "referral", "other"])
+      .describe("Identify the actual reward program; salary matching and yield are separate from purchase cashback.")
+      .optional(),
     ratePercent: z.number().finite().nonnegative().optional(),
     rewardAsset: z.string().optional(),
     cap: z

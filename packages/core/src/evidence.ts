@@ -18,12 +18,13 @@ export function verifyFinancialEvidence(fact: ExtractionData["facts"][number]) {
   if (!["fees", "rewards", "limits"].includes(fact.field)) return;
   const quote = fact.evidence.quote;
   const numbers = [...quote.matchAll(/\b(\d+(?:[,\u00a0 ]\d{3})*(?:\.\d+)?)(?:\s*(k|m|thousand|million)\b)?/gi)].map(match => {
-    const [whole, fraction = ""] = match[1].replace(/[,\s]/g, "").split(".");
+    const [whole, fraction = ""] = match[1].replace(/[,\s]/g, "").replace(/^0+(?=\d)/, "").split(".");
     const scale = /^(m|million)$/i.test(match[2] || "") ? 6 : match[2] ? 3 : 0;
     const digits = whole + fraction + "0".repeat(scale), split = whole.length + scale;
     return `${digits.slice(0, split)}.${digits.slice(split) || "0"}`;
   });
-  if (/\b(free|zero|none|no (?:[\w-]+\s+){0,3}(?:fees?|charges?|cost))\b/i.test(quote)) numbers.push("0");
+  if (/\b(free|zero|none|(?:no|without) (?:[\w-]+\s+){0,3}(?:fees?|charges?|cost|markup))\b/i.test(quote) ||
+      /\b(?:fees?|charges?|cost)\s+(?:is\s+)?(?:currently\s+)?waived\b/i.test(quote)) numbers.push("0");
   const visit = (value: unknown) => {
     if (!value || typeof value !== "object") return;
     const money = value as { amount?: unknown; currency?: string };

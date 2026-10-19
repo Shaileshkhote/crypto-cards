@@ -1,0 +1,267 @@
+[
+  {
+    "id": "exa-padded-zero",
+    "provider": "exa",
+    "url": "https://help.exactly.app/en/articles/10707672-exa-card-terms-and-conditions",
+    "text": "(b) Each time a payment on your Account is returned or reversed for any reason or we must return any check, instrument, or transaction you send us because it is incomplete or faulty, we will charge you a returned payment fee of $00.00. However, we will not charge a returned payment fee if we are charging a late fee with respect to the same minimum payment due and will never charge a returned payment fee exceeding the minimum payment due that was due immediately prior to the date on which the payment was returned to us.",
+    "field": "fees",
+    "productId": "exa",
+    "tierId": "exa--international--default",
+    "rules": [
+      {
+        "id": "returned",
+        "kind": "returned_payment",
+        "calculation": "fixed",
+        "scope": {},
+        "fixed": {
+          "amount": "00.00",
+          "currency": "USD"
+        }
+      }
+    ]
+  },
+  {
+    "id": "kraken-distinct-reward-programs",
+    "provider": "kraken",
+    "url": "https://krak.app/pricing",
+    "text": "Tier | 30-Day Average Assets Held (EUR) | Cashback Rate | Salary Match Rate ; Max | ≥ 50,000 | 2% | 1% ; Elite | ≥ 10,000 | 1.5% | 0.75% ; Pro | ≥ 1,000 | 1% | 0.5% ; Lite | ≥ 200 | 0.5% | 0.25% ; Starter | < 200 | 0% | 0%",
+    "field": "rewards",
+    "productId": "kraken",
+    "tierId": "kraken--eea--default",
+    "rules": [
+      {
+        "id": "cashback",
+        "kind": "cashback",
+        "scope": {
+          "conditions": [
+            "≥ 50,000"
+          ]
+        },
+        "ratePercent": 2,
+        "calculable": true
+      },
+      {
+        "id": "salary",
+        "kind": "salary_match",
+        "scope": {
+          "conditions": [
+            "≥ 50,000"
+          ]
+        },
+        "ratePercent": 1,
+        "calculable": true
+      }
+    ]
+  },
+  {
+    "id": "ethena-spending-bands",
+    "provider": "ethena-pay",
+    "url": "https://pay.ethena.fi/pricing",
+    "text": "Tier | Portion of monthly spend | Cashback rate ; Standard | $0 – $2,500 | 4% ; $2,500 – $4,000 | 1% ; Over $4,000 | 0% ; Pro | $0 – $8,000 | 4.5% ; $8,000 – $10,000 | 2% ; $10,000 – $12,000 | 1% ; Over $12,000 | 0.5% ; VIP | $0 – $20,000 | 5% ; $20,000 – $30,000 | 2% ; $30,000 – $40,000 | 1% ; Over $40,000 | 0.5%",
+    "field": "rewards",
+    "productId": "ethena-pay",
+    "tierId": "ethena-pay--international--standard",
+    "rules": [
+      {
+        "id": "first",
+        "kind": "cashback",
+        "scope": {
+          "conditions": [
+            "$0 – $2,500"
+          ]
+        },
+        "ratePercent": 4,
+        "rewardAsset": "AVAX",
+        "calculable": false
+      },
+      {
+        "id": "second",
+        "kind": "cashback",
+        "scope": {
+          "conditions": [
+            "$2,500 – $4,000"
+          ]
+        },
+        "ratePercent": 1,
+        "rewardAsset": "AVAX",
+        "calculable": false
+      }
+    ]
+  },
+  {
+    "id": "karta-material-and-cash-advance",
+    "provider": "karta",
+    "url": "https://content.conkarta.com/docs/card-member-agreements.pdf",
+    "text": " Annual Fee                        $300\n Additional Cards Fee              $150 Companion (Metal) Cards\n                                   $0 Plastic Companion Cards\n                                   * A maximum of five additional cards may be issued per Account,\n                                   subject to approval by the Issuer\n Transaction Fees                  3% of any amount of cash you request and receive\n  - Cash Advance\n Transaction Fees                  $5 or 3% of the ATM withdrawal amount, whichever is greater, plus\n  - ATM Fees                       any foreign exchange conversion fees or markups imposed by the\n                                   ATM operator or network, if applicable\n                                                                                                             1\n\f Transaction Fees                  0%\n  - Foreign Transaction\n  percent of transaction\n Penalty Fees\n  - Late Payment                   $40 or 2.99% of balance, whichever is higher\n  - Returned Payment Fee           $40\nPart B: General Terms and Conditions\nWHEN YOU APPLY FOR A CARD ACCOUNT, ACTIVATE A CARD, OR OTHERWISE PARTICIPATE IN THE PROGRAM IN\nANY WAY, YOU REPRESENT THAT YOU HAVE READ, UNDERSTAND, AND AGREE TO THESE CARD\nTERMS.\nBackground:\nThe Karta Card is provided to you on behalf of Karta in connection with your status as Karta customer and\npursuant to your separate Terms of Service between you and Karta (the “Terms of Service”). The Issuer\nis not a party to the Terms of Service and disclaims any liability for the performance of services covered\ntherein.",
+    "field": "fees",
+    "productId": "karta",
+    "tierId": null,
+    "rules": [
+      {
+        "id": "metal",
+        "kind": "issuance",
+        "calculation": "fixed",
+        "scope": {
+          "cardOrder": "additional",
+          "conditions": [
+            "Companion (Metal) Cards"
+          ]
+        },
+        "fixed": {
+          "amount": "150",
+          "currency": "USD"
+        }
+      },
+      {
+        "id": "plastic",
+        "kind": "issuance",
+        "calculation": "fixed",
+        "scope": {
+          "cardOrder": "additional",
+          "conditions": [
+            "Plastic Companion Cards"
+          ]
+        },
+        "fixed": {
+          "amount": "0",
+          "currency": "USD"
+        }
+      },
+      {
+        "id": "cash",
+        "kind": "cash_advance",
+        "calculation": "percentage",
+        "scope": {},
+        "ratePercent": 3
+      },
+      {
+        "id": "atm",
+        "kind": "atm",
+        "calculation": "unknown",
+        "scope": {},
+        "description": "ATM fee formula requires comparison"
+      }
+    ]
+  },
+  {
+    "id": "kolo-card-and-asset-conversion",
+    "provider": "kolo",
+    "url": "https://kkinvesting.io/en/posts/kolo-card/",
+    "text": "Fee Type | Amount | Notes ; Card issuance | Free | No signup or application fee ; Monthly / annual fee | $0 | No account maintenance fee ; Card transaction (conversion) | 1% | Applied to every card payment ; Non-US merchants (USD card) | +1% (total 2%) | Extra 1% when spending at non-USD merchants ; FX rate | Visa rate + 1% | Pass-through; Kolo does not profit from FX ; Crypto deposit | 0% | Kolo charges nothing; your sending wallet/network may charge gas ; Withdrawal fee | Shown in-app | Fixed fee per network/asset/direction; exact amounts shown at withdrawal time ; ATM single transaction max | $250 USD | Single ATM withdrawal over $250 is automatically declined ; ATM frequency limit | Max 3 per 24 hours | More than 3 ATM withdrawals in 24 hours are declined ; Personal daily spending limit | $9,000 USD | Also the monthly limit ; Minimum card activation deposit | $10 USD equivalent | One-time; not a recurring fee ; USDT / USDC / EURC conversion | 0% markup | Exchange-level rates, no spread added by Kolo",
+    "field": "fees",
+    "productId": "kolo",
+    "tierId": null,
+    "rules": [
+      {
+        "id": "card",
+        "kind": "conversion",
+        "calculation": "percentage",
+        "scope": {
+          "conditions": [
+            "Applied to every card payment"
+          ]
+        },
+        "ratePercent": 1
+      },
+      {
+        "id": "assets",
+        "kind": "conversion",
+        "calculation": "percentage",
+        "scope": {
+          "conditions": [
+            "USDT / USDC / EURC conversion"
+          ]
+        },
+        "ratePercent": 0
+      }
+    ]
+  },
+  {
+    "id": "kast-stablecoin-conversion",
+    "provider": "kast",
+    "url": "https://concierge.kast.xyz/hc/en-us/articles/9850062738703-What-Are-the-Fees-and-Conditions-for-KAST-Cards-and-Accounts",
+    "text": "When you deposit supported stablecoins into your KAST account, your balance is shown in USD. Supported stablecoin deposits are converted to USD at a 1:1 rate with 0% spread.",
+    "field": "fees",
+    "productId": "kast",
+    "tierId": null,
+    "rules": [
+      {
+        "id": "stablecoin",
+        "kind": "conversion",
+        "calculation": "percentage",
+        "scope": {
+          "conditions": [
+            "supported stablecoins"
+          ]
+        },
+        "ratePercent": 0
+      }
+    ]
+  },
+  {
+    "id": "kast-other-asset-conversion",
+    "provider": "kast",
+    "url": "https://concierge.kast.xyz/hc/en-us/articles/9850062738703-What-Are-the-Fees-and-Conditions-for-KAST-Cards-and-Accounts",
+    "text": "Fee / Limit | Amount ; Crypto Deposit Fee (Auto-Conversion to Stablecoins) | Varies by token and is shown before confirmation ; Crypto Deposit Limit | Unlimited",
+    "field": "fees",
+    "productId": "kast",
+    "tierId": null,
+    "rules": [
+      {
+        "id": "crypto",
+        "kind": "conversion",
+        "calculation": "unknown",
+        "scope": {
+          "conditions": [
+            "Auto-Conversion to Stablecoins"
+          ]
+        },
+        "description": "Varies by token and is shown before confirmation"
+      }
+    ]
+  },
+  {
+    "id": "revolut-explicit-no-fee",
+    "provider": "revolut",
+    "url": "https://help.revolut.com/help/wealth/cryptocurrencies/crypto-payments/setting-up-a-virtual-crypto-card/",
+    "text": "We'll automatically convert your crypto to the currency of your purchase without any fees. Fair usage fees may apply depending on your plan. Check out this FAQ about fair usage fees and this FAQ about crypto card payments.",
+    "field": "fees",
+    "productId": "revolut",
+    "tierId": null,
+    "rules": [
+      {
+        "id": "conversion",
+        "kind": "conversion",
+        "calculation": "percentage",
+        "scope": {
+          "conditions": [
+            "Fair usage fees may apply depending on your plan"
+          ]
+        },
+        "ratePercent": 0
+      }
+    ]
+  },
+  {
+    "id": "mexc-current-issuance-waiver",
+    "provider": "mexc",
+    "url": "https://www.mexc.com/support/article/how-to-apply-for-the-mexc-global-card-447067423629599744",
+    "text": "Limited-time card issuance fee waiver: The standard USD 20 card issuance fee is currently waived.",
+    "field": "fees",
+    "productId": "mexc-global",
+    "tierId": null,
+    "rules": [
+      {
+        "id": "waiver",
+        "kind": "issuance",
+        "calculation": "percentage",
+        "scope": {
+          "conditions": [
+            "Limited-time card issuance fee waiver"
+          ]
+        },
+        "ratePercent": 0
+      }
+    ]
+  }
+]

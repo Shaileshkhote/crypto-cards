@@ -277,3 +277,31 @@ it("reports the actual invalid rule instead of restoring optional nulls in a rej
   await expect(extract(adapter(), [doc], new Budget())).resolves.toMatchObject({ extraction: good });
   expect(calls).toBe(2);
 });
+it("reuses prior tool text without hiding a full block behind its earlier excerpt", async () => {
+  vi.stubEnv("OPENROUTER_API_KEY", "offline-fixture-not-a-key");
+  const docs = Array.from({ length: 20 }, (_, i) => documentFromText(`https://example.com/fees-${i}`, `Fee clause ${i}: ${"A detailed fee condition applies. ".repeat(40)}`));
+  let calls = 0;
+  vi.stubGlobal("fetch", vi.fn(async (input: string, init?: RequestInit) => {
+    if (input.endsWith("/models")) return Response.json({ data: [{ id: modelName(), pricing: { prompt: "0", completion: "0" }, supported_parameters: ["tools", "structured_outputs"] }] });
+    const body = JSON.parse(String(init?.body));
+    const turn = ++calls;
+    if (turn === 2) {
+      expect(Buffer.byteLength(String(init?.body))).toBeLessThan(220_000);
+      const results = body.messages.filter((m: { role: string }) => m.role === "tool").map((m: { content: string }) => JSON.parse(m.content));
+      expect(results.flat().some((p: { blocks: { alreadyRead?: boolean }[] }) => p.blocks.some(b => b.alreadyRead))).toBe(true);
+      expect(new Set(results.flat().map((p: { url: string }) => p.url)).size).toBe(docs.length);
+    }
+    if (turn === 3) expect(JSON.parse(body.messages.at(-1).content).blocks[0].text).toBe(docs[0].blocks[0].text);
+    if (turn === 4) {
+      const page = JSON.parse(body.messages.at(-1).content);
+      expect(page.blocks[0]).toEqual({ id: "p1b1", alreadyRead: true });
+      expect(page.nextOffset).toBeNull();
+    }
+    const tools = turn === 1
+      ? Array.from({ length: 32 }, (_, i) => ({ id: `search-${i}`, function: { name: "searchDocs", arguments: '{"query":"fee"}' } }))
+      : [{ id: `read-${turn}`, function: { name: "readPage", arguments: JSON.stringify({ url: docs[0].url, offset: 0 }) } }];
+    return Response.json({ usage: { cost: 0 }, choices: [{ finish_reason: turn < 4 ? "tool_calls" : "stop", message: turn < 4 ? { content: null, tool_calls: tools } : { content: JSON.stringify({ complete: true, products: [], tiers: [], facts: [] }) } }] });
+  }));
+  await expect(extract(adapter(), docs, new Budget(0))).resolves.toBeDefined();
+  expect(calls).toBe(4);
+});

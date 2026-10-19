@@ -14,6 +14,7 @@ import { enqueue, claimJob } from "@cards/core/jobs";
 import { adapter, document, extraction } from "./helpers";
 import { Card } from "@cards/core/schema";
 import { loadAdapters } from "@cards/core/adapters";
+import { documentFromText } from "@cards/core/crawler";
 const enabled = !!process.env.TEST_DATABASE_URL;
 describe.skipIf(!enabled)(
   "PostgreSQL sync, review, history, jobs and public cache",
@@ -63,6 +64,32 @@ describe.skipIf(!enabled)(
       expect((await db().query("SELECT * FROM card_versions")).rowCount).toBe(
         1,
       );
+    });
+    it("persists distinct material fees, reuses them warm and holds a changed price for review", async () => {
+      const a = adapter();
+      const sync = async (price: number, warm = false) => {
+        const doc = documentFromText(a.sources.urls[0], `Additional Metal card: ${price} USD. Additional Plastic card: 0 USD.`);
+        const e = extraction(doc);
+        e.facts[0].value = [
+          { id: "metal", kind: "issuance", calculation: "fixed", fixed: { amount: String(price), currency: "USD" }, scope: { cardOrder: "additional", conditions: ["Metal"] }, calculable: true },
+          { id: "plastic", kind: "issuance", calculation: "fixed", fixed: { amount: "0", currency: "USD" }, scope: { cardOrder: "additional", conditions: ["Plastic"] }, calculable: true },
+        ];
+        return syncAdapter(a, new Budget(0), { fetch: async () => doc, extract: async () => {
+          if (warm) throw new Error("Warm extraction must be cached");
+          return { extraction: e, documents: [doc], issues: [] };
+        } });
+      };
+      expect((await sync(150)).status).toBe("published");
+      const first = await read();
+      const fees = () => read().then(card => card.products![0].tiers![0].fees!);
+      expect(await fees()).toHaveLength(2);
+      expect((await sync(150, true)).status).toBe("unchanged");
+      expect(await read()).toEqual(first);
+      expect((await sync(200)).status).toBe("review");
+      expect((await fees()).map(fee => fee.calculation === "fixed" && fee.fixed.amount).sort()).toEqual(["0", "150"]);
+      const [proposal] = await listReviews();
+      await approveReview(proposal.id, "test-admin");
+      expect((await fees()).map(fee => fee.calculation === "fixed" && fee.fixed.amount).sort()).toEqual(["0", "200"]);
     });
     it("holds changed FX fee; approval changes the reviewed scope and caches only committed data", async () => {
       await run();

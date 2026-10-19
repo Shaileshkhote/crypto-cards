@@ -40,6 +40,10 @@ describe("typed canonical schema", () => {
   it("rejects missing numeric calculation inputs and prose countries", () => {
     expect(Money.parse({ amount: "0.00", currency: "EUR" }).amount).toBe("0");
     expect(Money.parse({ amount: "200.5000", currency: "EUR" }).amount).toBe("200.5");
+    expect(Money.parse({ amount: "00.00", currency: "USD" }).amount).toBe("0");
+    expect(Money.parse({ amount: "00010.500", currency: "USD" }).amount).toBe("10.5");
+    for (const amount of ["-1", "1e3", "10,000", " 10", ".5"])
+      expect(Money.safeParse({ amount, currency: "USD" }).success).toBe(false);
     expect(
       FeeRule.safeParse({
         id: "x",
@@ -58,6 +62,8 @@ describe("typed canonical schema", () => {
       residentCountries: ["GB"], regions: ["EEA"],
     });
     expect(Money.safeParse({ amount: 1, currency: "USD" }).success).toBe(false);
+    expect(Scope.parse({ paymentRails: ["apple_pay", "SCT_INST"] }).paymentRails).toEqual(["apple-pay", "sct-inst"]);
+    expect(Scope.safeParse({ paymentRails: ["https://example.com"] }).success).toBe(false);
   });
   it("validates tiered inclusion, thresholds, currency, period and behavior", () => {
     const rule = {
