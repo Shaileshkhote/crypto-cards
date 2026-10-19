@@ -17,19 +17,27 @@ pnpm install --frozen-lockfile
 cp .env.example .env
 ```
 
-Supply PostgreSQL credentials and admin authorization in `.env`. Use URL-encoded database passwords. Commands below load this ignored file through Node's supported environment-file option:
+Supply PostgreSQL credentials and admin authorization through your environment or ignored `.env`. Use URL-encoded database passwords. Worker/CLI commands can load this file through Node's environment-file option:
 
 ```sh
-# Or use your platform's injected environment bindings instead.
-export NODE_OPTIONS="--env-file=$(pwd)/.env"
+# With platform-injected environment bindings:
 pnpm db:migrate
 pnpm cards validate
 pnpm dev
 # A separate cloud terminal/process:
-pnpm worker
+node --env-file=.env --import tsx apps/worker/src/worker.ts
 ```
 
-For a cloud-only development database, `pnpm cloud:dev` creates or starts a persistent loopback-only PostgreSQL container, applies migrations, and saves generated local credentials in ignored `.local/dev.env`. Re-running it preserves the database and credentials. Start commands can use `node --env-file=.local/dev.env --run dev` and `node --env-file=.local/dev.env --run worker`.
+For a cloud-only development database, `pnpm cloud:dev` creates or starts a persistent loopback-only PostgreSQL container, applies migrations, and saves generated local credentials in ignored `.local/dev.env`. Re-running it preserves the database and credentials. Load this generated, shell-compatible file before starting admin:
+
+```sh
+set -a
+. ./.local/dev.env
+set +a
+MAX_RUN_COST_USD=0 pnpm dev
+```
+
+Do not put `--env-file` in `NODE_OPTIONS`; Next.js subprocesses reject it. The dev command uses webpack, matching the custom webpack configuration and production build. Start the worker separately only after checking queued jobs and paid-work authorization: `node --env-file=.local/dev.env --import tsx apps/worker/src/worker.ts`.
 
 For a containerized database and application, `docker compose up --build -d` starts three services. The worker runs migrations before accepting jobs; admin waits for worker readiness. Only route admin's internal port 3000 in Coolify. Compose deliberately publishes no host ports. See [deployment](docs/deployment.md) for local port forwarding, production auth, backups, and smoke checks.
 
