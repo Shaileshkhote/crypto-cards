@@ -144,3 +144,21 @@ it("keeps meaningful article header dates and footer caveats", () => {
     "Only eligible EUR purchases; cash withdrawals are excluded.",
   );
 });
+
+it("extracts the primary page and retains issuer disclosures without importing site-wide promotions", () => {
+  const doc = parseHtml("https://example.com/card", '<header>Other account: 20% APY</header><main><h1>Card fees</h1><p>Annual fee: USD 10.</p><p>Physical cards are available in Singapore.</p></main><footer><p>Unrelated staking product: 99% APY.</p><p>The card is issued by Example Bank.</p></footer>');
+  expect(doc.content).toContain("Annual fee: USD 10.");
+  expect(doc.content).toContain("Physical cards are available in Singapore.");
+  expect(doc.content).toContain("The card is issued by Example Bank.");
+  expect(doc.content).not.toContain("20% APY");
+  expect(doc.content).not.toContain("99% APY");
+  const withoutMain = parseHtml(doc.url, "<div>Annual card fee: USD 10.</div>");
+  expect(withoutMain.content).toContain("Annual card fee: USD 10.");
+});
+
+it("reads a streamed server-rendered article outside an empty main placeholder", () => {
+  const doc = parseHtml("https://example.com/help/fees", '<main><!-- suspense placeholder --></main><div hidden><article><h1>Card fees</h1><p>Non-USD FX fee: 1.7%.</p><p>No monthly card fee.</p></article></div><footer><p>Unrelated product: 99% APY.</p></footer>');
+  expect(doc.content).toContain("Non-USD FX fee: 1.7%.");
+  expect(doc.content).toContain("No monthly card fee.");
+  expect(doc.content).not.toContain("99% APY");
+});

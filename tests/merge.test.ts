@@ -21,7 +21,7 @@ describe("deterministic merge and protection", () => {
     const same = extraction(both);
     same.facts[0] = { ...same.facts[0], field: "limits", value: [{ id: "atm", kind: "atm", amount: { amount: "200", currency: "USD" }, period: "month", scope: {}, calculable: true }] };
     expect(() => candidate(adapter(), [same], undefined, [both])).not.toThrow();
-    const freePlan = documentFromText(doc.url, "Plan | Amount ; Free plan ATM hard limit | USD 200", "Limits", [], true);
+    const freePlan = documentFromText(doc.url, "Plan | Monthly amount ; Free plan ATM hard limit | USD 200", "Limits", [], true);
     const plan = extraction(freePlan);
     plan.facts[0] = { ...plan.facts[0], field: "limits", value: [{ id: "atm", kind: "atm", amount: { amount: "200", currency: "USD" }, period: "month", scope: {}, calculable: true }] };
     expect(() => candidate(adapter(), [plan], undefined, [freePlan])).not.toThrow();
@@ -551,4 +551,48 @@ it("scopes an explicit zero addition to provider markup and preserves the networ
   expect(() => candidate(adapter(), [e], undefined, [doc])).toThrow("not a zero total charge");
   const uncertain = documentFromText(doc.url, "This 1% is the network fee. The app may not add anything on top.");
   expect(() => candidate(adapter(), [extraction(uncertain, 0)], undefined, [uncertain])).toThrow("Financial value 0 is absent");
+});
+
+it("rejects a country inventory cited to a heading instead of the country rows", () => {
+  const a = adapter(), doc = documentFromText("https://example.com/countries", "The card is currently available in:\nSingapore, mainland China.\nUK and Hong Kong.");
+  const e = extraction(doc);
+  const claim = { ...e.facts[0], field: "residentCountries", value: ["SG", "CN"], evidence: { url: doc.url, blockId: doc.blocks[0].id, quote: doc.blocks[0].text } };
+  e.facts = [claim];
+  expect(() => candidate(a, [e], undefined, [doc])).toThrow("Country values SG, CN are absent");
+  e.facts = [{ ...claim, evidence: { ...claim.evidence, blockId: doc.blocks[1].id, quote: doc.blocks[1].text } }];
+  expect(candidate(a, [e], undefined, [doc]).data.products![0].tiers![0].residentCountries).toEqual(["CN", "SG"]);
+  e.facts = [{ ...claim, value: ["GB", "HK"], evidence: { ...claim.evidence, blockId: doc.blocks[2].id, quote: doc.blocks[2].text } }];
+  expect(candidate(a, [e], undefined, [doc]).data.products![0].tiers![0].residentCountries).toEqual(["GB", "HK"]);
+  e.facts = [{ ...claim, value: ["IN"], evidence: { ...claim.evidence, quote: doc.blocks[0].text } }];
+  expect(() => candidate(a, [e], undefined, [doc])).toThrow("Country values IN are absent");
+});
+
+it("rejects invented card types and calendar periods while keeping explicitly sourced claims", () => {
+  const a = adapter();
+  const physical = documentFromText("https://example.com/card", "Physical cards are available in Singapore.");
+  const e = extraction(physical);
+  e.facts = [{ ...e.facts[0], field: "cardTypes", value: { physical: true, virtual: true } }];
+  expect(() => candidate(a, [e], undefined, [physical])).toThrow("virtual card availability is absent");
+  e.facts[0].value = { physical: true };
+  expect(candidate(a, [e], undefined, [physical]).data.products![0].tiers![0].cardTypes).toEqual({ physical: true });
+  const annual = documentFromText("https://example.com/fees", "0 annual fee");
+  e.facts = [{ ...extraction(annual).facts[0], value: [{ id: "monthly", kind: "monthly", calculation: "percentage", ratePercent: 0, scope: {}, calculable: true }] }];
+  expect(() => candidate(a, [e], undefined, [annual])).toThrow("Period month is absent");
+  const consecutive = documentFromText("https://example.com/limits", "A PIN is required after 5 consecutive contactless payments.");
+  e.facts = [{ ...extraction(consecutive).facts[0], field: "limits", value: [{ id: "count", kind: "transaction_count", count: 5, period: "day", scope: {}, calculable: true }] }];
+  expect(() => candidate(a, [e], undefined, [consecutive])).toThrow("Period day is absent");
+  const daily = documentFromText(consecutive.url, "At most 5 ATM withdrawals per 24-hour period.");
+  e.facts[0].evidence = { url: daily.url, blockId: daily.blocks[0].id, quote: daily.blocks[0].text };
+  expect(candidate(a, [e], undefined, [daily]).data.products![0].tiers![0].limits![0]).toMatchObject({ count: 5, period: "day" });
+});
+
+it("does not assign a late-payment clause to returned-payment fees", () => {
+  const a = adapter(), doc = documentFromText("https://example.com/card-terms", "Late payment: up to $40.");
+  const e = extraction(doc);
+  e.facts[0].value = [{ id: "returned", kind: "returned_payment", calculation: "unknown", calculable: false, scope: {}, description: doc.blocks[0].text }];
+  expect(() => candidate(a, [e], undefined, [doc])).toThrow("A late-payment clause does not support a returned-payment charge");
+  const returned = documentFromText(doc.url, "A returned or reversed payment incurs a fee of $5.");
+  e.facts[0].value = [{ id: "returned", kind: "returned_payment", calculation: "fixed", calculable: true, scope: {}, fixed: { amount: "5", currency: "USD" } }];
+  e.facts[0].evidence = { url: returned.url, blockId: returned.blocks[0].id, quote: returned.blocks[0].text };
+  expect(candidate(a, [e], undefined, [returned]).data.products![0].tiers![0].fees![0]).toMatchObject({ kind: "returned_payment", fixed: { amount: "5" } });
 });

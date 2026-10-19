@@ -162,6 +162,18 @@ export function parseHtml(url: string, html: string): Document {
   $(
     'script,style,nav,[role="navigation"],noscript,svg,[aria-hidden="true"]',
   ).remove();
+  const main = $("main,[role='main']").filter((_, el) => normalize($(el).text()).length > 0).first();
+  const articles = $("article").filter((_, el) => normalize($(el).text()).length > 0);
+  // React can stream an article outside an initially empty main placeholder.
+  const primary = main.length ? main : articles.length === 1 ? articles.first() : $([]);
+  if (primary.length) {
+    // Shared site chrome and unrelated product promotions are not article
+    // content. Keep real card-issuer disclosures commonly placed in footers.
+    const disclosures = $("footer p,footer small,[role='contentinfo'] p,[role='contentinfo'] small")
+      .filter((_, el) => !$(el).closest("main,[role='main']").length && /\b(?:issued by|issuing bank|card issuer|issuer of (?:the |your )?card)\b/i.test($(el).text()))
+      .clone();
+    $("body").empty().append(primary, disclosures);
+  }
   $("table").each((_, table) => {
     const elements = $(table).find("tr").filter((_, tr) => $(tr).closest("table")[0] === table).toArray();
     const grid: string[][] = [];

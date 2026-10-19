@@ -32,6 +32,21 @@ function financialNumbers(quote: string, implicitZero = true) {
 // A real citation alone is insufficient: a table's adjacent row must not
 // supply an amount/count that is absent from the selected evidence block.
 export function verifyFinancialEvidence(fact: ExtractionData["facts"][number]) {
+  if (fact.field === "cardTypes" && fact.value && typeof fact.value === "object") {
+    for (const [kind, words] of [["physical", /\b(?:physical|plastic|metal)\b/i], ["virtual", /\b(?:virtual|digital)\b/i]] as const)
+      if (typeof (fact.value as Record<string, unknown>)[kind] === "boolean" && !words.test(fact.evidence.quote))
+        throw new Error(`${kind} card availability is absent from its cited block. Cite explicit support for each card type separately; one type does not establish the other.`);
+  }
+  if (["residentCountries", "excludedResidentCountries"].includes(fact.field) && Array.isArray(fact.value)) {
+    const names = new Intl.DisplayNames(["en"], { type: "region" });
+    const aliases: Record<string, string[]> = { GB: ["UK", "United Kingdom"], US: ["USA", "United States"], HK: ["Hong Kong"], MO: ["Macau", "Macao"], TR: ["Turkey", "Türkiye"], CZ: ["Czech Republic"] };
+    const missing = (fact.value as string[]).filter(code => {
+      const escape = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      return !new RegExp(`\\b${escape(code)}\\b`).test(fact.evidence.quote) &&
+        ![names.of(code)!, ...(aliases[code] || [])].some(name => new RegExp(`(?:^|\\W)${escape(name)}(?:$|\\W)`, "i").test(fact.evidence.quote));
+    });
+    if (missing.length) throw new Error(`Country values ${missing.join(", ")} are absent from their cited block. Cite the actual country rows separately, never a heading or an adjacent block; do not infer countries from a region label. Citation ${fact.evidence.url}#${fact.evidence.blockId}.`);
+  }
   if (!["fees", "rewards", "limits"].includes(fact.field)) return;
   const quote = fact.evidence.quote;
   // "None" or "free" is not a hard limit of zero.
@@ -52,6 +67,12 @@ export function verifyFinancialEvidence(fact: ExtractionData["facts"][number]) {
     if ("id" in value && typeof value.id === "string") ruleId = value.id;
     const report = (message: string) => errors.push(`${message} Location: ${path}${ruleId ? ` (rule ${ruleId})` : ""}; target ${[fact.productId, fact.tierId].filter(Boolean).join("/") || "provider"}; citation ${fact.evidence.url}#${fact.evidence.blockId}.`);
     const fee = value as { kind?: string; ratePercent?: number; fixed?: { amount: string }; scope?: { conditions?: string[] } };
+    if (fact.field === "fees" && fee.kind === "returned_payment" && !/\b(?:return\w*|revers\w*|dishono[u]?r\w*|bounc\w*)\b|\b(?:check|cheque|payment)\b.{0,40}\b(?:fail\w*|declin\w*)\b/i.test(quote))
+      report("Returned-payment fees require a returned, reversed or dishonoured payment in the cited block. A late-payment clause does not support a returned-payment charge.");
+    const periods: Record<string, RegExp> = { day: /\b(?:day|daily|24[-\s]?(?:hours?|hrs?|h))\b/i, week: /\b(?:week|weekly)\b/i, month: /\b(?:month|monthly)\b/i, year: /\b(?:year|yearly|annual|annually|annum)\b/i };
+    const period = fact.field === "fees" ? ({ monthly: "month", annual: "year" } as Record<string, string>)[fee.kind || ""] : fact.field === "limits" && "calculable" in value && value.calculable === true && "period" in value ? String(value.period) : undefined;
+    if (period && periods[period] && !periods[period].test(quote))
+      report(`Period ${period} is absent from its cited block. Never invent a calendar period for consecutive transactions or use an annual-fee quote for a monthly fee. Preserve an unsupported limit period as a non-calculable description without amount/count.`);
     if (markupOnlyZero && fee.kind && (fee.ratePercent === 0 || fee.fixed && compareDecimals(fee.fixed.amount, "0") === 0) && !fee.scope?.conditions?.some(condition => /markup|provider|additional|add[- ]?on|on top/i.test(condition)))
       report("Not adding anything on top establishes zero provider/add-on markup, not a zero total charge. Scope the zero to that explicit charge component and preserve the network charge separately.");
     if (fact.field === "fees" && "kind" in value && value.kind === "atm") {

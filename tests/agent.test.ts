@@ -1,21 +1,23 @@
 import { afterEach, it, expect, vi } from "vitest";
 import { Budget, extract, fingerprint, modelName, RunError } from "@cards/core/agent";
 import { syncAdapter } from "@cards/core/sync";
-import { adapter, document, extraction } from "./helpers";
+import { adapter, extraction } from "./helpers";
 import { documentFromText } from "@cards/core/crawler";
+// Wire-format tests return one fee, so their source fixture contains that complete inventory.
+const document = () => documentFromText("https://example.com/fees", "Core FX fee: 1.5% for residents of Germany.");
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.unstubAllEnvs();
 });
-it("shows currency-code limits alongside early percentage fees in the bounded preview", async () => {
+it("supplies the complete financial inventory including late limits and explicit free charges", async () => {
   vi.stubEnv("OPENROUTER_API_KEY", "fixture-not-a-real-key");
-  const doc = documentFromText("https://example.com/fees", Array.from({ length: 7 }, (_, i) => `FX fee ${i}: 1.5%.`).join("\n") + "\nDaily spending limit: 10,000 USD.");
+  const doc = documentFromText("https://example.com/fees", Array.from({ length: 7 }, (_, i) => `FX fee ${i}: 1.5%.`).join("\n") + "\nDaily spending limit: 10,000 USD.\nMonthly fee: none.\nNo withdrawal limits.\nAnnual fee: 0.\nAt most 3 ATM withdrawals per day.");
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
     if (url.endsWith("/models")) return Response.json({ data: [{ id: modelName(), pricing: { prompt: "0", completion: "0" }, supported_parameters: ["tools", "structured_outputs"] }] });
     const excerpts = JSON.parse(JSON.parse(String(init?.body)).messages[1].content).excerpts;
-    expect(excerpts[0].blocks).toHaveLength(5);
+    expect(excerpts[0].blocks).toHaveLength(12);
     expect(excerpts[0].blocks.some((b: { text: string }) => b.text.includes("10,000 USD"))).toBe(true);
-    return Response.json({ usage: { cost: 0 }, choices: [{ finish_reason: "stop", message: { content: JSON.stringify(extraction(doc)) } }] });
+    return Response.json({ usage: { cost: 0 }, choices: [{ finish_reason: "stop", message: { content: JSON.stringify({ complete: true, products: [], tiers: [], facts: doc.blocks.map(block => ({ productId: "card", tierId: null, inherit: false, field: "terms", value: [block.text], evidence: { url: doc.url, blockId: block.id, quote: block.text } })) }) } }] });
   }));
   await expect(extract(adapter(), [doc], new Budget(0))).resolves.toBeDefined();
 });
@@ -45,7 +47,11 @@ it("requires the omitted competing financial block, then preserves both claims w
   let calls = 0;
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
     if (url.endsWith("/models")) return Response.json({ data: [{ id: modelName(), pricing: { prompt: "0", completion: "0" }, supported_parameters: ["tools", "structured_outputs"] }] });
-    if (++calls === 2) expect(JSON.parse(String(init?.body)).messages.at(-1).content).toContain('"p2b1"');
+    if (++calls === 2) {
+      const feedback = JSON.parse(String(init?.body)).messages.at(-1).content;
+      expect(feedback).toContain('"p2b1"');
+      expect(feedback).toContain("ATM withdrawal limit: USD 250 per withdrawal.");
+    }
     return Response.json({ usage: { cost: 0 }, choices: [{ finish_reason: "stop", message: { content: JSON.stringify({ complete: true, products: [], tiers: [], facts: calls === 1 ? facts.slice(0, 1) : facts }) } }] });
   }));
   const result = await extract(a, docs, new Budget(0));
@@ -154,7 +160,7 @@ it("runs one three-tool loop and validates its final evidence", async () => {
           {
             id: modelName(),
             pricing: { prompt: "0.0000004", completion: "0.0000016" },
-            supported_parameters: ["tools", "structured_outputs"],
+            supported_parameters: ["tools", "structured_outputs", "reasoning"],
           },
         ],
       });
@@ -164,6 +170,9 @@ it("runs one three-tool loop and validates its final evidence", async () => {
     expect(
       body.tools.map((x: { function: { name: string } }) => x.function.name),
     ).toEqual(["listPages", "searchDocs", "readPage"]);
+    expect(body.tool_choice).toBe(body.messages.length === 2 ? "required" : "auto");
+    expect(body.reasoning).toEqual({ effort: "medium", exclude: true });
+    expect(body.max_tokens).toBe(24_000);
     expect(body.response_format.type).toBe("json_schema");
     expect(body.response_format.json_schema.strict).toBe(false);
     const schema = body.response_format.json_schema.schema;
@@ -322,7 +331,8 @@ it("searches later sources even when a long first page contains many matches", a
     const body = JSON.parse(String(init?.body));
     if (++requests === 2) {
       const result = JSON.parse(body.messages.at(-1).content);
-      expect(result.find((p: { url: string }) => p.url === last.url).blocks[0].text).toContain("Example Bank");
+      expect(result.find((p: { url: string }) => p.url === last.url).blocks[0]).toMatchObject({ id: "p2b1", alreadyRead: true });
+      expect(JSON.parse(body.messages[1].content).excerpts.find((p: { url: string }) => p.url === last.url).blocks[0].text).toContain("Example Bank");
     }
     return Response.json({ usage: { cost: 0.001 }, choices: [{ finish_reason: requests === 1 ? "tool_calls" : "stop", message: requests === 1
       ? { content: null, tool_calls: [{ id: "search", function: { name: "searchDocs", arguments: '{"query":"fee issuer"}' } }] }
@@ -389,7 +399,7 @@ it("reports the actual invalid rule instead of restoring optional nulls in a rej
 });
 it("reuses prior tool text without hiding a full block behind its earlier excerpt", async () => {
   vi.stubEnv("OPENROUTER_API_KEY", "offline-fixture-not-a-key");
-  const docs = Array.from({ length: 20 }, (_, i) => documentFromText(`https://example.com/fees-${i}`, `Fee clause ${i}: ${"A detailed fee condition applies. ".repeat(40)}`));
+  const docs = Array.from({ length: 20 }, (_, i) => documentFromText(`https://example.com/fees-${i}`, `Introduction.\nContents.\nProcedure clause ${i}: ${"A detailed procedure condition applies. ".repeat(35)}`));
   let calls = 0;
   vi.stubGlobal("fetch", vi.fn(async (input: string, init?: RequestInit) => {
     if (input.endsWith("/models")) return Response.json({ data: [{ id: modelName(), pricing: { prompt: "0", completion: "0" }, supported_parameters: ["tools", "structured_outputs"] }] });
@@ -401,15 +411,15 @@ it("reuses prior tool text without hiding a full block behind its earlier excerp
       expect(results.flat().some((p: { blocks: { alreadyRead?: boolean }[] }) => p.blocks.some(b => b.alreadyRead))).toBe(true);
       expect(new Set(results.flat().map((p: { url: string }) => p.url)).size).toBe(docs.length);
     }
-    if (turn === 3) expect(JSON.parse(body.messages.at(-1).content).blocks[0].text).toBe(docs[0].blocks[0].text);
+    if (turn === 3) expect(JSON.parse(body.messages.at(-1).content).blocks[0].text).toBe(docs[0].blocks[2].text);
     if (turn === 4) {
       const page = JSON.parse(body.messages.at(-1).content);
-      expect(page.blocks[0]).toEqual({ id: "p1b1", alreadyRead: true });
+      expect(page.blocks[0]).toEqual({ id: "p1b3", alreadyRead: true });
       expect(page.nextOffset).toBeNull();
     }
     const tools = turn === 1
-      ? Array.from({ length: 32 }, (_, i) => ({ id: `search-${i}`, function: { name: "searchDocs", arguments: '{"query":"fee"}' } }))
-      : [{ id: `read-${turn}`, function: { name: "readPage", arguments: JSON.stringify({ url: docs[0].url, offset: 0 }) } }];
+      ? Array.from({ length: 32 }, (_, i) => ({ id: `search-${i}`, function: { name: "searchDocs", arguments: '{"query":"procedure"}' } }))
+      : [{ id: `read-${turn}`, function: { name: "readPage", arguments: JSON.stringify({ url: docs[0].url, offset: 2 }) } }];
     return Response.json({ usage: { cost: 0 }, choices: [{ finish_reason: turn < 4 ? "tool_calls" : "stop", message: turn < 4 ? { content: null, tool_calls: tools } : { content: JSON.stringify({ complete: true, products: [], tiers: [], facts: [] }) } }] });
   }));
   await expect(extract(adapter(), docs, new Budget(0))).resolves.toBeDefined();
@@ -418,24 +428,24 @@ it("reuses prior tool text without hiding a full block behind its earlier excerp
 
 it("shows late search matches and different excerpts from the same block without hiding the full source", async () => {
   vi.stubEnv("OPENROUTER_API_KEY", "offline-fixture-not-a-key");
-  const text = `${"Legal introduction. ".repeat(35)}Fast ACH: $1 plus 0.75%. ${"Other conditions. ".repeat(35)}Debit funding: 1.75%.`;
-  const doc = documentFromText("https://example.com/fees", text, "Fees", [], true);
+  const text = `${"Legal introduction. ".repeat(35)}Photo format: a color image. ${"Other conditions. ".repeat(35)}Document translation: certified copy.`;
+  const doc = documentFromText("https://example.com/fees", `Introduction.\nContents.\n${text}`, "Requirements");
   let calls = 0;
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
     if (url.endsWith("/models")) return Response.json({ data: [{ id: modelName(), pricing: { prompt: "0", completion: "0" }, supported_parameters: ["tools", "structured_outputs"] }] });
     const turn = ++calls, body = JSON.parse(String(init?.body));
     if (turn === 2 || turn === 3) {
       const block = JSON.parse(body.messages.at(-1).content)[0].blocks[0];
-      expect(block.text).toContain(turn === 2 ? "Fast ACH: $1 plus 0.75%" : "Debit funding: 1.75%");
-      expect(block).toMatchObject({ id: "p1b1", offset: 0, truncated: true });
+      expect(block.text).toContain(turn === 2 ? "Photo format: a color image" : "Document translation: certified copy");
+      expect(block).toMatchObject({ id: "p1b3", offset: 2, truncated: true });
       expect(block.alreadyRead).toBeUndefined();
     }
     if (turn === 4) expect(JSON.parse(body.messages.at(-1).content).blocks[0].text).toBe(text);
-    const tool = turn < 3 ? { name: "searchDocs", arguments: JSON.stringify({ query: turn === 1 ? "Fast ACH" : "Debit funding" }) }
-      : { name: "readPage", arguments: JSON.stringify({ url: doc.url, offset: 0 }) };
+    const tool = turn < 3 ? { name: "searchDocs", arguments: JSON.stringify({ query: turn === 1 ? "Photo format" : "Document translation" }) }
+      : { name: "readPage", arguments: JSON.stringify({ url: doc.url, offset: 2 }) };
     return Response.json({ usage: { cost: 0 }, choices: [{ finish_reason: turn < 4 ? "tool_calls" : "stop", message: turn < 4
       ? { content: null, tool_calls: [{ id: `tool-${turn}`, function: tool }] }
-      : { content: JSON.stringify({ complete: true, products: [], tiers: [], facts: [{ productId: "card", tierId: null, inherit: false, field: "fees", value: [{ id: "fast-ach", kind: "other", serviceId: "fast-ach", scope: { paymentRails: ["ach"], conditions: ["Fast ACH"] }, calculation: "unknown", calculable: false, description: "Fast ACH: $1 plus 0.75%." }], evidence: { url: doc.url, blockId: doc.blocks[0].id, quote: doc.blocks[0].text } }] }) } }] });
+      : { content: JSON.stringify({ complete: true, products: [], tiers: [], facts: [{ productId: "card", tierId: null, inherit: false, field: "requirements", value: ["Use a color photo and a certified document translation."], evidence: { url: doc.url, blockId: doc.blocks[2].id, quote: doc.blocks[2].text } }] }) } }] });
   }));
   await extract(adapter(), [doc], new Budget(0));
   expect(calls).toBe(4);
@@ -454,8 +464,7 @@ it("exposes a later numeric ATM limit instead of only the first two marketing ma
     if (calls === 2) {
       const page = JSON.parse(JSON.parse(String(init?.body)).messages.at(-1).content)[0];
       expect(page.totalMatches).toBe(6);
-      expect(page.blocks[0]).toMatchObject({ id: "p1b6", offset: 5 });
-      expect(page.blocks[0].text).toContain("$250 per withdrawal");
+      expect(page.blocks[0]).toEqual({ id: "p1b6", alreadyRead: true });
     }
     return Response.json({ usage: { cost: 0 }, choices: [{ finish_reason: calls === 1 ? "tool_calls" : "stop", message: calls === 1
       ? { content: null, tool_calls: [{ id: "atm", function: { name: "searchDocs", arguments: '{"query":"ATM"}' } }] }
@@ -505,7 +514,8 @@ it("keeps sources and tool reasoning while replacing superseded drafts before co
       expect(assistants[1].reasoning_details).toBeUndefined();
       expect(body.messages.filter((m: { role: string; content?: string }) => m.role === "user" && m.content?.startsWith("Candidate validation failed:"))).toHaveLength(1);
       const source = body.messages.find((m: { role: string }) => m.role === "tool");
-      expect(JSON.parse(source.content).blocks[0].text).toBe(doc.blocks[0].text);
+      expect(JSON.parse(source.content).blocks[0]).toEqual({ id: "p1b1", alreadyRead: true });
+      expect(JSON.parse(body.messages[1].content).excerpts[0].blocks[0].text).toBe(doc.blocks[0].text);
       expect(Buffer.byteLength(String(init?.body))).toBeLessThan(512_000);
     }
     const message = turn === 1
@@ -579,4 +589,101 @@ it("canonicalizes equivalent citation URLs while rejecting references to another
   wire.facts[0].evidence.url = "https://evil.example/fees";
   stub(wire);
   await expect(extract(adapter(), [doc], new Budget(0))).rejects.toThrow("Unknown source reference");
+});
+
+it("returns actionable crypto-currency feedback without treating a stablecoin as fiat money", async () => {
+  vi.stubEnv("OPENROUTER_API_KEY", "fixture-not-a-real-key");
+  const doc = documentFromText("https://example.com/fees", "A 2% crypto conversion fee applies when funding with USDT.");
+  const good = extraction(doc);
+  good.facts[0].value = [{ id: "conversion", kind: "conversion", calculation: "percentage", ratePercent: 2, calculable: true, scope: { conditions: ["Funding with USDT"] } }];
+  const bad = structuredClone(good);
+  (bad.facts[0].value as { scope: Record<string, unknown> }[])[0].scope = { fundingCurrencies: ["USDT"] };
+  let calls = 0;
+  vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+    if (url.endsWith("/models")) return Response.json({ data: [{ id: modelName(), pricing: { prompt: "0", completion: "0" }, supported_parameters: ["tools", "structured_outputs"] }] });
+    if (++calls === 2) {
+      const feedback = JSON.parse(String(init?.body)).messages.at(-1).content;
+      expect(feedback).toContain("scope.conditions");
+      expect(feedback).toContain("never be relabeled USD");
+      expect(feedback).not.toContain('"AED","AFN"');
+    }
+    return Response.json({ usage: { cost: 0 }, choices: [{ finish_reason: "stop", message: { content: JSON.stringify(calls === 1 ? bad : good) } }] });
+  }));
+  expect((await extract(adapter(), [doc], new Budget(0))).extraction).toEqual(good);
+  expect(calls).toBe(2);
+});
+
+it("requires source-named assetback rewards instead of overlooking them as non-financial text", async () => {
+  vi.stubEnv("OPENROUTER_API_KEY", "fixture-not-a-real-key");
+  const a = adapter(), fees = documentFromText("https://example.com/fees", "Core FX fee: 1.5%."), rewards = documentFromText("https://example.com/rewards", "New users receive 3% assetback on eligible card purchases.");
+  a.sources.urls = [fees.url, rewards.url];
+  const good = extraction(fees);
+  good.facts.push({ ...good.facts[0], field: "rewards", value: [{ id: "assetback", kind: "cashback", ratePercent: 3, calculable: true, scope: { conditions: ["New users; eligible card purchases"] } }], evidence: { url: rewards.url, blockId: rewards.blocks[0].id, quote: rewards.blocks[0].text } });
+  let calls = 0;
+  vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+    if (url.endsWith("/models")) return Response.json({ data: [{ id: modelName(), pricing: { prompt: "0", completion: "0" }, supported_parameters: ["tools", "structured_outputs"] }] });
+    if (++calls === 2) expect(JSON.parse(String(init?.body)).messages.at(-1).content).toContain(rewards.blocks[0].text);
+    return Response.json({ usage: { cost: 0 }, choices: [{ finish_reason: "stop", message: { content: JSON.stringify(calls === 1 ? { ...good, facts: good.facts.slice(0, 1) } : good) } }] });
+  }));
+  expect((await extract(a, [fees, rewards], new Budget(0))).extraction.facts).toHaveLength(2);
+  expect(calls).toBe(2);
+});
+
+it("requires authoritative financial clauses in the full input and before accepting a lower-priority price", async () => {
+  vi.stubEnv("OPENROUTER_API_KEY", "fixture-not-a-real-key");
+  const a = adapter(), pricing = documentFromText("https://example.com/fees", "Non-USD FX fee: 1%."), authority = documentFromText("https://example.com/card-terms", Array.from({ length: 6 }, (_, i) => `Legal liability limit: USD ${100 + i}.`).join("\n") + "\nNon-USD foreign exchange fee: 2.2%.");
+  a.sources.urls = [pricing.url, authority.url];
+  a.sources.metadata = [{ url: authority.url, productIds: ["card"], supersedes: [pricing.url] }];
+  const good = extraction(pricing);
+  good.facts[0].value = [{ id: "fx", kind: "fx", calculation: "percentage", ratePercent: 1, calculable: true, scope: { excludedTransactionCurrencies: ["USD"] } }];
+  for (const block of authority.blocks.slice(0, -1)) good.facts.push({ ...good.facts[0], field: "terms", value: [block.text], evidence: { url: authority.url, blockId: block.id, quote: block.text } });
+  const previous = structuredClone(good);
+  const block = authority.blocks.at(-1)!;
+  good.facts.push({ ...good.facts[0], value: [{ id: "fx", kind: "fx", calculation: "percentage", ratePercent: 2.2, calculable: true, scope: { excludedTransactionCurrencies: ["USD"] } }], evidence: { url: authority.url, blockId: block.id, quote: block.text } });
+  let calls = 0;
+  vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+    if (url.endsWith("/models")) return Response.json({ data: [{ id: modelName(), pricing: { prompt: "0", completion: "0" }, supported_parameters: ["tools", "structured_outputs"] }] });
+    if (++calls === 2) expect(JSON.parse(String(init?.body)).messages.at(-1).content).toContain(block.text);
+    return Response.json({ usage: { cost: 0 }, choices: [{ finish_reason: "stop", message: { content: JSON.stringify(calls === 1 ? previous : good) } }] });
+  }));
+  const result = await extract(a, [pricing, authority], new Budget(0));
+  expect(calls).toBe(2);
+  expect(result.extraction.facts.filter(f => f.field === "fees").flatMap(f => f.value as { ratePercent?: number }[]).map(f => f.ratePercent)).toEqual([2.2]);
+  expect(result.extraction.facts.some(f => f.field === "terms" && f.evidence.url === pricing.url)).toBe(true);
+});
+
+it("requires complete coverage when the adapter has only one configured source", async () => {
+  vi.stubEnv("OPENROUTER_API_KEY", "fixture-not-a-real-key");
+  const doc = documentFromText("https://example.com/fees", "Monthly fee: free.\nAnnual fee: free.");
+  const a = adapter();
+  const facts = doc.blocks.map((block, i) => ({ productId: "card", tierId: null, inherit: false, field: "fees", value: [{ id: i ? "annual" : "monthly", kind: i ? "annual" : "monthly", calculation: "percentage", ratePercent: 0, scope: {} }], evidence: { url: doc.url, blockId: block.id, quote: block.text } }));
+  let calls = 0;
+  vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+    if (url.endsWith("/models")) return Response.json({ data: [{ id: modelName(), pricing: { prompt: "0", completion: "0" }, supported_parameters: ["tools", "structured_outputs"] }] });
+    if (++calls === 2) expect(JSON.parse(String(init?.body)).messages.at(-1).content).toContain("Annual fee: free.");
+    return Response.json({ usage: { cost: 0 }, choices: [{ finish_reason: "stop", message: { content: JSON.stringify({ complete: true, products: [], tiers: [], facts: calls === 1 ? facts.slice(0, 1) : facts }) } }] });
+  }));
+  expect((await extract(a, [doc], new Budget(0))).extraction.facts).toHaveLength(2);
+  expect(calls).toBe(2);
+});
+
+it("accepts a short clause covered verbatim by a richer same-page citation, but still requires independent pages", async () => {
+  vi.stubEnv("OPENROUTER_API_KEY", "fixture-not-a-real-key");
+  const a = adapter(), one = documentFromText("https://example.com/fees", "ATM fee: $5\nATM fee: $5 per withdrawal."), other = documentFromText("https://example.com/other", "ATM fee: $5");
+  const fact = (doc: typeof one, index: number) => ({ productId: "card", tierId: null, inherit: false, field: "fees", value: [{ id: "atm", kind: "atm", calculation: "fixed", fixed: { amount: "5", currency: "USD" }, scope: {} }], evidence: { url: doc.url, blockId: doc.blocks[index].id, quote: doc.blocks[index].text } });
+  let calls = 0, secondPage = false;
+  vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+    if (url.endsWith("/models")) return Response.json({ data: [{ id: modelName(), pricing: { prompt: "0", completion: "0" }, supported_parameters: ["tools", "structured_outputs"] }] });
+    if (++calls === 2) {
+      expect(secondPage).toBe(true);
+      expect(JSON.parse(String(init?.body)).messages.at(-1).content).toContain(other.url);
+    }
+    const facts = [fact(one, 1), ...(secondPage && calls > 1 ? [fact(other, 0)] : [])];
+    return Response.json({ usage: { cost: 0 }, choices: [{ finish_reason: "stop", message: { content: JSON.stringify({ complete: true, products: [], tiers: [], facts }) } }] });
+  }));
+  expect((await extract(a, [one], new Budget(0))).extraction.facts).toHaveLength(1);
+  expect(calls).toBe(1);
+  calls = 0; secondPage = true; a.sources.urls.push(other.url);
+  expect((await extract(a, [one, other], new Budget(0))).extraction.facts).toHaveLength(2);
+  expect(calls).toBe(2);
 });
