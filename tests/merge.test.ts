@@ -26,6 +26,23 @@ describe("deterministic merge and protection", () => {
     plan.facts[0] = { ...plan.facts[0], field: "limits", value: [{ id: "atm", kind: "atm", amount: { amount: "200", currency: "USD" }, period: "month", scope: {}, calculable: true }] };
     expect(() => candidate(adapter(), [plan], undefined, [freePlan])).not.toThrow();
   });
+  it("keeps a zero-fee ATM threshold with a beyond-threshold charge out of hard amount and count limits", () => {
+    const doc = documentFromText("https://example.com/fees", "Operation | Fee ; ATM withdrawal — up to 5 withdrawals or USD 200 per month (whichever first) | 0% ; ATM withdrawal beyond that limit | 2% ; Actual ATM hard cap | USD 5000 per month", "Fees", [], true), e = extraction(doc);
+    e.facts[0].field = "limits";
+    e.facts[0].value = [{ id: "atm", kind: "atm", scope: {}, amount: { amount: "200", currency: "USD" }, period: "month", calculable: true }];
+    expect(() => candidate(adapter(), [e], undefined, [doc])).toThrow("is an allowance, not a hard withdrawal limit");
+    e.facts[0].value = [{ id: "count", kind: "transaction_count", scope: {}, count: 5, period: "month", calculable: true }];
+    expect(() => candidate(adapter(), [e], undefined, [doc])).toThrow("is an allowance, not a hard withdrawal limit");
+    e.facts[0].value = [{ id: "atm", kind: "atm", scope: {}, amount: { amount: "5000", currency: "USD" }, period: "month", calculable: true }];
+    expect(() => candidate(adapter(), [e], undefined, [doc])).not.toThrow();
+    e.facts[0].field = "fees";
+    e.facts[0].value = [{ id: "free", kind: "atm", scope: { conditions: ["First five withdrawals or USD 200 per month"] }, calculation: "percentage", ratePercent: 0, allowance: { amount: { amount: "200", currency: "USD" }, period: "month" }, calculable: true }];
+    expect(() => candidate(adapter(), [e], undefined, [doc])).not.toThrow();
+    const hard = documentFromText(doc.url, "Service | Fee ; ATM withdrawal hard limit up to USD 200 per month | 0%", "Fees", [], true), actual = extraction(hard);
+    actual.facts[0].field = "limits";
+    actual.facts[0].value = [{ id: "atm", kind: "atm", scope: {}, amount: { amount: "200", currency: "USD" }, period: "month", calculable: true }];
+    expect(() => candidate(adapter(), [actual], undefined, [hard])).not.toThrow();
+  });
   it("does not turn an unlimited withdrawal amount into zero while preserving explicit no-fee charges", () => {
     const doc = documentFromText("https://example.com/limits", "Yearly ATM withdrawal limit (USD): None."), e = extraction(doc);
     e.facts[0] = { ...e.facts[0], field: "limits", value: [{ id: "atm", kind: "atm", amount: { amount: "0", currency: "USD" }, period: "year", scope: {}, calculable: true }] };

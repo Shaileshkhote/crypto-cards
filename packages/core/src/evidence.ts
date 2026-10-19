@@ -39,6 +39,11 @@ export function verifyFinancialEvidence(fact: ExtractionData["facts"][number]) {
   const freeAtm = (text: string) => /\b(?:fee[-\s]free|free)\s+(?:atm|(?:cash\s+)?withdrawals?)\b/i.test(text);
   const rows = fact.field === "limits" ? quote.split(/\s*;\s*/).map(text => ({ text, numbers: financialNumbers(text, false) })) : [];
   const freeList = rows.length > 1 && rows[0].text.trim().endsWith(":") && freeAtm(rows[0].text);
+  const aboveAtm = /\batm\s+withdrawals?\b[^;|]*\b(?:above|beyond|after)\b/i.test(quote);
+  const freeRow = (text: string) => {
+    const cells = text.trim().replace(/^\|\s*/, "").split("|");
+    return freeAtm(cells[0]) || aboveAtm && /\batm\s+withdrawals?\b/i.test(cells[0]) && /\b(?:up to|first|allowance)\b/i.test(cells[0]) && cells.slice(1).some(cell => /^\s*0(?:\.0+)?\s*%\s*$/.test(cell));
+  };
   const errors: string[] = [];
   const visit = (value: unknown, path: string, ruleId?: string) => {
     if (!value || typeof value !== "object") return;
@@ -61,7 +66,7 @@ export function verifyFinancialEvidence(fact: ExtractionData["facts"][number]) {
     for (const [key, item] of Object.entries(value)) {
       if (["amount", "ratePercent", "count"].includes(key) && (typeof item === "number" || typeof item === "string")) {
         const matchingRows = rows.filter(row => row.numbers.some(number => compareDecimals(number, String(item)) === 0));
-        if (fact.field === "limits" && matchingRows.length && matchingRows.every(row => freeList || row.text.includes("|") && freeAtm(row.text.trim().replace(/^\|\s*/, "").split("|")[0])))
+        if (fact.field === "limits" && matchingRows.length && matchingRows.every(row => freeList || row.text.includes("|") && freeRow(row.text)))
           report(`Fee-free ATM amount/count ${item} is an allowance, not a hard withdrawal limit. Use fees[].allowance for money or fee scope.conditions for free counts. Keep actual withdrawal limits separately.`);
         if (!numbers.some(number => compareDecimals(number, String(item)) === 0))
           report(`Financial value ${item} is absent from its cited block. Cite the row containing that value; emit separate facts for separate table rows. Keep unrepresentable values as narrative.`);

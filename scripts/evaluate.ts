@@ -2,18 +2,11 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { loadAdapters } from "@cards/core/adapters";
 import { Budget, extract, extractionSettings, RunError } from "@cards/core/agent";
 import { documentFromText } from "@cards/core/crawler";
+import { matchesClaim, type Claim } from "./evaluation-claims";
 
-interface Claim { field: string; productId?: string; tierId?: string; value?: unknown; rule?: unknown }
 interface Golden {
   id: string; provider: string; url: string; text: string; preserveLayout?: boolean;
   expected: Claim[]; forbidden: Claim[];
-}
-function contains(value: unknown, expected: unknown): boolean {
-  if (Array.isArray(expected))
-    return Array.isArray(value) && expected.every(e => value.some(v => contains(v, e)));
-  if (expected && typeof expected === "object")
-    return !!value && typeof value === "object" && Object.entries(expected).every(([k,v]) => contains((value as Record<string, unknown>)[k],v));
-  return value === expected;
 }
 async function run() {
   const allFixtures: Golden[] = JSON.parse(await readFile("tests/fixtures/live-providers.json", "utf8"));
@@ -30,13 +23,7 @@ async function run() {
     try {
       const doc = documentFromText(fixture.url, fixture.text, fixture.url, [], fixture.preserveLayout);
       const { extraction } = await extract(adapter, [doc], budget);
-      const matches = (claim: Claim) => extraction.facts.some(f =>
-        f.field === claim.field &&
-        (claim.productId === undefined || f.productId === claim.productId) &&
-        (claim.tierId === undefined || f.tierId === claim.tierId) &&
-        (claim.value === undefined || contains(f.value, claim.value)) &&
-        (claim.rule === undefined || (Array.isArray(f.value) && f.value.some(r => contains(r, claim.rule)))),
-      );
+      const matches = (claim: Claim) => matchesClaim(extraction, claim);
       const missing = fixture.expected.filter(c => !matches(c));
       const unsupported = fixture.forbidden.filter(matches);
       results.push({ id: fixture.id, passed: !missing.length && !unsupported.length, missing, unsupported, extraction, costUsd: budget.spent-before, elapsedMs: Date.now()-started });
