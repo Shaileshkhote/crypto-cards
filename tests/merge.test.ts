@@ -11,6 +11,18 @@ import { adapter, document, extraction } from "./helpers";
 import { Card } from "@cards/core/schema";
 import { documentFromText } from "@cards/core/crawler";
 describe("deterministic merge and protection", () => {
+  it("holds a legacy limit's calculability transition for review without leaking fields between variants", () => {
+    const identity = { id: "example", name: "Example", website: "https://example.com" };
+    const accepted = Card.parse({ ...identity, limits: [{ id: "legacy-limit", kind: "spending", period: "transaction", scope: {}, calculable: true, amount: { amount: "1000", currency: "USD" } }] });
+    const unknown = Card.parse({ ...identity, limits: [{ id: "legacy-limit", kind: "spending", period: "transaction", scope: {}, calculable: false, description: "The limit now depends on the account." }] });
+    const proposed = merge(accepted, unknown);
+    expect(proposed.published).toEqual(accepted);
+    expect(proposed.changes.some(change => change.path.at(-1) === "amount" && change.after === undefined)).toBe(true);
+    expect(applyChanges(proposed.published, proposed.changes)).toEqual(unknown);
+    const restored = merge(unknown, accepted);
+    expect(restored.published).toEqual(unknown);
+    expect(applyChanges(restored.published, restored.changes)).toEqual(accepted);
+  });
   it("reuses normalized IDs and explicit aliases before repeated regional tier names", () => {
     const a = adapter(), doc = documentFromText("https://example.com/fees", "Tier 1 in region A: 1%. Tier 1 in region B: 2%."), e = extraction(doc);
     e.tiers = ["region-a--tier-1", "region-b--tier-1"].map(id => ({ id, name: "Tier 1", productId: "card" }));

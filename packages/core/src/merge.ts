@@ -8,7 +8,7 @@ import {
 } from "./schema";
 import { canonical, hash, slug } from "./serialize";
 import { verifyEvidence, verifyFinancialEvidence } from "./evidence";
-export const MERGE_VERSION = "12";
+export const MERGE_VERSION = "13";
 type ObjectValue = Record<string, unknown>;
 const isObject = (v: unknown): v is ObjectValue =>
   !!v && typeof v === "object" && !Array.isArray(v);
@@ -32,17 +32,20 @@ export function overlay(base: unknown, patch: unknown): unknown {
     return [...values.values()].sort((a, b) => a.id.localeCompare(b.id));
   }
   if (isObject(base) && isObject(patch)) {
-    // Provenance and fee calculations are unions, so switching variants replaces
-    // the object instead of retaining incompatible keys from its old variant.
+    // Switching a union branch replaces its incompatible fields. A limit
+    // becoming non-calculable must not keep its old amount or count.
     if (
       patch.origin === "static" ||
       ("url" in patch && "blockId" in patch && "quote" in patch)
     )
       return patch;
     if (
-      base.calculation !== undefined &&
+      (base.calculation !== undefined &&
       patch.calculation !== undefined &&
-      base.calculation !== patch.calculation
+      base.calculation !== patch.calculation) ||
+      (typeof base.calculable === "boolean" &&
+        typeof patch.calculable === "boolean" &&
+        base.calculable !== patch.calculable)
     )
       return patch;
     const out = { ...base };
