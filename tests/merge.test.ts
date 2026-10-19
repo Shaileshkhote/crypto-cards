@@ -129,14 +129,16 @@ describe("deterministic merge and protection", () => {
   });
   it("distinguishes monetary currencies in otherwise identical rules without hiding same-currency price conflicts", () => {
     const a = adapter(), doc = documentFromText("https://example.com/fees", "ATM fee: 2%, minimum 1.99 EUR or 1.99 GBP. The EUR minimum may instead be 2.99 EUR."), e = extraction(doc);
-    e.facts[0].value = (["EUR", "GBP"] as const).map(currency => ({ id: `atm-${currency.toLowerCase()}`, kind: "atm", scope: {}, calculation: "percentage", ratePercent: 2, minFee: { amount: "1.99", currency }, calculable: true }));
+    const rules = (["EUR", "GBP"] as const).map(currency => ({ id: `atm-${currency.toLowerCase()}`, kind: "atm" as const, scope: {}, calculation: "percentage" as const, ratePercent: 2, minFee: { amount: "1.99", currency }, calculable: true as const }));
+    e.facts[0].value = rules;
     const card = candidate(a, [e], undefined, [doc]).data;
     const fees = card.products![0].tiers![0].fees!;
     expect(fees).toHaveLength(2);
     expect(new Set(fees.map(fee => fee.id)).size).toBe(2);
     const changed = structuredClone(e);
-    changed.facts[0].value = [structuredClone((e.facts[0].value as Record<string, unknown>[])[0])];
-    ((changed.facts[0].value as Record<string, unknown>[])[0].minFee as { amount: string }).amount = "2.99";
+    const changedRule = structuredClone(rules[0]);
+    changedRule.minFee.amount = "2.99";
+    changed.facts[0].value = [changedRule];
     const incoming = candidate(a, [changed], undefined, [doc]).data;
     expect(incoming.products![0].tiers![0].fees![0].id).toBe(fees.find(fee => fee.minFee?.currency === "EUR")!.id);
     const held = merge(card, incoming);
