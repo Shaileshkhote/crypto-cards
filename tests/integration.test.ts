@@ -10,7 +10,7 @@ import * as syncFunctions from "@cards/core/sync";
 import { Budget, RunError, type Extractor } from "@cards/core/agent";
 import { listReviews, approveReview, rejectReview } from "@cards/core/review";
 import { readCache, rebuildCache } from "@cards/core/cache";
-import { publicationHash, preserveSourceDisagreements } from "@cards/core/merge";
+import { publicationHash, preserveSourceDisagreements, MERGE_VERSION } from "@cards/core/merge";
 import { enqueue, claimJob, status } from "@cards/core/jobs";
 import { adapter, document, extraction } from "./helpers";
 import { Card } from "@cards/core/schema";
@@ -89,6 +89,21 @@ describe.skipIf(!enabled)(
       expect((await readCache("cards/example"))?.payload).toBe(before?.payload);
       expect((await run(1.5, async () => { throw new Error("Repaired cache must be reused"); })).status).toBe("unchanged");
       expect((await readCache("cards/example"))?.payload).toBe(before?.payload);
+    });
+    it("refreshes an immutable proposal after merge rules change before allowing approval", async () => {
+      await run();
+      expect((await run(2)).status).toBe("review");
+      const old = (await listReviews())[0];
+      await db().query("UPDATE card_reviews SET context=jsonb_set(context,'{mergeVersion}',$2::jsonb) WHERE id=$1", [old.id, JSON.stringify("legacy")]);
+      await expect(approveReview(old.id, "test-admin")).rejects.toThrow("merge rules changed");
+      expect((await run(2, async () => { throw new Error("Valid source cache must be reused"); })).status).toBe("review");
+      const fresh = (await listReviews())[0];
+      expect(fresh.id).not.toBe(old.id);
+      expect(fresh.context).toMatchObject({ mergeVersion: MERGE_VERSION });
+      const historical = (await db().query("SELECT status,changes,base_version FROM card_reviews WHERE id=$1", [old.id])).rows[0];
+      expect(historical).toMatchObject({ status: "superseded", changes: old.changes, base_version: old.base_version });
+      await approveReview(fresh.id, "test-admin");
+      expect((await read()).products![0].tiers![0].fees![0]).toMatchObject({ ratePercent: 2 });
     });
     it("persists distinct material fees, reuses them warm and holds a changed price for review", async () => {
       const a = adapter();

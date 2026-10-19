@@ -6,7 +6,7 @@ import {
   type ReviewRow,
 } from "@cards/db";
 import { Card } from "./schema";
-import { applyChanges, publicationHash, type Change } from "./merge";
+import { applyChanges, publicationHash, MERGE_VERSION, type Change } from "./merge";
 import { rebuildCache } from "./cache";
 export async function listReviews(cardId?: string) {
   return (
@@ -35,10 +35,13 @@ export async function approveReview(id: string, reviewer: string) {
         row.card_id,
       ])
     ).rows[0];
+    if (card?.retired) throw new Error(`Adapter is retired: ${row.card_id}`);
     if (!card || card.version !== row.base_version)
       throw new Error(
         "Review is stale: published version changed; run sync to refresh",
       );
+    if ((row.context as { mergeVersion?: string } | null)?.mergeVersion !== MERGE_VERSION)
+      throw new Error("Review is stale: merge rules changed; run sync to refresh");
     const data = applyChanges(Card.parse(card.data), row.changes as Change[]);
     const version = await publish(
       c,

@@ -158,3 +158,29 @@ it.each([
   const built = candidate(exampleAdapter(), [resolved.extraction], undefined, docs).data;
   expect(built.products![0].tiers![0][field as 'chains' | 'network' | 'issuer']).toBeUndefined();
 });
+
+it.each([false, true])('canonicalizes a repeated target tier before comparing fees (disagreement: %s)', async (different) => {
+  const { adapter: exampleAdapter, extraction: exampleExtraction } = await import('./helpers');
+  const docs = [1.5, different ? 2.5 : 1.5].map((rate, i) => documentFromText(`https://example.com/source-${i}`, `Core FX fee: ${rate}% for residents of Germany.`));
+  const parts = docs.map((doc, i) => exampleExtraction(doc, i && different ? 2.5 : 1.5));
+  (parts[1].facts[0].value as { scope: { tierIds?: string[] } }[])[0].scope.tierIds = ['core'];
+  const incoming = Extraction.parse({ ...parts[0], facts: parts.flatMap(part => part.facts) });
+  const resolved = preserveSourceDisagreements(incoming);
+  const tier = candidate(exampleAdapter(), [resolved.extraction], undefined, docs).data.products![0].tiers![0];
+  if (different) {
+    expect(tier.fees).toBeUndefined();
+    expect(tier.terms).toEqual(expect.arrayContaining(docs.map(doc => doc.content)));
+  } else {
+    expect(tier.fees).toHaveLength(1);
+    expect(tier.fees![0]).toMatchObject({ ratePercent: 1.5 });
+  }
+});
+
+it('keeps static precedence when a fee repeats its containing tier in scope', async () => {
+  const { adapter: exampleAdapter, document, extraction: exampleExtraction } = await import('./helpers');
+  const adapter = exampleAdapter(), doc = document();
+  adapter.static = { products: [{ id: 'card', name: 'Card', tiers: [{ id: 'core', name: 'Core', fees: [{ id: 'manual', kind: 'fx', calculation: 'percentage', ratePercent: 2, scope: { residentCountries: ['DE'], tierIds: ['core'] }, calculable: true }] }] }] };
+  const tier = candidate(adapter, [exampleExtraction(doc)], undefined, [doc]).data.products![0].tiers![0];
+  expect(tier.fees).toHaveLength(1);
+  expect(tier.fees![0]).toMatchObject({ ratePercent: 2, source: { origin: 'static' }, scope: { tierIds: ['core'] } });
+});

@@ -9,7 +9,7 @@ import {
 } from "./schema";
 import { canonical, hash, slug } from "./serialize";
 import { verifyEvidence, verifyFinancialEvidence } from "./evidence";
-export const MERGE_VERSION = "15";
+export const MERGE_VERSION = "16";
 type ObjectValue = Record<string, unknown>;
 const isObject = (v: unknown): v is ObjectValue =>
   !!v && typeof v === "object" && !Array.isArray(v);
@@ -211,11 +211,14 @@ function moneyCurrencies(value: unknown): string[] {
     ...Object.values(value).flatMap(moneyCurrencies),
   ])].sort();
 }
-function rules(value: unknown, field: string, target: string, origin: unknown): unknown {
+function rules(value: unknown, field: string, target: string, origin: unknown, targetTier?: string | null): unknown {
   if (!Array.isArray(value) || !["fees", "rewards", "limits"].includes(field)) return value;
   return coalesceRules(value.map(r => {
     const obj = ordered(r) as ObjectValue;
     const currencies = moneyCurrencies(obj);
+    const identityScope = ordered(obj.scope || {}) as ObjectValue;
+    if (targetTier && Array.isArray(identityScope.tierIds) && identityScope.tierIds.length === 1 && identityScope.tierIds[0] === targetTier)
+      delete identityScope.tierIds;
     const id = `${field.slice(0, -1)}-${hash({
       target, kind: obj.kind || "cashback",
       serviceId: obj.kind === "other" ? obj.serviceId : undefined,
@@ -223,23 +226,23 @@ function rules(value: unknown, field: string, target: string, origin: unknown): 
       requirements: field === "rewards" ? ordered(obj.requirements) : undefined,
       period: field === "limits" ? obj.period : undefined,
       currencies: currencies.length ? currencies : undefined,
-      scope: ordered(obj.scope || {}),
+      scope: identityScope,
     }).slice(0, 20)}`;
     return { ...obj, scope: ordered(obj.scope || {}), id, source: origin, status: "verified" };
   }), field);
 }
-function staticOrigin(v: unknown, path = "provider"): unknown {
-  if (Array.isArray(v)) return v.map((x) => staticOrigin(x, path));
+function staticOrigin(v: unknown, path = "provider", targetTier?: string): unknown {
+  if (Array.isArray(v)) return v.map((x) => staticOrigin(x, path, targetTier));
   if (!isObject(v)) return v;
   const out = { ...v },
     sources: Record<string, unknown> = {};
   for (const [k, x] of Object.entries(v)) {
     if (featureFields.has(k)) {
       sources[k] = { origin: "static" };
-      out[k] = rules(x, k, path, { origin: "static" });
+      out[k] = rules(x, k, path, { origin: "static" }, targetTier);
     } else if (k === "products" || k === "tiers")
       out[k] = (x as ObjectValue[]).map((e) =>
-        staticOrigin(e, `${path}/${e.id}`),
+        staticOrigin(e, `${path}/${e.id}`, k === "tiers" ? String(e.id) : undefined),
       );
   }
   if (Object.keys(sources).length) out.fieldSources = sources;
@@ -291,7 +294,7 @@ export function preserveSourceDisagreements(extraction: ExtractionData, sources?
     const target = [fact.productId, fact.tierId].filter(Boolean).join("/");
     const key = `${target}/${fact.field}`;
     if (["fees", "rewards", "limits"].includes(fact.field) && Array.isArray(fact.value)) {
-      const normalized = rules(fact.value, fact.field, target, fact.evidence) as ObjectValue[];
+      const normalized = rules(fact.value, fact.field, target, fact.evidence, fact.tierId) as ObjectValue[];
       // Same-block pairs must still be qualified rather than hidden as terms.
       for (const value of normalized) {
         const id = `${key}/${value.id}`, entries = groups.get(id) || [];
@@ -372,7 +375,7 @@ export function preserveSourceDisagreements(extraction: ExtractionData, sources?
     }
     if (removed) {
       const target = [fact.productId, fact.tierId].filter(Boolean).join("/");
-      const retained = (fact.value as ObjectValue[]).filter(rule => !removed.has(String((rules([rule], fact.field, target, fact.evidence) as ObjectValue[])[0].id)));
+      const retained = (fact.value as ObjectValue[]).filter(rule => !removed.has(String((rules([rule], fact.field, target, fact.evidence, fact.tierId) as ObjectValue[])[0].id)));
       if (retained.length) facts.push(Fact.parse({ ...fact, value: retained }));
     }
     facts.push(Fact.parse({ ...fact, field: "terms", value: [fact.evidence.quote] }));
@@ -528,7 +531,7 @@ function assembleCandidate(
             return { ...rule, scope: { ...scope, tierIds: ids } };
           })
         : fact.value;
-      const value = rules(scoped, fact.field, target, fact.evidence);
+      const value = rules(scoped, fact.field, target, fact.evidence, tierId);
       const factKey = `${target}/${fact.field}`;
       const earlier = factsSeen.get(factKey);
       // Assemble cited collection rows before comparing complete lists from
