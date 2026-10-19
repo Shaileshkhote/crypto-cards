@@ -17,9 +17,9 @@ it("automatically discovers all 36 migrated providers with three files each", as
 it("excludes retired adapters by default and retains their configuration for validation", async () => {
   const active = await loadAdapters();
   const all = await loadAdapters(undefined, { includeRetired: true });
-  expect(active).toHaveLength(34);
-  expect(active.some(a => ["safepal", "gnosis-pay"].includes(a.config.id))).toBe(false);
-  expect(all.filter(a => a.config.retired).map(a => a.config.id).sort()).toEqual(["gnosis-pay", "safepal"]);
+  expect(active).toHaveLength(33);
+  expect(active.some(a => ["safepal", "gnosis-pay", "ready"].includes(a.config.id))).toBe(false);
+  expect(all.filter(a => a.config.retired).map(a => a.config.id).sort()).toEqual(["gnosis-pay", "ready", "safepal"]);
 });
 it("fails with adapter filename and field instead of silently skipping", async () => {
   const root = await mkdtemp(join(tmpdir(), "cards-adapters-"));

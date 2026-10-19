@@ -43,7 +43,7 @@ The supplied legacy adapter migration preserves catalog data, not the old pipeli
 
 ## Retiring an adapter
 
-Set `retired: true` at the top level of `config.ts`. SafePal and Gnosis Pay use this flag. It retires the entire adapter independently of individual product/tier lifecycle metadata. The default loader excludes retired adapters; `loadAdapters(undefined, { includeRetired: true })` retains them for validation and maintenance. `pnpm cards validate` reports active and retired counts separately.
+Set `retired: true` at the top level of `config.ts`. SafePal, Gnosis Pay and Ready use this flag. It retires the entire adapter independently of individual product/tier lifecycle metadata. The default loader excludes retired adapters; `loadAdapters(undefined, { includeRetired: true })` retains them for validation and maintenance. `pnpm cards validate` reports active and retired counts separately.
 
 Run `pnpm db:migrate` and `pnpm cards cache` with the database binding after applying configuration changes, or redeploy: worker startup applies retirement before reporting readiness. Cache rebuilding updates `cards.retired` and public projections in one transaction. Retired cards are excluded from active SQL counts, published-card reads, pending reviews and cache output; old per-provider cache entries are removed. Canonical facts, versions, source snapshots, extractions and review records are retained. Historical jobs and spending remain in the audit.
 

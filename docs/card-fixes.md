@@ -40,7 +40,7 @@ TypeScript, ESLint and **124 tests**, including PostgreSQL integration, pass. Fi
 
 Some failures remain real source or output problems: Bitget's eligibility lists differ; MEXC's sources state different APAC transaction fees; KAST states both $250 and $500 per ATM withdrawal; Payitfast's official charges conflict. Other saved outputs need corrected scopes, citations or complete responses. Gnosis help pages still disallow the crawler. No source was removed and no conflicting price was selected merely to make a candidate pass.
 
-SafePal and Gnosis Pay were subsequently retired by adapter configuration. They are excluded from active runs and counts; the remaining active inventory contains 34 adapters and 404 URLs. The earlier Gnosis access failure is historical, not an active-provider blocker.
+SafePal, Gnosis Pay and Ready were subsequently retired by adapter configuration. They are excluded from active runs and counts; the remaining active inventory contains 33 adapters and 396 URLs. The earlier Gnosis access failure is historical, not an active-provider blocker.
 
 A fresh full active-inventory run with functioning native DNS, source access and the final model contract remains required. The hard $4.99 invocation ceiling is unchanged; a complete successful ingestion below $5 is not yet demonstrated. Conservative accounting remains **$9.978259/$10** for model testing and **$14.970552/$15** for adapters, **$24.948811/$25** combined.
 
@@ -66,3 +66,5 @@ A replay of the stored responses under prompt 23 still has **17 valid candidates
 The focused regressions and full **124-test** suite pass with PostgreSQL integration, TypeScript and ESLint; the production build passes. Three new labeled paid-model evaluation cases are prepared but unrun. Native DNS was rechecked for KAST, MEXC and Payitfast and still returns `EAI_AGAIN`. There were **zero additional paid model requests**, and the remaining original allocation cannot fund a meaningful complete acceptance run. Source authority decisions and a fresh complete run remain outstanding.
 
 A subsequent prompt-23 offline publication check used a new copy of the 17-card dataset: accepted values were retained for 17/17 cards, and all 17 warm passes were unchanged with byte-identical caches. Two cold candidates stayed held for review; no reviews were approved and no model requests were sent.
+
+Ready was subsequently retired through the same top-level adapter flag. It is excluded from new active runs, counts and public data; accepted facts and history remain archived. The active inventory now contains **33 adapters / 396 URLs**. Ready's two new-allocation evaluation cases had finished before the retirement request and remain historical accounting; the upcoming full run excludes Ready.

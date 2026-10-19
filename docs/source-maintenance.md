@@ -2,7 +2,7 @@
 
 The original import contained 36 providers and 446 URLs. The maintained inventory contains the same 36 providers and 433 URLs. Changes below were checked against public provider pages on 2026-10-18; no legacy adapter code was used.
 
-The active inventory is now **34 adapters / 404 URLs**. SafePal and Gnosis Pay are retired and excluded from ingestion; their 29 configured URLs remain archived in the inventory. The full-inventory audit below predates this exclusion. Gnosis's archived robots failures no longer block an active inventory run.
+The active inventory is now **33 adapters / 396 URLs**. SafePal, Gnosis Pay and Ready are retired and excluded from ingestion; their 37 configured URLs remain archived in the inventory. The full-inventory audit below predates this exclusion. Gnosis's archived robots failures no longer block an active inventory run.
 
 | Provider | Update | Reason |
 | --- | --- | --- |

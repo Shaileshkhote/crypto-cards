@@ -10,7 +10,7 @@ The maintained inventory is **36 providers / 433 configured URLs**. The fresh ap
 
 The subsequent [remaining-card fixes](card-fixes.md) used offline data only: Revolut validates from unchanged recorded output, and six manually reviewed candidates publish in a copied database. That dataset has 17 cards with 17 unchanged warm passes and all original accepted values retained. These results do not replace the historical paid replay below.
 
-SafePal and Gnosis Pay have since been retired through adapter configuration. The active inventory is now **34 adapters / 404 URLs**; archived configurations and historical measurements remain available. Retirement tests verify zero model/source work, exclusion from active database/cache counts, and retention of canonical data and history. See [adapter retirement](adapters.md#retiring-an-adapter).
+SafePal, Gnosis Pay and Ready have since been retired through adapter configuration. The active inventory is now **33 adapters / 396 URLs**; archived configurations and historical measurements remain available. Retirement tests verify zero model/source work, exclusion from active database/cache counts, and retention of canonical data and history. See [adapter retirement](adapters.md#retiring-an-adapter).
 
 ## Final inventory replay
 
