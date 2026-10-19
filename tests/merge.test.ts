@@ -116,6 +116,22 @@ describe("deterministic merge and protection", () => {
     e.facts[0].value = [{ id: "spend", kind: "spending", amount: { amount: "1500", currency: "USD" }, period: "transaction", scope: {}, calculable: true }];
     expect(candidate(a, [e], undefined, [doc]).data.products![0].tiers![0].limits![0]).toMatchObject({ amount: { amount: "1500" } });
   });
+  it("identifies all wrongly cited financial facts and their rules in one validation result", () => {
+    const doc = documentFromText("https://example.com/fees", "Card issuance depends on card type."), e = extraction(doc);
+    e.facts = ["virtual-issuance", "physical-issuance"].map((id, index) => ({ ...e.facts[0], value: [{ id, kind: "issuance", scope: {}, calculation: "fixed", fixed: { amount: String((index + 1) * 10), currency: "USD" }, calculable: true }] }));
+    try { candidate(adapter(), [e], undefined, [doc]); throw new Error("Expected evidence rejection"); }
+    catch (error) {
+      const message = (error as Error).message;
+      expect(message).toContain("facts[0]");
+      expect(message).toContain("facts[1]");
+      expect(message).toContain("virtual-issuance");
+      expect(message).toContain("physical-issuance");
+      expect(message).toContain("Money currency USD is absent");
+      expect(message).toContain("Financial value 10 is absent");
+      expect(message).toContain("Financial value 20 is absent");
+      expect(message).toContain(doc.url);
+    }
+  });
   it("keeps separately cited narrative clauses and detects a missing contributing source", () => {
     const a = adapter(), first = document(), second = documentFromText("https://example.com/eligibility", "Applicants must be adults.");
     const evidence = (doc: typeof first) => ({ url: doc.url, blockId: doc.blocks[0].id, quote: doc.blocks[0].text });

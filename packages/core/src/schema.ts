@@ -59,7 +59,7 @@ export const Scope = z
   .strict();
 const RuleBase = {
   id: Id,
-  scope: Scope,
+  scope: Scope.describe("Required explicit applicability for this rule. Use typed fields and sourced conditions. Use {} only when no qualification is stated; omission does not mean worldwide or unconditional."),
   description: z.string().optional(),
   source: Origins.optional(),
   status: z.enum(["verified", "unconfirmed"]).optional(),

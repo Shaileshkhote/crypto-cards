@@ -52,6 +52,25 @@ it.each(fixtures)("retains the sourced rules for $id", async fixture => {
   const rules = rulesIn(built);
   expect(rules).toHaveLength(fixture.rules.length);
   expect(new Set(rules.map(r => r.id)).size).toBe(rules.length);
+  if (fixture.id === "phantom-funding-and-ach") {
+    expect(rules).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: "topup", ratePercent: 1.75, scope: { conditions: ["debit card through Stripe"] } }),
+      expect.objectContaining({ kind: "topup", ratePercent: 3.5, scope: { conditions: ["credit card through Stripe"] } }),
+      expect.objectContaining({ calculation: "unknown", calculable: false, scope: { paymentRails: ["ach"], conditions: ["fast ACH"] } }),
+    ]));
+  }
+  if (fixture.id === "picnic-atm-allowance") {
+    expect(rules).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: "atm", ratePercent: 0, allowance: { amount: { amount: "200", currency: "USD" }, period: "month" } }),
+      expect.objectContaining({ kind: "atm", ratePercent: 2, scope: { conditions: ["ATM withdrawal beyond that limit"] } }),
+    ]));
+  }
+  if (fixture.id === "vaultleap-partner-charge-versus-markup") {
+    expect(rules).toEqual(expect.arrayContaining([
+      expect.objectContaining({ calculation: "unknown", calculable: false, scope: { conditions: ["partner pass-through fee"] } }),
+      expect.objectContaining({ calculation: "percentage", ratePercent: 0, scope: { conditions: ["VaultLeap markup"] } }),
+    ]));
+  }
   const reversed = structuredClone(result.extraction);
   (reversed.facts[0].value as unknown[]).reverse();
   expect(canonical(candidate(adapter, [reversed], undefined, [doc]).data)).toBe(canonical(built));

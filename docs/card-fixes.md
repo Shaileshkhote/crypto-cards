@@ -32,14 +32,37 @@ All **17/17 warm passes** were unchanged, used cached extraction without calling
 - Repeated tool results reference text already in the conversation. A truncated search excerpt does not hide the full block from a later page read. This removes the reproduced Coinbase context overflow without raising the context bound or dropping source text; that recording still requires a corrected response with explicit rule scopes.
 - Validation errors identify the conflicting rule, conditions and values. Extraction guidance distinguishes tier-specific issuers, program dates from campaign dates, and separate reward programs.
 
-Schema **8 / prompt 22** is the current contract, using the selected Luna/high model setting. It has not received a new paid whole-provider or labeled model evaluation. The earlier 10/11 model score belongs to schema 7 / prompt 21.
+Schema **8 / prompt 23** is the current contract, using the selected Luna/high model setting. It has not received a new paid whole-provider or labeled model evaluation. The earlier 10/11 model score belongs to schema 7 / prompt 21.
 
 ## Checks and remaining work
 
-TypeScript, ESLint and **111 tests**, including PostgreSQL integration, pass. Nine manually reviewed source-excerpt fixtures cover the new representations. Additional tests exercise repeated tool reads, conditional-price sorting and a material-fee price change held until version-checked approval. The production build and CI results are recorded on the PR.
+TypeScript, ESLint and **124 tests**, including PostgreSQL integration, pass. Fifteen manually reviewed source-excerpt fixtures cover the representations; four additional source-disagreement fixtures check citation retention and accepted-value preservation. Additional tests exercise repeated tool reads, conditional-price sorting and a material-fee price change held until version-checked approval. The production build and CI results are recorded on the PR.
 
 Some failures remain real source or output problems: Bitget's eligibility lists differ; MEXC's sources state different APAC transaction fees; KAST states both $250 and $500 per ATM withdrawal; Payitfast's official charges conflict. Other saved outputs need corrected scopes, citations or complete responses. Gnosis help pages still disallow the crawler. No source was removed and no conflicting price was selected merely to make a candidate pass.
 
 SafePal and Gnosis Pay were subsequently retired by adapter configuration. They are excluded from active runs and counts; the remaining active inventory contains 34 adapters and 404 URLs. The earlier Gnosis access failure is historical, not an active-provider blocker.
 
 A fresh full active-inventory run with functioning native DNS, source access and the final model contract remains required. The hard $4.99 invocation ceiling is unchanged; a complete successful ingestion below $5 is not yet demonstrated. Conservative accounting remains **$9.978259/$10** for model testing and **$14.970552/$15** for adapters, **$24.948811/$25** combined.
+
+## Follow-up on the unresolved active cards
+
+Prompt 23 keeps the same strict schema. Missing financial scopes are reported together in one correction instead of exposing only eight paths per turn. It does not fill missing scopes with `{}` automatically. Financial evidence errors now identify the fact, rule, target and exact citation, and report failures across the candidate together. Country-list conflicts show which source differs and the differing values (Bitget's saved disagreement includes CN and SG).
+
+Search results show text around a matching term instead of always showing the first 600 characters. They include the block offset for a full page read and a truncation flag. Different excerpts from the same block remain available; a partial excerpt cannot hide a later full read. Context, request and spending bounds are unchanged. Compose now defaults to the selected Luna model and $4.50 budget, matching the CLI and `.env.example`.
+
+Guidance and source-reviewed tests distinguish debit/credit funding, standard/fast ACH, swap direction, free ATM allowances, approximate partner charges versus provider markup, and crypto units versus fiat currencies. A genuinely disputed value can stay as independently cited narrative clauses while other facts remain usable. The application still rejects competing typed prices, and omission cannot erase accepted values. Product-level narrative additions follow the existing review policy.
+
+Four saved disagreements are explicitly covered without an authority decision:
+
+| Card | Saved source disagreement |
+| --- | --- |
+| KAST | Help article: $500 per withdrawal; product page: $250. |
+| MEXC APAC | Comparison table: 0% transaction fee; application article: 1% spending fee. |
+| Payitfast | Pricing: 1% non-USD FX; card terms: 2.2%. |
+| Bitget Wallet | Main card page includes Singapore/mainland China; reward page's application list omits them. Neither the URL nor an omitted country establishes a safe eligibility interpretation. |
+
+A replay of the stored responses under prompt 23 still has **17 valid candidates, 17 unresolved active cards and two retired adapters skipped**. Six of those 17 valid candidates still use the earlier manually reviewed inputs. The replay cannot generate corrected responses that are absent from the recording. Improved validation feedback and new representation tests are not new model successes. The seven budget-incomplete cards remain Plasma One, Robinhood Gold, Ruvo, Solayer, Tria, Tuyo and Wirex One; no new provider defect is inferred from a missing response.
+
+The focused regressions and full **124-test** suite pass with PostgreSQL integration, TypeScript and ESLint; the production build passes. Three new labeled paid-model evaluation cases are prepared but unrun. Native DNS was rechecked for KAST, MEXC and Payitfast and still returns `EAI_AGAIN`. There were **zero additional paid model requests**, and the remaining original allocation cannot fund a meaningful complete acceptance run. Source authority decisions and a fresh complete run remain outstanding.
+
+A subsequent prompt-23 offline publication check used a new copy of the 17-card dataset: accepted values were retained for 17/17 cards, and all 17 warm passes were unchanged with byte-identical caches. Two cold candidates stayed held for review; no reviews were approved and no model requests were sent.

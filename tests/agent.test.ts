@@ -321,3 +321,48 @@ it("reuses prior tool text without hiding a full block behind its earlier excerp
   await expect(extract(adapter(), docs, new Budget(0))).resolves.toBeDefined();
   expect(calls).toBe(4);
 });
+
+it("shows late search matches and different excerpts from the same block without hiding the full source", async () => {
+  vi.stubEnv("OPENROUTER_API_KEY", "offline-fixture-not-a-key");
+  const text = `${"Legal introduction. ".repeat(35)}Fast ACH: $1 plus 0.75%. ${"Other conditions. ".repeat(35)}Debit funding: 1.75%.`;
+  const doc = documentFromText("https://example.com/fees", text, "Fees", [], true);
+  let calls = 0;
+  vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+    if (url.endsWith("/models")) return Response.json({ data: [{ id: modelName(), pricing: { prompt: "0", completion: "0" }, supported_parameters: ["tools", "structured_outputs"] }] });
+    const turn = ++calls, body = JSON.parse(String(init?.body));
+    if (turn === 2 || turn === 3) {
+      const block = JSON.parse(body.messages.at(-1).content)[0].blocks[0];
+      expect(block.text).toContain(turn === 2 ? "Fast ACH: $1 plus 0.75%" : "Debit funding: 1.75%");
+      expect(block).toMatchObject({ id: "p1b1", offset: 0, truncated: true });
+      expect(block.alreadyRead).toBeUndefined();
+    }
+    if (turn === 4) expect(JSON.parse(body.messages.at(-1).content).blocks[0].text).toBe(text);
+    const tool = turn < 3 ? { name: "searchDocs", arguments: JSON.stringify({ query: turn === 1 ? "Fast ACH" : "Debit funding" }) }
+      : { name: "readPage", arguments: JSON.stringify({ url: doc.url, offset: 0 }) };
+    return Response.json({ usage: { cost: 0 }, choices: [{ finish_reason: turn < 4 ? "tool_calls" : "stop", message: turn < 4
+      ? { content: null, tool_calls: [{ id: `tool-${turn}`, function: tool }] }
+      : { content: JSON.stringify({ complete: true, products: [], tiers: [], facts: [] }) } }] });
+  }));
+  await extract(adapter(), [doc], new Budget(0));
+  expect(calls).toBe(4);
+});
+
+it("reports every missing financial scope in a single correction without assuming global applicability", async () => {
+  vi.stubEnv("OPENROUTER_API_KEY", "offline-fixture-not-a-key");
+  const doc = document(), good = extraction(doc);
+  good.facts = Array.from({ length: 17 }, () => structuredClone(good.facts[0]));
+  const bad = structuredClone(good);
+  for (const fact of bad.facts) delete (fact.value as Record<string, unknown>[])[0].scope;
+  let calls = 0;
+  vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+    if (url.endsWith("/models")) return Response.json({ data: [{ id: modelName(), pricing: { prompt: "0", completion: "0" }, supported_parameters: ["tools", "structured_outputs"] }] });
+    if (++calls === 2) {
+      const feedback = JSON.parse(String(init?.body)).messages.at(-1).content;
+      for (let i = 0; i < 17; i++) expect(feedback).toContain(JSON.stringify(["facts", i, "value", 0, "scope"]));
+      expect(feedback).toContain("Do not assume a missing scope means global applicability");
+    }
+    return Response.json({ usage: { cost: 0 }, choices: [{ finish_reason: "stop", message: { content: JSON.stringify(calls === 1 ? bad : good) } }] });
+  }));
+  expect((await extract(adapter(), [doc], new Budget(0))).extraction).toEqual(good);
+  expect(calls).toBe(2);
+});

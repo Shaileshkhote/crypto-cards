@@ -1,0 +1,103 @@
+[
+  {
+    "provider": "kast",
+    "productId": "kast",
+    "field": "limits",
+    "previousValue": [
+      {
+        "id": "previous",
+        "scope": {},
+        "calculable": true,
+        "kind": "atm",
+        "amount": {
+          "amount": "500",
+          "currency": "USD"
+        },
+        "period": "transaction"
+      }
+    ],
+    "observations": [
+      {
+        "url": "https://concierge.kast.xyz/hc/en-us/articles/11290428597647-What-Are-the-Daily-Spending-and-ATM-Withdrawal-Limits-on-My-KAST-Card",
+        "text": "Per withdrawal cap: $500 maximum per withdrawal, including fees."
+      },
+      {
+        "url": "https://www.kast.xyz/crypto-cards",
+        "text": "Card spending has no daily or monthly cap \u2014 you can spend up to the balance in your wallet, though unusually large transactions may be flagged for a compliance check. Cash is the exception: ATM withdrawals are capped at $250 per withdrawal including fees, and at three withdrawals in a rolling 24-hour window, so $750 a day. Individual ATM operators may add their own fees or restrictions."
+      }
+    ]
+  },
+  {
+    "provider": "mexc",
+    "productId": "mexc-apac",
+    "field": "fees",
+    "previousValue": [
+      {
+        "id": "previous",
+        "scope": {},
+        "calculable": true,
+        "kind": "transaction",
+        "calculation": "percentage",
+        "ratePercent": 0
+      }
+    ],
+    "observations": [
+      {
+        "url": "https://www.mexc.com/support/article/understanding-the-mexc-card-446453561133852672",
+        "text": "Fee Type | MEXC Card (APAC) | MEXC Global Card ; Transaction Fee | 0% | 1% ; Crypto Conversion Fee | 0% | 0% ; Foreign Exchange Fee | Visa exchange rate + 1% cross-border fee | Visa exchange rate + 0% markup ; Top-Up Fee | 0 | 0 ; ATM Withdrawal Fee | Not applicable to virtual cards | Not applicable to virtual cards ; Refund Fee | 1% for USD transactions 3% for non-USD transactions | 0 ; Failed Transaction Fee (Applies only to failed transactions) | 0 | 0 USD per transaction if the failed transaction rate is < 20% 0.5 USD per transaction if the failed transaction rate is \u2265 20% ; Small-Amount Transaction Fee (< 1 USD ) | | 0.1 USD"
+      },
+      {
+        "url": "https://www.mexc.com/support/article/how-to-apply-for-mexc-card-apac-400415248342093824",
+        "text": "Spending fee: 1%"
+      }
+    ]
+  },
+  {
+    "provider": "payitfast",
+    "productId": "payitfast",
+    "field": "fees",
+    "previousValue": [
+      {
+        "id": "previous",
+        "scope": {
+          "excludedTransactionCurrencies": [
+            "USD"
+          ]
+        },
+        "calculable": true,
+        "kind": "fx",
+        "calculation": "percentage",
+        "ratePercent": 1
+      }
+    ],
+    "observations": [
+      {
+        "url": "https://payitfast.com/pricing",
+        "text": "Item | Rate ; FX fee (all non-USD transactions) | 1%"
+      },
+      {
+        "url": "https://payitfast.com/card-terms",
+        "text": "- Foreign Exchange Fee (non USD): 2.2%"
+      }
+    ]
+  },
+  {
+    "provider": "bitget-wallet",
+    "productId": "bitget-wallet",
+    "field": "residentCountries",
+    "previousValue": [
+      "SG",
+      "CN"
+    ],
+    "observations": [
+      {
+        "url": "https://web3.bitget.com/card",
+        "text": "- Asia-Pacific: Singapore, South Korea, Japan, Vietnam, Malaysia, mainland China, Taiwan, Australia, Thailand, the Philippines"
+      },
+      {
+        "url": "https://web3.bitget.com/card-reward",
+        "text": "Users from the following countries/regions are eligible to apply: Europe (EEA and UK), Latin American countries (Argentina, Brazil, Chile, Colombia, Ecuador, El Salvador, Guatemala, Mexico, Panama, and Peru), APAC (South Korea, Japan, Vietnam, Malaysia, Taiwan, Australia, Thailand, the Philippines, Bangladesh, Pakistan), and Africa (South Africa)."
+      }
+    ]
+  }
+]

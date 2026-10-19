@@ -426,5 +426,170 @@
         }
       }
     ]
+  },
+  {
+    "id": "phantom-distinct-funding-and-ach",
+    "provider": "phantom-cash",
+    "url": "https://help.phantom.com/articles/phantom-cash-fees-44800531617939",
+    "verifiedAt": "2026-10-19",
+    "preserveLayout": true,
+    "text": "Action | Fee ; Add Cash with a debit card through Stripe, including Apple Pay and Google Pay | 1.75% ; Add Cash with a credit card through Stripe, including Apple Pay and Google Pay | 3.50%1 ; Add Cash with a direct deposit from a US bank account | 0.30%2 ; Add Cash with a domestic wire from a US bank account | 1.00%2 ; Withdraw CASH from your Cash account with standard ACH | Free ; Withdraw CASH from your Cash account with fast ACH | $1.00 flat + 0.75% (min $1.50)",
+    "expected": [
+      {
+        "field": "fees",
+        "rule": {
+          "kind": "topup",
+          "calculation": "percentage",
+          "ratePercent": 1.75
+        }
+      },
+      {
+        "field": "fees",
+        "rule": {
+          "kind": "topup",
+          "calculation": "percentage",
+          "ratePercent": 3.5
+        }
+      },
+      {
+        "field": "fees",
+        "rule": {
+          "kind": "topup",
+          "calculation": "percentage",
+          "ratePercent": 0.3
+        }
+      },
+      {
+        "field": "fees",
+        "rule": {
+          "kind": "topup",
+          "calculation": "percentage",
+          "ratePercent": 1
+        }
+      },
+      {
+        "field": "fees",
+        "rule": {
+          "kind": "transaction",
+          "calculation": "percentage",
+          "ratePercent": 0,
+          "scope": {
+            "paymentRails": [
+              "ach"
+            ]
+          }
+        }
+      },
+      {
+        "field": "fees",
+        "rule": {
+          "kind": "transaction",
+          "calculation": "unknown",
+          "calculable": false,
+          "scope": {
+            "paymentRails": [
+              "ach"
+            ]
+          }
+        }
+      }
+    ],
+    "forbidden": [
+      {
+        "field": "fees",
+        "rule": {
+          "kind": "transaction",
+          "calculation": "percentage",
+          "ratePercent": 0.75
+        }
+      },
+      {
+        "field": "fees",
+        "rule": {
+          "kind": "transaction",
+          "calculation": "fixed",
+          "fixed": {
+            "amount": "1",
+            "currency": "USD"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "id": "picnic-fee-allowance-not-withdrawal-cap",
+    "provider": "picnic",
+    "url": "https://help.usepicnic.com/hc/picnic/articles/complete-picnic-fee-table",
+    "verifiedAt": "2026-10-19",
+    "preserveLayout": true,
+    "text": "Operation | Picnic fee | Other costs ; Top up the card via PIX | 0% | Between 0.3% and 0.5% versus the onchain rate_1_ ; Withdraw from the card via PIX | 0% | Between 0.3% and 0.5% versus the onchain rate_1_ ; Top up the card via crypto (any network) | 0% | Crypto deposit provider's cost and conversion to the Gnosis Chain network ; Card purchases in US dollars (USD) | 0% | \u2014 ; Card purchases in other currencies (BRL, EUR, etc.) | 0% | ~0.3% Visa conversion fee ; ATM withdrawal \u2014 up to 5 withdrawals or 200 USD per month (whichever first) | 0% | Local ATM operator may charge a fee ; ATM withdrawal beyond that limit | 2% per withdrawal | Local ATM operator may charge a fee",
+    "expected": [
+      {
+        "field": "fees",
+        "rule": {
+          "kind": "atm",
+          "ratePercent": 0,
+          "allowance": {
+            "amount": {
+              "amount": "200",
+              "currency": "USD"
+            },
+            "period": "month"
+          }
+        }
+      },
+      {
+        "field": "fees",
+        "rule": {
+          "kind": "atm",
+          "ratePercent": 2
+        }
+      }
+    ],
+    "forbidden": [
+      {
+        "field": "limits",
+        "rule": {
+          "kind": "transaction_count",
+          "count": 5
+        }
+      }
+    ]
+  },
+  {
+    "id": "vaultleap-approximate-partner-fee",
+    "provider": "vaultleap",
+    "url": "https://vaultleap.com/help-center/vaultleap-card-help-support/card-regions-supported",
+    "verifiedAt": "2026-10-19",
+    "preserveLayout": true,
+    "text": "FX conversions are subject to a ~0.5% partner pass-through fee on all tiers. No VaultLeap markup. No additional hidden costs.",
+    "expected": [
+      {
+        "field": "fees",
+        "rule": {
+          "kind": "fx",
+          "calculation": "unknown",
+          "calculable": false
+        }
+      },
+      {
+        "field": "fees",
+        "rule": {
+          "kind": "fx",
+          "calculation": "percentage",
+          "ratePercent": 0
+        }
+      }
+    ],
+    "forbidden": [
+      {
+        "field": "fees",
+        "rule": {
+          "kind": "fx",
+          "calculation": "percentage",
+          "ratePercent": 0.5
+        }
+      }
+    ]
   }
 ]

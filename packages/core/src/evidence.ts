@@ -25,21 +25,25 @@ export function verifyFinancialEvidence(fact: ExtractionData["facts"][number]) {
   });
   if (/\b(free|zero|none|(?:no|without) (?:[\w-]+\s+){0,3}(?:fees?|charges?|cost|markup))\b/i.test(quote) ||
       /\b(?:fees?|charges?|cost)\s+(?:is\s+)?(?:currently\s+)?waived\b/i.test(quote)) numbers.push("0");
-  const visit = (value: unknown) => {
+  const errors: string[] = [];
+  const visit = (value: unknown, path: string, ruleId?: string) => {
     if (!value || typeof value !== "object") return;
+    if ("id" in value && typeof value.id === "string") ruleId = value.id;
+    const report = (message: string) => errors.push(`${message} Location: ${path}${ruleId ? ` (rule ${ruleId})` : ""}; target ${[fact.productId, fact.tierId].filter(Boolean).join("/") || "provider"}; citation ${fact.evidence.url}#${fact.evidence.blockId}.`);
     const money = value as { amount?: unknown; currency?: string };
     if (typeof money.amount === "string" && typeof money.currency === "string") {
       const symbol = ({ USD: "$", EUR: "€", GBP: "£", JPY: "¥", CNY: "¥", INR: "₹", KRW: "₩" } as Record<string, string>)[money.currency];
       const name = new Intl.DisplayNames(["en"], { type: "currency" }).of(money.currency);
       if (!new RegExp(`\\b${money.currency}\\b`, "i").test(quote) && !(symbol && quote.includes(symbol)) && !(name && quote.toLowerCase().includes(name.toLowerCase())))
-        throw new Error(`Money currency ${money.currency} is absent from its cited block. Preserve the source unit; a percentage or free charge without a currency is not fixed money.`);
+        report(`Money currency ${money.currency} is absent from its cited block. Preserve the source unit; a percentage or free charge without a currency is not fixed money.`);
     }
     for (const [key, item] of Object.entries(value)) {
       if (["amount", "ratePercent", "count"].includes(key) && (typeof item === "number" || typeof item === "string")) {
         if (!numbers.some(number => compareDecimals(number, String(item)) === 0))
-          throw new Error(`Financial value ${item} is absent from its cited block. Cite the row containing that value; emit separate facts for separate table rows. Keep unrepresentable values as narrative.`);
-      } else visit(item);
+          report(`Financial value ${item} is absent from its cited block. Cite the row containing that value; emit separate facts for separate table rows. Keep unrepresentable values as narrative.`);
+      } else visit(item, `${path}.${key}`, ruleId);
     }
   };
-  visit(fact.value);
+  visit(fact.value, fact.field);
+  if (errors.length) throw new Error(errors.join("\n"));
 }

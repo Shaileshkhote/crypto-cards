@@ -4,7 +4,7 @@ Complete production ingestion acceptance remains open. Code checks, source acces
 
 ## Application and sources
 
-TypeScript, ESLint and **111 tests** pass with PostgreSQL integration. The Next.js production build passes. CI additionally builds/runs the three-service Compose application: migrations, authenticated HTTP, cache jobs, restart persistence and dump/restore. Inspect the PR checks for the exact tested commit. The final local HTTP smoke covered all four admin screens, anonymous rejection, public POST denial, cache ETag/304, and visible fixed-fee conditions, minimums, maximums and allowances using a labeled synthetic fixture.
+TypeScript, ESLint and **124 tests** pass with PostgreSQL integration. The Next.js production build passes. CI additionally builds/runs the three-service Compose application: migrations, authenticated HTTP, cache jobs, restart persistence and dump/restore. Inspect the PR checks for the exact tested commit. The final local HTTP smoke covered all four admin screens, anonymous rejection, public POST denial, cache ETag/304, and visible fixed-fee conditions, minimums, maximums and allowances using a labeled synthetic fixture.
 
 The maintained inventory is **36 providers / 433 configured URLs**. The fresh approved HTTPS proxy audit fetched 418 successfully; 15 Gnosis Pay help articles explicitly disallow this crawler. All ten available text PDFs parsed through bounded Poppler extraction. Native public DNS still returns EAI_AGAIN, including outside the process sandbox. See [source maintenance](source-maintenance.md).
 
@@ -67,7 +67,7 @@ The full replay exposed a statement-copying charge labeled as a normal transacti
 
 The selected high-reasoning Luna profile passed **10/11** labeled passages for **$0.020326625** of accounting across two batches, including the partial attempt before the first batch's cap. The second batch finished two budget-limited/unrun cases; the failed Avici case was retained. High reasoning recovered the ETHFI reward missed by medium. Avici's stated $15/$10/$50 issuance prices still appeared as non-calculable narrative rather than typed money. The named statement-copying charge passed with its USD 10 price. See [evaluation](evaluation.md).
 
-A planned whole-provider check of the final service contract was not started: the remaining adapter allowance could not fund a conservative request reservation. **Neither the complete high-reasoning/schema-7 inventory nor the current schema-8/prompt-22 inventory has been benchmarked.**
+A planned whole-provider check of the final service contract was not started: the remaining adapter allowance could not fund a conservative request reservation. **Neither the complete high-reasoning/schema-7 inventory nor the current schema-8/prompt-23 inventory has been benchmarked.**
 
 ## Stored-data audit and restore
 

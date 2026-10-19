@@ -268,6 +268,16 @@ export function candidate(
   accepted?: CardData,
   documents: Document[] = [],
 ): { data: CardData; discrepancies: string[] } {
+  if (extractions.some(extraction => !extraction.complete))
+    throw new Error("Incomplete extraction cannot form a candidate");
+  // Return the evidence failures together so one correction can fix a whole
+  // candidate, rather than spending a model turn on each wrongly cited row.
+  const evidenceErrors = extractions.flatMap(extraction => extraction.facts.flatMap((fact, index) => {
+    if (!verifyEvidence(fact.evidence, documents)) return [`Invalid evidence: facts[${index}].${fact.field}`];
+    try { verifyFinancialEvidence(fact); return []; }
+    catch (error) { return [`facts[${index}]: ${error instanceof Error ? error.message : String(error)}`]; }
+  }));
+  if (evidenceErrors.length) throw new Error(evidenceErrors.slice(0, 20).join("\n"));
   const knownProducts = [
     ...adapter.config.products,
     ...(accepted?.products || []),
@@ -322,8 +332,6 @@ export function candidate(
       ),
   };
   for (const extraction of [combined]) {
-    if (!extraction.complete)
-      throw new Error("Incomplete extraction cannot form a candidate");
     for (const p of extraction.products) {
       const id = identity(p.id, p.name, knownProducts, adapter.config.aliases);
       productMap.set(p.id, id);
@@ -346,9 +354,6 @@ export function candidate(
       }) as ObjectValue;
     }
     for (const fact of extraction.facts) {
-      if (!verifyEvidence(fact.evidence, documents))
-        throw new Error(`Invalid evidence: ${fact.field}`);
-      verifyFinancialEvidence(fact);
       if (fact.tierId && !fact.productId)
         throw new Error("Tier fact requires productId");
       const productId = fact.productId
@@ -456,8 +461,13 @@ export function candidate(
   }
   for (const [key, sources] of collectionSources) {
     const lists = [...sources.values()].map(items => canonical([...items].sort()));
-    if (lists.some(list => list !== lists[0]))
-      throw new Error(`Conflicting extracted lists: ${key}; published values retained`);
+    if (lists.some(list => list !== lists[0])) {
+      const observations = [...sources].map(([url, items]) => ({
+        url,
+        differingValues: [...items].filter(item => [...sources.values()].some(other => !other.has(item))).sort(),
+      }));
+      throw new Error(`Conflicting extracted lists: ${key}; published values retained. Source differences: ${canonical(observations).slice(0, 4000)}. Check whether these describe the same program or a separate campaign; do not union incompatible eligibility lists.`);
+    }
   }
   const { note: _note, sourceDate: _date, ...staticData } = adapter.static;
   const staticWithOrigin = staticOrigin(staticData, adapter.config.id);
