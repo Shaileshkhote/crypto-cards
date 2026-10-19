@@ -2,6 +2,7 @@ import { zodToJsonSchema } from "zod-to-json-schema";
 import { z } from "zod";
 import {
   Extraction,
+  Fact,
   SCHEMA_VERSION,
   Country,
   Currency,
@@ -13,6 +14,7 @@ import {
 import { canonical, hash } from "./serialize";
 import { normalizeUrl, verifyEvidence } from "./crawler";
 import { candidate } from "./merge";
+import { verifyFinancialEvidence } from "./evidence";
 
 export const PROMPT_VERSION = "27";
 const MAX_OUTPUT_TOKENS = 24_000;
@@ -289,11 +291,11 @@ export const extract: Extractor = async (
   const blocks = (doc: Document) => doc.blocks.map((b, i) => ({
     id: `p${documents.indexOf(doc) + 1}b${i + 1}`, text: b.text,
   }));
-  const resolveEvidence = (e: { url: string; blockId: string; quote?: string }) => {
+  const resolveEvidence = (e: { url: string; blockId: string; quote?: string }, errors: string[]) => {
     const doc = documents.find(d => d.url === e.url);
     const index = doc ? blocks(doc).findIndex(b => b.id === e.blockId) : -1;
     if (index < 0 && e.quote === undefined)
-      throw new Error(`Unknown source reference: ${e.url}#${e.blockId}. Select the exact URL and block ID returned by readPage or searchDocs; do not generate a quote.`);
+      errors.push(`Unknown source reference: ${e.url}#${e.blockId}. Select the exact URL and block ID returned by readPage or searchDocs; do not generate a quote.`);
     return index < 0 ? e : { ...e, blockId: doc!.blocks[index].id, quote: e.quote ?? doc!.blocks[index].text };
   };
   // Keep source text in the conversation once. An excerpt does not mark the
@@ -596,6 +598,7 @@ export const extract: Extractor = async (
     if (choice.finish_reason !== "stop")
       throw new Error(`Incomplete extraction: ${choice.finish_reason}`);
     try {
+      const referenceErrors: string[] = [];
       const hydrate = (value: unknown): unknown => {
         if (Array.isArray(value)) return value.map(hydrate);
         if (!value || typeof value !== "object") return value;
@@ -622,10 +625,27 @@ export const extract: Extractor = async (
           }
         }
         return typeof obj.url === "string" && typeof obj.blockId === "string"
-          ? resolveEvidence(obj as { url: string; blockId: string; quote?: string })
+          ? resolveEvidence(obj as { url: string; blockId: string; quote?: string }, referenceErrors)
           : obj;
       };
-      const extraction = Extraction.parse(removeOptionalNulls(hydrate(JSON.parse(choice.message.content || "")), Extraction));
+      const hydrated = removeOptionalNulls(hydrate(JSON.parse(choice.message.content || "")), Extraction);
+      const parsed = Extraction.safeParse(hydrated);
+      if (!parsed.success || referenceErrors.length) {
+        const errors = [...referenceErrors, ...(!parsed.success ? [validationFeedback(parsed.error.issues)] : [])];
+        // A malformed field or URL must not hide independently verifiable
+        // wrong financial rows until the next correction. Never publish a
+        // partially parsed draft or manufacture a quote for an unknown URL.
+        const facts = (hydrated as { facts?: unknown[] } | null)?.facts;
+        if (Array.isArray(facts)) for (const [index, value] of facts.entries()) {
+          const fact = Fact.safeParse(value);
+          if (!fact.success) continue;
+          if (!verifyEvidence(fact.data.evidence, documents)) errors.push(`Invalid citation: facts[${index}] ${fact.data.evidence.url}#${fact.data.evidence.blockId}`);
+          else try { verifyFinancialEvidence(fact.data); }
+          catch (error) { errors.push(`facts[${index}]: ${error instanceof Error ? error.message : String(error)}`); }
+        }
+        throw new Error([...new Set(errors)].join("\n"));
+      }
+      const extraction = parsed.data;
       if (!extraction.complete) throw new Error("Agent marked extraction incomplete; finish reading the available sources");
 
       const invalid = extraction.facts.flatMap((f, index) =>

@@ -419,11 +419,14 @@ it("keeps sources and tool reasoning while replacing superseded drafts before co
   expect(calls).toBe(4);
 });
 
-it("reports the short source selector and wrong cited text when a financial row needs correction", async () => {
+it("reports unknown source URLs, malformed fields and wrong financial rows together with the model's source selectors", async () => {
   vi.stubEnv("OPENROUTER_API_KEY", "offline-fixture-not-a-key");
   const doc = documentFromText("https://example.com/fees", "FX fee: 1.5%.\nCollateral can be increased voluntarily.");
   const good = extraction(doc), bad = structuredClone(good);
   bad.facts[0].evidence = { url: doc.url, blockId: "p1b2" } as typeof bad.facts[0]["evidence"];
+  for (const url of ["https://example.com/typo-one", "https://example.com/typo-two"])
+    bad.facts.push({ ...good.facts[0], evidence: { url, blockId: "p1b1" } } as typeof bad.facts[number]);
+  bad.facts.push({ ...good.facts[0], field: "residentCountries", value: [""] } as typeof bad.facts[number]);
   let calls = 0;
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
     if (url.endsWith("/models")) return Response.json({ data: [{ id: modelName(), pricing: { prompt: "0", completion: "0" }, supported_parameters: ["tools", "structured_outputs"] }] });
@@ -431,6 +434,9 @@ it("reports the short source selector and wrong cited text when a financial row 
       const feedback = JSON.parse(String(init?.body)).messages.at(-1).content;
       expect(feedback).toContain(`${doc.url}#p1b2`);
       expect(feedback).toContain("Collateral can be increased voluntarily");
+      expect(feedback).toContain("https://example.com/typo-one");
+      expect(feedback).toContain("https://example.com/typo-two");
+      expect(feedback).toContain("invalid_enum_value");
       expect(feedback).not.toContain(doc.blocks[1].id);
     }
     return Response.json({ usage: { cost: 0 }, choices: [{ finish_reason: "stop", message: { content: JSON.stringify(calls === 1 ? bad : good) } }] });
