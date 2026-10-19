@@ -151,6 +151,23 @@ describe("deterministic merge and protection", () => {
       expect(() => candidate(adapter(), [e], undefined, [doc])).toThrow("Financial value 0 is absent");
     }
   });
+  it("keeps qualified dollar currencies distinct from unqualified dollars", () => {
+    for (const [text, currency] of [["Close account: S$50", "SGD"], ["Close account: A$50", "AUD"], ["Close account: HK$50", "HKD"]]) {
+      const doc = documentFromText("https://example.com/fees", text), e = extraction(doc);
+      e.facts[0].value = [{ id: "close", kind: "cancellation", scope: {}, calculation: "fixed", fixed: { amount: "50", currency }, calculable: true }];
+      expect(() => candidate(adapter(), [e], undefined, [doc])).not.toThrow();
+      (e.facts[0].value as { fixed: { currency: string } }[])[0].fixed.currency = "USD";
+      expect(() => candidate(adapter(), [e], undefined, [doc])).toThrow("Money currency USD is absent");
+    }
+  });
+  it("accepts definite absence of a fee while rejecting uncertain absence", () => {
+    for (const text of ["The card does not have any monthly or annual fees.", "We don't have an annual fee."]) {
+      const doc = documentFromText("https://example.com/fees", text), e = extraction(doc, 0);
+      expect(() => candidate(adapter(), [e], undefined, [doc])).not.toThrow();
+    }
+    const doc = documentFromText("https://example.com/fees", "The card may not have any monthly or annual fees."), e = extraction(doc, 0);
+    expect(() => candidate(adapter(), [e], undefined, [doc])).toThrow("Financial value 0 is absent");
+  });
   it("accepts an explicit waived charge in a labeled value or table cell", () => {
     for (const text of ["Card upgrade: Waived", "Service | Price ; Card upgrade | Waived"]) {
       const doc = documentFromText("https://example.com/fees", text), e = extraction(doc, 0);

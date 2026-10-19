@@ -24,6 +24,7 @@ function financialNumbers(quote: string, implicitZero = true) {
   });
   if (implicitZero && (/\b(free|zero|none|(?:no|without) (?:[\w-]+(?:,\s*|\s+)){0,5}(?:fees?|charges?|cost|markup))\b/i.test(quote) ||
       /\b(?:(?:will|shall|do|does|is|are)\s+not|(?:wo|sha|do(?:es)?)n't)\s+(?:be\s+)?charg(?:e|ed)\s+(?:(?:a|an|any)\s+)?(?:[\w-]+\s+){0,3}fees?\b/i.test(quote.replace(/[’‘]/g, "'")) ||
+      /\b(?:does|do)(?:\s+not|n't)\s+have\s+(?:(?:a|an|any)\s+)?(?:[\w-]+(?:,\s*|\s+)){0,5}fees?\b/i.test(quote.replace(/[’‘]/g, "'")) ||
       /\b(?:fees?|charges?|cost)\s+(?:is\s+)?(?:currently\s+)?waived\b/i.test(quote) ||
       /[:|]\s*waived\s*(?:[.;|]|$)/i.test(quote))) numbers.push("0");
   return numbers;
@@ -50,9 +51,11 @@ export function verifyFinancialEvidence(fact: ExtractionData["facts"][number]) {
     }
     const money = value as { amount?: unknown; currency?: string };
     if (typeof money.amount === "string" && typeof money.currency === "string") {
-      const symbol = ({ USD: "$", EUR: "€", GBP: "£", JPY: "¥", CNY: "¥", INR: "₹", KRW: "₩" } as Record<string, string>)[money.currency];
+      const symbol = ({ EUR: "€", GBP: "£", JPY: "¥", CNY: "¥", INR: "₹", KRW: "₩" } as Record<string, string>)[money.currency];
+      const dollarPrefixes = ({ USD: ["US"], SGD: ["S", "SG"], AUD: ["A", "AU"], CAD: ["CA"], NZD: ["NZ"], HKD: ["HK"], TWD: ["NT"] } as Record<string, string[]>)[money.currency] || [];
+      const dollar = dollarPrefixes.some(prefix => new RegExp(`\\b${prefix}\\$`, "i").test(quote)) || money.currency === "USD" && /(?<![A-Za-z])\$/.test(quote);
       const name = new Intl.DisplayNames(["en"], { type: "currency" }).of(money.currency);
-      if (!new RegExp(`\\b${money.currency}\\b`, "i").test(quote) && !(symbol && quote.includes(symbol)) && !(name && quote.toLowerCase().includes(name.toLowerCase())))
+      if (!new RegExp(`\\b${money.currency}\\b`, "i").test(quote) && !dollar && !(symbol && quote.includes(symbol)) && !(name && quote.toLowerCase().includes(name.toLowerCase())))
         report(`Money currency ${money.currency} is absent from its cited block. Preserve the source unit; a percentage or free charge without a currency is not fixed money.`);
     }
     for (const [key, item] of Object.entries(value)) {
