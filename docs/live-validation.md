@@ -4,7 +4,7 @@ Complete production ingestion acceptance remains open. Code checks, source acces
 
 ## Application and sources
 
-TypeScript, ESLint and **92 tests** pass with PostgreSQL integration. The Next.js production build passes. CI additionally builds/runs the three-service Compose application: migrations, authenticated HTTP, cache jobs, restart persistence and dump/restore. Inspect the PR checks for the exact tested commit. The final local HTTP smoke covered all four admin screens, anonymous rejection, public POST denial, cache ETag/304, and visible fixed-fee conditions, minimums, maximums and allowances using a labeled synthetic fixture.
+TypeScript, ESLint and **93 tests** pass with PostgreSQL integration. The Next.js production build passes. CI additionally builds/runs the three-service Compose application: migrations, authenticated HTTP, cache jobs, restart persistence and dump/restore. Inspect the PR checks for the exact tested commit. The final local HTTP smoke covered all four admin screens, anonymous rejection, public POST denial, cache ETag/304, and visible fixed-fee conditions, minimums, maximums and allowances using a labeled synthetic fixture.
 
 The maintained inventory is **36 providers / 433 configured URLs**. The fresh approved HTTPS proxy audit fetched 418 successfully; 15 Gnosis Pay help articles explicitly disallow this crawler. All ten available text PDFs parsed through bounded Poppler extraction. Native public DNS still returns EAI_AGAIN, including outside the process sandbox. See [source maintenance](source-maintenance.md).
 
@@ -12,7 +12,9 @@ The maintained inventory is **36 providers / 433 configured URLs**. The fresh ap
 
 This was a sequential diagnostic replay through the shared parser, extractor, PostgreSQL publication and cache functions, using actual HTTPS proxy source snapshots. Its model settings were `openai/gpt-6-luna`, **medium reasoning, schema 6 / prompt 20**, and a shared **$0.445 remaining test cap**. It attempted the inventory of 36 providers and made **144 paid-model requests** with **$0.425622495 application accounting**.
 
-Outcomes: **{'published': 10, 'extraction_failed': 12, 'source_blocked': 1, 'budget_limited': 13}**. All **9/10** unchanged passes succeeded with zero model calls. Budget-limited providers are not completed accuracy tests. The diagnostic harness continued individual provider calls when a smaller request could fit the remaining shared budget; the production worker stops remaining adapters after its first fatal budget error. This replay does not establish a successful native `sync --all`, complete extraction under $5, or full-provider accuracy.
+Outcomes: **{'published': 10, 'extraction_failed': 12, 'source_blocked': 1, 'budget_limited': 13}**. All ten warm attempts made zero model calls; **9/10** succeeded unchanged. Bybit's warm attempt failed because auto-created IDs were normalized at publication but resolved by an ambiguous repeated tier name on reuse. The final merge resolves the same normalized ID and explicit aliases before names. Recomputing Bybit from its actual 17 stored source extractions and snapshots now produces a byte-identical publication with zero held changes, safe changes or model calls. This is an offline verification of the identity fix, not a rerun of the final model profile.
+
+Budget-limited providers are not completed accuracy tests. The diagnostic harness continued individual provider calls when a smaller request could fit the remaining shared budget; the production worker stops remaining adapters after its first fatal budget error. This replay does not establish a successful native `sync --all`, complete extraction under $5, or full-provider accuracy.
 
 The source audit covers all configured URLs independently of the model cutoff. Publication means schema, citation and publication validation passed; it does not prove every interpretation or omitted fact. Failed candidates preserve accepted data. No values or tests were weakened to turn rejected candidates into successful publications.
 
@@ -22,7 +24,7 @@ The source audit covers all configured URLs independently of the model cutoff. P
 | avici | extraction_failed | 8 | — | Conflicting extracted facts: avici/avici/effectiveFrom; published values retained |
 | bitget-wallet | extraction_failed | 6 | — | Conflicting extracted lists: bitget-wallet/bitget-wallet/residentCountries; published values retained |
 | bitunix | published | 9 | 0 |  |
-| bybit | published | 5 | 0 |  |
+| bybit | published | 5 | 0 | Warm identity failure; fixed and verified against 17 cached extractions, as described above |
 | coinbase | extraction_failed | 4 | — | Agent context limit exceeded |
 | crypto-com | published | 4 | 0 |  |
 | ethena-pay | extraction_failed | 5 | — | Ambiguous rewards identity; conflicting rules share a scope |

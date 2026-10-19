@@ -8,7 +8,7 @@ import {
 } from "./schema";
 import { canonical, hash, slug } from "./serialize";
 import { verifyEvidence, verifyFinancialEvidence } from "./evidence";
-export const MERGE_VERSION = "8";
+export const MERGE_VERSION = "9";
 type ObjectValue = Record<string, unknown>;
 const isObject = (v: unknown): v is ObjectValue =>
   !!v && typeof v === "object" && !Array.isArray(v);
@@ -161,11 +161,16 @@ function identity(
 ): string {
   const exact = known.find((x) => x.id === id);
   if (exact) return exact.id;
+  const alias =
+    known.find((x) => x.id === aliases[id]) ||
+    known.find((x) => x.id === aliases[name]);
+  if (alias) return alias.id;
+  // Auto-created IDs are slugged on first publication. Resolve that same ID
+  // before names, which can legitimately repeat across regional tiers.
+  const canonicalId = known.find((x) => x.id === slug(id));
+  if (canonicalId) return canonicalId.id;
   const matches = [...new Map(known.map((x) => [x.id, x])).values()].filter(
-    (x) =>
-      slug(x.name) === slug(name) ||
-      x.id === aliases[id] ||
-      x.id === aliases[name],
+    (x) => slug(x.name) === slug(name),
   );
   if (matches.length > 1)
     throw new Error(

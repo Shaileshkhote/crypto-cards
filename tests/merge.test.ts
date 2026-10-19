@@ -11,6 +11,20 @@ import { adapter, document, extraction } from "./helpers";
 import { Card } from "@cards/core/schema";
 import { documentFromText } from "@cards/core/crawler";
 describe("deterministic merge and protection", () => {
+  it("reuses normalized IDs and explicit aliases before repeated regional tier names", () => {
+    const a = adapter(), doc = documentFromText("https://example.com/fees", "Tier 1 in region A: 1%. Tier 1 in region B: 2%."), e = extraction(doc);
+    e.tiers = ["region-a--tier-1", "region-b--tier-1"].map(id => ({ id, name: "Tier 1", productId: "card" }));
+    e.facts = e.tiers.map((tier, index) => ({ ...e.facts[0], tierId: tier.id, value: [{ id: "fx", kind: "fx", calculation: "percentage", ratePercent: index + 1, scope: {}, calculable: true }] }));
+    const cold = candidate(a, [e], undefined, [doc]).data;
+    expect(canonical(candidate(a, [e], cold, [doc]).data)).toBe(canonical(cold));
+    a.config.aliases["old-region-a"] = "region-a-tier-1";
+    const aliased = structuredClone(e);
+    aliased.tiers[0].id = "old-region-a";
+    aliased.facts[0].tierId = "old-region-a";
+    expect(canonical(candidate(a, [aliased], cold, [doc]).data)).toBe(canonical(cold));
+    const ambiguous = { ...e, tiers: [{ id: "unrelated-tier", name: "Tier 1", productId: "card" }], facts: [] };
+    expect(() => candidate(a, [ambiguous], cold, [doc])).toThrow("Ambiguous identity");
+  });
   it("assigns distinct stable identities to uncommon services", () => {
     const a = adapter(), doc = documentFromText("https://example.com/fees", "Statement copy: USD 10. Account letter: USD 3."), e = extraction(doc);
     const base = { kind: "other" as const, calculation: "fixed" as const, scope: {}, calculable: true as const };
