@@ -534,11 +534,16 @@ export const extract: Extractor = async (
             .toLowerCase()
             .split(/\s+/)
             .filter(Boolean);
+          const financial = words.some(word => /fee|limit|atm|withdraw|spend|cashback|reward|rate|price|cost|interest|conversion|exchange|^fx$/.test(word));
+          const numeric = (text: string) => /[$€£¥₹]|\d[\d.,]*\s*%/.test(text);
           // Give every page a chance to contribute. A global first-N slice
           // repeatedly hid all later sources behind one long legal document.
           const matches = documents.map(d => ({
             url: d.url,
-            matches: blocks(d).filter(b => words.some(w => b.text.toLowerCase().includes(w))),
+            matches: blocks(d).filter(b => words.some(w => b.text.toLowerCase().includes(w)))
+              // Financial values outrank early marketing/navigation matches.
+              // Preserve source order for ties and the original block offsets.
+              .sort((a, b) => financial ? Number(numeric(b.text)) - Number(numeric(a.text)) : 0),
           }));
           const excerpts = [];
           for (const page of matches) {

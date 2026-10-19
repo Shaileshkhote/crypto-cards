@@ -347,6 +347,26 @@ it("shows late search matches and different excerpts from the same block without
   expect(calls).toBe(4);
 });
 
+it("exposes a later numeric ATM limit instead of only the first two marketing matches", async () => {
+  vi.stubEnv("OPENROUTER_API_KEY", "offline-fixture-not-a-key");
+  const doc = documentFromText("https://example.com/card", "Withdraw from supported ATMs.\nAccess cash at ATMs worldwide.\nATM withdrawals are capped at $250 per withdrawal.");
+  let calls = 0;
+  vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+    if (url.endsWith("/models")) return Response.json({ data: [{ id: modelName(), pricing: { prompt: "0", completion: "0" }, supported_parameters: ["tools", "structured_outputs"] }] });
+    if (++calls === 2) {
+      const page = JSON.parse(JSON.parse(String(init?.body)).messages.at(-1).content)[0];
+      expect(page.totalMatches).toBe(3);
+      expect(page.blocks[0]).toMatchObject({ id: "p1b3", offset: 2 });
+      expect(page.blocks[0].text).toContain("$250 per withdrawal");
+    }
+    return Response.json({ usage: { cost: 0 }, choices: [{ finish_reason: calls === 1 ? "tool_calls" : "stop", message: calls === 1
+      ? { content: null, tool_calls: [{ id: "atm", function: { name: "searchDocs", arguments: '{"query":"ATM"}' } }] }
+      : { content: JSON.stringify({ complete: true, products: [], tiers: [], facts: [] }) } }] });
+  }));
+  await extract(adapter(), [doc], new Budget(0));
+  expect(calls).toBe(2);
+});
+
 it("reports every missing financial scope in a single correction without assuming global applicability", async () => {
   vi.stubEnv("OPENROUTER_API_KEY", "offline-fixture-not-a-key");
   const doc = document(), good = extraction(doc);
