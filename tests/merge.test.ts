@@ -542,3 +542,13 @@ it("replaces extracted provenance and fee variants with explicit static values t
     origin: "static",
   });
 });
+
+it("scopes an explicit zero addition to provider markup and preserves the network charge", () => {
+  const doc = documentFromText("https://example.com/pricing", "This 1% is the network fee. The app doesn't add anything on top."), e = extraction(doc, 0);
+  e.facts[0].value = [{ id: "markup", kind: "fx", scope: { conditions: ["Provider markup only"] }, calculation: "percentage", ratePercent: 0, calculable: true }];
+  expect(() => candidate(adapter(), [e], undefined, [doc])).not.toThrow();
+  e.facts[0].value = [{ id: "total", kind: "fx", scope: {}, calculation: "percentage", ratePercent: 0, calculable: true }];
+  expect(() => candidate(adapter(), [e], undefined, [doc])).toThrow("not a zero total charge");
+  const uncertain = documentFromText(doc.url, "This 1% is the network fee. The app may not add anything on top.");
+  expect(() => candidate(adapter(), [extraction(uncertain, 0)], undefined, [uncertain])).toThrow("Financial value 0 is absent");
+});

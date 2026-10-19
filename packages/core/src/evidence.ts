@@ -36,6 +36,8 @@ export function verifyFinancialEvidence(fact: ExtractionData["facts"][number]) {
   const quote = fact.evidence.quote;
   // "None" or "free" is not a hard limit of zero.
   const numbers = financialNumbers(quote, fact.field !== "limits");
+  const markupOnlyZero = fact.field === "fees" && !numbers.some(n => compareDecimals(n, "0") === 0) && /\b(?:(?:do|does|will|shall)\s+not|(?:do(?:es)?|wo|sha)n't)\s+add\s+anything\s+on\s+top\b/i.test(quote.replace(/[’‘]/g, "'"));
+  if (markupOnlyZero) numbers.push("0");
   const freeAtm = (text: string) => /\b(?:fee[-\s]free|free)\s+(?:atm|(?:cash\s+)?withdrawals?)\b/i.test(text);
   const rows = fact.field === "limits" ? quote.split(/\s*;\s*/).map(text => ({ text, numbers: financialNumbers(text, false) })) : [];
   const freeList = rows.length > 1 && rows[0].text.trim().endsWith(":") && freeAtm(rows[0].text);
@@ -49,6 +51,9 @@ export function verifyFinancialEvidence(fact: ExtractionData["facts"][number]) {
     if (!value || typeof value !== "object") return;
     if ("id" in value && typeof value.id === "string") ruleId = value.id;
     const report = (message: string) => errors.push(`${message} Location: ${path}${ruleId ? ` (rule ${ruleId})` : ""}; target ${[fact.productId, fact.tierId].filter(Boolean).join("/") || "provider"}; citation ${fact.evidence.url}#${fact.evidence.blockId}.`);
+    const fee = value as { kind?: string; ratePercent?: number; fixed?: { amount: string }; scope?: { conditions?: string[] } };
+    if (markupOnlyZero && fee.kind && (fee.ratePercent === 0 || fee.fixed && compareDecimals(fee.fixed.amount, "0") === 0) && !fee.scope?.conditions?.some(condition => /markup|provider|additional|add[- ]?on|on top/i.test(condition)))
+      report("Not adding anything on top establishes zero provider/add-on markup, not a zero total charge. Scope the zero to that explicit charge component and preserve the network charge separately.");
     if (fact.field === "fees" && "kind" in value && value.kind === "atm") {
       const rails = (value as { scope?: { paymentRails?: string[] } }).scope?.paymentRails || [];
       if (rails.some(rail => /^(?:ach|wire|sepa)(?:-|$)/i.test(rail)))

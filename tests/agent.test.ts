@@ -472,3 +472,39 @@ it("reports unknown source URLs, malformed fields and wrong financial rows toget
   expect((await extract(adapter(), [doc], new Budget(0))).extraction).toEqual(good);
   expect(calls).toBe(2);
 });
+
+it("corrects a supplied non-verbatim quote using short selectors without echoing the bad quote", async () => {
+  vi.stubEnv("OPENROUTER_API_KEY", "fixture-not-a-real-key");
+  const doc = document(), good = extraction(doc), wire = structuredClone(good), bad = structuredClone(good);
+  wire.facts[0].evidence = { url: doc.url, blockId: "p1b1" } as typeof good.facts[0]["evidence"];
+  bad.facts[0].evidence = { url: doc.url, blockId: "p1b1", quote: "An invented non-verbatim quote." };
+  let calls = 0;
+  vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+    if (url.endsWith("/models")) return Response.json({ data: [{ id: modelName(), pricing: { prompt: "0", completion: "0" }, supported_parameters: ["tools", "structured_outputs"] }] });
+    if (++calls === 2) {
+      const feedback = JSON.parse(String(init?.body)).messages.at(-1).content;
+      expect(feedback).toContain("p1b1");
+      expect(feedback).toContain("omit quote");
+      expect(feedback).not.toContain(doc.blocks[0].id);
+      expect(feedback).not.toContain(bad.facts[0].evidence.quote);
+    }
+    return Response.json({ usage: { cost: 0 }, choices: [{ finish_reason: "stop", message: { content: JSON.stringify(calls === 1 ? bad : wire) } }] });
+  }));
+  await expect(extract(adapter(), [doc], new Budget(0))).resolves.toMatchObject({ extraction: good });
+});
+
+it("canonicalizes equivalent citation URLs while rejecting references to another host", async () => {
+  vi.stubEnv("OPENROUTER_API_KEY", "fixture-not-a-real-key");
+  const doc = document(), good = extraction(doc), wire = structuredClone(good);
+  wire.facts[0].evidence = { url: doc.url.replace("example.com", "EXAMPLE.com") + "#pricing", blockId: "p1b1" } as typeof good.facts[0]["evidence"];
+  const stub = (data: typeof wire) => vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+    if (url.endsWith("/models")) return Response.json({ data: [{ id: modelName(), pricing: { prompt: "0", completion: "0" }, supported_parameters: ["tools", "structured_outputs"] }] });
+    expect(JSON.parse(JSON.parse(String(init?.body)).messages[1].content).pages[0]).toMatchObject({ id: "p1", url: doc.url });
+    return Response.json({ usage: { cost: 0 }, choices: [{ finish_reason: "stop", message: { content: JSON.stringify(data) } }] });
+  }));
+  stub(wire);
+  await expect(extract(adapter(), [doc], new Budget(0))).resolves.toMatchObject({ extraction: good });
+  wire.facts[0].evidence.url = "https://evil.example/fees";
+  stub(wire);
+  await expect(extract(adapter(), [doc], new Budget(0))).rejects.toThrow("Unknown source reference");
+});

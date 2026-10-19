@@ -292,11 +292,13 @@ export const extract: Extractor = async (
     id: `p${documents.indexOf(doc) + 1}b${i + 1}`, text: b.text,
   }));
   const resolveEvidence = (e: { url: string; blockId: string; quote?: string }, errors: string[]) => {
-    const doc = documents.find(d => d.url === e.url);
+    let normalized: string | undefined;
+    try { normalized = normalizeUrl(e.url); } catch { /* Report invalid references with the other draft errors. */ }
+    const doc = documents.find(d => d.url === e.url || normalized !== undefined && normalizeUrl(d.url) === normalized);
     const index = doc ? blocks(doc).findIndex(b => b.id === e.blockId) : -1;
     if (index < 0 && e.quote === undefined)
-      errors.push(`Unknown source reference: ${e.url}#${e.blockId}. Select the exact URL and block ID returned by readPage or searchDocs; do not generate a quote.`);
-    return index < 0 ? e : { ...e, blockId: doc!.blocks[index].id, quote: e.quote ?? doc!.blocks[index].text };
+      errors.push(`Unknown source reference: ${e.url}#${e.blockId}.${doc ? ` This URL is page p${documents.indexOf(doc) + 1}, with ${doc.blocks.length} blocks.` : ""} Select the exact URL and block ID returned by readPage or searchDocs; do not generate a quote.`);
+    return index < 0 ? e : { ...e, url: doc!.url, blockId: doc!.blocks[index].id, quote: e.quote ?? doc!.blocks[index].text };
   };
   // Keep source text in the conversation once. An excerpt does not mark the
   // complete block as read: a later readPage still returns its full text.
@@ -395,6 +397,7 @@ export const extract: Extractor = async (
         sourceHints: adapter.sources.metadata?.filter(hint => documents.some(doc => normalizeUrl(doc.url) === normalizeUrl(hint.url))),
         excerpts: preview,
         pages: documents.map((d) => ({
+          id: `p${documents.indexOf(d) + 1}`,
           url: d.url,
           title: d.title,
           blocks: d.blocks.length,
@@ -529,6 +532,7 @@ export const extract: Extractor = async (
         let result: unknown;
         if (call.function.name === "listPages")
           result = documents.map((d) => ({
+            id: `p${documents.indexOf(d) + 1}`,
             url: d.url,
             title: d.title,
             status: d.status,
@@ -581,6 +585,7 @@ export const extract: Extractor = async (
           result = doc
             ? {
                 url: doc.url,
+                id: `p${documents.indexOf(doc) + 1}`,
                 title: doc.title,
                 status: doc.status,
                 blocks: pageBlocks,
@@ -652,10 +657,13 @@ export const extract: Extractor = async (
       }
       const extraction = parsed.data;
 
-      const invalid = extraction.facts.flatMap((f, index) =>
-        verifyEvidence(f.evidence, documents) ? [] : [{ index, evidence: f.evidence }],
-      );
-      if (invalid.length) throw new Error(`Invalid citations: ${JSON.stringify(invalid.slice(0, 6))}. Use the exact block reference and a verbatim substring.`);
+      const invalid = extraction.facts.flatMap((f, index) => {
+        if (verifyEvidence(f.evidence, documents)) return [];
+        const doc = documents.find(d => d.url === f.evidence.url);
+        const block = doc?.blocks.findIndex(b => b.id === f.evidence.blockId) ?? -1;
+        return [{ index, url: f.evidence.url, blockId: doc && block >= 0 ? `p${documents.indexOf(doc) + 1}b${block + 1}` : f.evidence.blockId }];
+      });
+      if (invalid.length) throw new Error(`Invalid citations: ${JSON.stringify(invalid.slice(0, 6))}. Use the exact source selector.`);
       // Use the publication validator here too, so invalid targets and conflicting
       // scopes can be corrected within this same bounded extraction.
       candidate(adapter, [extraction], undefined, documents);
@@ -664,6 +672,10 @@ export const extract: Extractor = async (
       let message = error instanceof z.ZodError
         ? validationFeedback(error.issues)
         : error instanceof Error ? error.message : String(error);
+      if (/Invalid citation/i.test(message))
+        message += " Return only url and blockId for evidence; omit quote. The application copies the exact source text.";
+      if (message.includes("Ambiguous fees identity"))
+        message += " If the source explicitly charges different components, identify each source-named component in scope.conditions (such as FX padding versus exchange processing). Never invent conditions to separate conflicting prices for the same charge; preserve those conflicting clauses in terms.";
       // Storage uses content hashes; the model saw short page/block selectors.
       // Return those same selectors when asking it to correct a wrong citation.
       for (const doc of documents)
