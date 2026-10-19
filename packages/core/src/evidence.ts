@@ -17,14 +17,17 @@ export function verifyEvidence(
 export function verifyFinancialEvidence(fact: ExtractionData["facts"][number]) {
   if (!["fees", "rewards", "limits"].includes(fact.field)) return;
   const quote = fact.evidence.quote;
-  const numbers = [...quote.matchAll(/\b(\d+(?:[,\u00a0 ]\d{3})*(?:\.\d+)?)(?:\s*(k|m|thousand|million)\b)?/gi)].map(match => {
+  // A short comma fraction immediately before % is unambiguous (e.g. 1,5%).
+  // Keep three-digit grouping and ambiguous money such as 10.000$ unchanged.
+  const numericText = quote.replace(/(?<![\d.,-])(\d+),(\d{1,2})(?=\s*%)/g, "$1.$2");
+  const numbers = [...numericText.matchAll(/\b(\d+(?:[,\u00a0 ]\d{3})*(?:\.\d+)?)(?:\s*(k|m|thousand|million)\b)?/gi)].map(match => {
     const [whole, fraction = ""] = match[1].replace(/[,\s]/g, "").replace(/^0+(?=\d)/, "").split(".");
     const scale = /^(m|million)$/i.test(match[2] || "") ? 6 : match[2] ? 3 : 0;
     const digits = whole + fraction + "0".repeat(scale), split = whole.length + scale;
     return `${digits.slice(0, split)}.${digits.slice(split) || "0"}`;
   });
   if (/\b(free|zero|none|(?:no|without) (?:[\w-]+(?:,\s*|\s+)){0,5}(?:fees?|charges?|cost|markup))\b/i.test(quote) ||
-      /\b(?:will|shall|do|does)\s+not\s+charge\s+(?:(?:a|any)\s+)?(?:[\w-]+\s+){0,3}fees?\b/i.test(quote) ||
+      /\b(?:(?:will|shall|do|does|is|are)\s+not|(?:wo|sha|do(?:es)?)n't)\s+(?:be\s+)?charg(?:e|ed)\s+(?:(?:a|an|any)\s+)?(?:[\w-]+\s+){0,3}fees?\b/i.test(quote.replace(/[’‘]/g, "'")) ||
       /\b(?:fees?|charges?|cost)\s+(?:is\s+)?(?:currently\s+)?waived\b/i.test(quote)) numbers.push("0");
   const errors: string[] = [];
   const visit = (value: unknown, path: string, ruleId?: string) => {

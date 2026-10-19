@@ -104,7 +104,7 @@ describe("deterministic merge and protection", () => {
     expect(candidate(a, [e], undefined, [doc]).data.products![0].tiers![0].fees![0]).toMatchObject({ ratePercent: 0 });
   });
   it("does not treat a possible or refused waiver as an explicit free charge", () => {
-    for (const text of ["The fee is not waived.", "The fee may be waived.", "An additional fee applies.", "Monthly, annual, or inactivity card fees may be waived.", "The bank may not charge fees.", "The bank will not waive the fee."]) {
+    for (const text of ["The fee is not waived.", "The fee may be waived.", "An additional fee applies.", "Monthly, annual, or inactivity card fees may be waived.", "The bank may not charge fees.", "The bank may not be charged a fee.", "The bank doesn't waive the fee.", "The bank will not waive the fee."]) {
       const doc = documentFromText("https://example.com/fees", text), e = extraction(doc, 0);
       expect(() => candidate(adapter(), [e], undefined, [doc])).toThrow("Financial value 0 is absent");
     }
@@ -116,6 +116,16 @@ describe("deterministic merge and protection", () => {
     const contract = documentFromText("https://example.com/contract", "The issuer will not charge fees for overdraft or attempted overdraft."), statement = extraction(contract, 0);
     statement.facts[0].value = [{ id: "overdraft", kind: "other", serviceId: "overdraft", scope: {}, calculation: "percentage", ratePercent: 0, calculable: true }];
     expect(candidate(adapter(), [statement], undefined, [contract]).data.products![0].tiers![0].fees![0]).toMatchObject({ serviceId: "overdraft", ratePercent: 0 });
+    for (const text of ["The bank doesn’t charge any additional fees.", "For this network you will not be charged a gas fee."]) {
+      const source = documentFromText("https://example.com/fees", text);
+      expect(candidate(adapter(), [extraction(source, 0)], undefined, [source]).data.products![0].tiers![0].fees![0]).toMatchObject({ ratePercent: 0 });
+    }
+  });
+  it("supports short decimal-comma percentages while preserving thousands grouping", () => {
+    const doc = documentFromText("https://example.com/fees", "Foreign exchange fee: 1,5%."), e = extraction(doc, 1.5);
+    expect(candidate(adapter(), [e], undefined, [doc]).data.products![0].tiers![0].fees![0]).toMatchObject({ ratePercent: 1.5 });
+    const grouped = documentFromText(doc.url, "Foreign exchange fee: 1,000%.");
+    expect(() => candidate(adapter(), [extraction(grouped, 1)], undefined, [grouped])).toThrow("Financial value 1 is absent");
   });
   it("rejects a real citation to the wrong financial row and accepts explicit scaled amounts", () => {
     const a = adapter(), doc = documentFromText("https://example.com/limits", "Per purchase: 1.5k USD.\nAnnual transaction count: 1,040."), e = extraction(doc);
