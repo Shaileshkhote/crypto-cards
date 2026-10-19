@@ -25,6 +25,7 @@ function financialNumbers(quote: string, implicitZero = true) {
   if (implicitZero && (/\b(free|zero|none|(?:no|without) (?:[\w-]+(?:,\s*|\s+)){0,5}(?:fees?|charges?|cost|markup))\b/i.test(quote.replace(/\btoll[- ]free\b/gi, "")) ||
       /\b(?:(?:will|shall|do|does|is|are)\s+not|(?:wo|sha|do(?:es)?)n't)\s+(?:be\s+)?charg(?:e|ed)\s+(?:(?:a|an|any)\s+)?(?:[\w-]+\s+){0,3}fees?\b/i.test(quote.replace(/[’‘]/g, "'")) ||
       /\b(?:does|do)(?:\s+not|n't)\s+(?:have|incur)\s+(?:(?:a|an|any)\s+)?(?:[\w-]+(?:,\s*|\s+)){0,5}fees?\b/i.test(quote.replace(/[’‘]/g, "'")) ||
+      /\b(?:fees?|charges?)\s+(?:do|does)\s+not\s+apply\b/i.test(quote) ||
       /\b(?:fees?|charges?|cost)\s+(?:(?:is|are)\s+)?(?:currently\s+)?waived\b/i.test(quote) ||
       /[:|]\s*waived\s*(?:[.;|]|$)/i.test(quote))) numbers.push("0");
   return numbers;
