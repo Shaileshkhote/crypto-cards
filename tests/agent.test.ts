@@ -349,14 +349,18 @@ it("shows late search matches and different excerpts from the same block without
 
 it("exposes a later numeric ATM limit instead of only the first two marketing matches", async () => {
   vi.stubEnv("OPENROUTER_API_KEY", "offline-fixture-not-a-key");
-  const doc = documentFromText("https://example.com/card", "Withdraw from supported ATMs.\nAccess cash at ATMs worldwide.\nATM withdrawals are capped at $250 per withdrawal.");
+  const doc = documentFromText("https://example.com/card", "Withdraw from supported ATMs.\nAccess cash at ATMs worldwide.\nATM access is convenient.\nATM cash is available worldwide.\nUse your card at an ATM.\nATM withdrawals are capped at $250 per withdrawal.");
   let calls = 0;
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
     if (url.endsWith("/models")) return Response.json({ data: [{ id: modelName(), pricing: { prompt: "0", completion: "0" }, supported_parameters: ["tools", "structured_outputs"] }] });
-    if (++calls === 2) {
+    if (++calls === 1) {
+      const preview = JSON.parse(JSON.parse(String(init?.body)).messages[1].content).excerpts[0];
+      expect(preview.blocks[0]).toMatchObject({ id: "p1b6", text: "ATM withdrawals are capped at $250 per withdrawal." });
+    }
+    if (calls === 2) {
       const page = JSON.parse(JSON.parse(String(init?.body)).messages.at(-1).content)[0];
-      expect(page.totalMatches).toBe(3);
-      expect(page.blocks[0]).toMatchObject({ id: "p1b3", offset: 2 });
+      expect(page.totalMatches).toBe(6);
+      expect(page.blocks[0]).toMatchObject({ id: "p1b6", offset: 5 });
       expect(page.blocks[0].text).toContain("$250 per withdrawal");
     }
     return Response.json({ usage: { cost: 0 }, choices: [{ finish_reason: calls === 1 ? "tool_calls" : "stop", message: calls === 1

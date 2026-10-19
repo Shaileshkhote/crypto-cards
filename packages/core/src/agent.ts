@@ -318,9 +318,12 @@ export const extract: Extractor = async (
     texts.add(block.text);
     presented.set(key, texts);
   };
+  const numeric = (text: string) => /[$€£¥₹]|\d[\d.,]*\s*%/.test(text);
+  const priced = (text: string) => numeric(text) && /fee|limit|atm|withdraw|cashback|reward|price|interest|conversion|exchange/i.test(text);
   const preview = documents.map(doc => ({
     url: doc.url,
-    blocks: blocks(doc).filter((b, i) => i < 2 || /fee|limit|cashback|reward|issuer|physical|virtual|country|countries|kyc|verification|custod|iban|network|effective/i.test(b.text)).slice(0, 5),
+    blocks: blocks(doc).filter((b, i) => i < 2 || /fee|limit|atm|withdraw|cashback|reward|issuer|physical|virtual|country|countries|kyc|verification|custod|iban|network|effective/i.test(b.text))
+      .sort((a, b) => Number(priced(b.text)) - Number(priced(a.text))).slice(0, 5),
   }));
   const tools = [
     {
@@ -537,7 +540,6 @@ export const extract: Extractor = async (
             .split(/\s+/)
             .filter(Boolean);
           const financial = words.some(word => /fee|limit|atm|withdraw|spend|cashback|reward|rate|price|cost|interest|conversion|exchange|^fx$/.test(word));
-          const numeric = (text: string) => /[$€£¥₹]|\d[\d.,]*\s*%/.test(text);
           // Give every page a chance to contribute. A global first-N slice
           // repeatedly hid all later sources behind one long legal document.
           const matches = documents.map(d => ({
