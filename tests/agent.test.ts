@@ -9,6 +9,20 @@ afterEach(() => {
   vi.unstubAllGlobals();
   vi.unstubAllEnvs();
 });
+it("corrects an output-limit response within the existing bound without accepting partial JSON", async () => {
+  vi.stubEnv("OPENROUTER_API_KEY", "fixture-not-a-real-key");
+  const doc = document(), good = extraction(doc);
+  let calls = 0;
+  vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+    if (url.endsWith("/models")) return Response.json({ data: [{ id: modelName(), pricing: { prompt: "0", completion: "0" }, supported_parameters: ["tools", "structured_outputs"] }] });
+    const body = JSON.parse(String(init?.body));
+    expect(body.max_tokens).toBe(24000);
+    if (++calls === 2) expect(body.messages.at(-1).content).toContain("response reached the output limit");
+    return Response.json({ usage: { cost: 0 }, choices: [{ finish_reason: calls === 1 ? "length" : "stop", message: { content: calls === 1 ? '{"complete":true,"facts":[' : JSON.stringify(good) } }] });
+  }));
+  await expect(extract(adapter(), [doc], new Budget(0))).resolves.toMatchObject({ extraction: good });
+  expect(calls).toBe(2);
+});
 it("supplies the complete financial inventory including late limits and explicit free charges", async () => {
   vi.stubEnv("OPENROUTER_API_KEY", "fixture-not-a-real-key");
   const doc = documentFromText("https://example.com/fees", Array.from({ length: 7 }, (_, i) => `FX fee ${i}: 1.5%.`).join("\n") + "\nDaily spending limit: 10,000 USD.\nMonthly fee: none.\nNo withdrawal limits.\nAnnual fee: 0.\nAt most 3 ATM withdrawals per day.");
@@ -462,22 +476,22 @@ it("shows late search matches and different excerpts from the same block without
 
 it("exposes a later numeric ATM limit instead of only the first two marketing matches", async () => {
   vi.stubEnv("OPENROUTER_API_KEY", "offline-fixture-not-a-key");
-  const doc = documentFromText("https://example.com/card", "Withdraw from supported ATMs.\nAccess cash at ATMs worldwide.\nATM access is convenient.\nATM cash is available worldwide.\nUse your card at an ATM.\nATM withdrawals are capped at $250 per withdrawal.");
+  const doc = documentFromText("https://example.com/card", "Withdraw from supported ATMs.\nAccess cash at ATMs worldwide.\nATM access is convenient.\nATM cash is available worldwide.\nUse your card at an ATM.\n3. ATM Withdrawal Limits (Physical Card Only)\nCall the toll-free number 1-888-824-8817 to activate the card. Consult the fee schedule.\nATM withdrawals are capped at $250 per withdrawal.");
   let calls = 0;
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
     if (url.endsWith("/models")) return Response.json({ data: [{ id: modelName(), pricing: { prompt: "0", completion: "0" }, supported_parameters: ["tools", "structured_outputs"] }] });
     if (++calls === 1) {
       const preview = JSON.parse(JSON.parse(String(init?.body)).messages[1].content).excerpts[0];
-      expect(preview.blocks[0]).toMatchObject({ id: "p1b6", text: "ATM withdrawals are capped at $250 per withdrawal." });
+      expect(preview.blocks[0]).toMatchObject({ id: "p1b8", text: "ATM withdrawals are capped at $250 per withdrawal." });
     }
     if (calls === 2) {
       const page = JSON.parse(JSON.parse(String(init?.body)).messages.at(-1).content)[0];
-      expect(page.totalMatches).toBe(6);
-      expect(page.blocks[0]).toEqual({ id: "p1b6", alreadyRead: true });
+      expect(page.totalMatches).toBe(7);
+      expect(page.blocks[0]).toEqual({ id: "p1b8", alreadyRead: true });
     }
     return Response.json({ usage: { cost: 0 }, choices: [{ finish_reason: calls === 1 ? "tool_calls" : "stop", message: calls === 1
       ? { content: null, tool_calls: [{ id: "atm", function: { name: "searchDocs", arguments: '{"query":"ATM"}' } }] }
-      : { content: JSON.stringify({ complete: true, products: [], tiers: [], facts: [{ ...extraction(doc).facts[0], field: "terms", value: [doc.blocks[5].text], evidence: { url: doc.url, blockId: "p1b6" } }] }) } }] });
+      : { content: JSON.stringify({ complete: true, products: [], tiers: [], facts: [{ ...extraction(doc).facts[0], field: "terms", value: [doc.blocks[7].text], evidence: { url: doc.url, blockId: "p1b8" } }] }) } }] });
   }));
   await extract(adapter(), [doc], new Budget(0));
   expect(calls).toBe(2);

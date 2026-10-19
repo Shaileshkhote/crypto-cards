@@ -163,7 +163,7 @@ describe("deterministic merge and protection", () => {
     expect(candidate(a, [e], undefined, [doc]).data.products![0].tiers![0].fees![0]).toMatchObject({ ratePercent: 0 });
   });
   it("does not treat a possible or refused waiver as an explicit free charge", () => {
-    for (const text of ["Card upgrade: Not waived.", "Card upgrade: May be waived.", "The fee is not waived.", "The fee may be waived.", "An additional fee applies.", "Monthly, annual, or inactivity card fees may be waived.", "The bank may not charge fees.", "The bank may not be charged a fee.", "The bank doesn't waive the fee.", "The bank will not waive the fee."]) {
+    for (const text of ["Card upgrade: Not waived.", "Card upgrade: May be waived.", "The fee is not waived.", "The fee may be waived.", "An additional fee applies.", "Monthly, annual, or inactivity card fees may be waived.", "The bank may not charge fees.", "The bank may not be charged a fee.", "The bank doesn't waive the fee.", "The bank will not waive the fee.", "Call the toll-free number to ask about the monthly fee."]) {
       const doc = documentFromText("https://example.com/fees", text), e = extraction(doc, 0);
       expect(() => candidate(adapter(), [e], undefined, [doc])).toThrow("Financial value 0 is absent");
     }

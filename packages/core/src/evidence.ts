@@ -22,7 +22,7 @@ function financialNumbers(quote: string, implicitZero = true) {
     const digits = whole + fraction + "0".repeat(scale), split = whole.length + scale;
     return `${digits.slice(0, split)}.${digits.slice(split) || "0"}`;
   });
-  if (implicitZero && (/\b(free|zero|none|(?:no|without) (?:[\w-]+(?:,\s*|\s+)){0,5}(?:fees?|charges?|cost|markup))\b/i.test(quote) ||
+  if (implicitZero && (/\b(free|zero|none|(?:no|without) (?:[\w-]+(?:,\s*|\s+)){0,5}(?:fees?|charges?|cost|markup))\b/i.test(quote.replace(/\btoll[- ]free\b/gi, "")) ||
       /\b(?:(?:will|shall|do|does|is|are)\s+not|(?:wo|sha|do(?:es)?)n't)\s+(?:be\s+)?charg(?:e|ed)\s+(?:(?:a|an|any)\s+)?(?:[\w-]+\s+){0,3}fees?\b/i.test(quote.replace(/[’‘]/g, "'")) ||
       /\b(?:does|do)(?:\s+not|n't)\s+(?:have|incur)\s+(?:(?:a|an|any)\s+)?(?:[\w-]+(?:,\s*|\s+)){0,5}fees?\b/i.test(quote.replace(/[’‘]/g, "'")) ||
       /\b(?:fees?|charges?|cost)\s+(?:(?:is|are)\s+)?(?:currently\s+)?waived\b/i.test(quote) ||

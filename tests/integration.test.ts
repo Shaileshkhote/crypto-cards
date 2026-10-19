@@ -188,7 +188,7 @@ describe.skipIf(!enabled)(
       );
       await expect(approveReview(r.id, "admin")).rejects.toThrow("stale");
     });
-    it("reuses validated sources after a later source fails and reconciles cached competing prices", async () => {
+    it.each([0, 1])("reuses validated sources when source %i fails and reconciles cached competing prices", async (failedIndex) => {
       await run();
       const before = await readCache("cards/example"), a = adapter();
       const docs = [documentFromText(a.sources.urls[0], "Core FX fee: 2.5% for residents of Germany."), documentFromText("https://example.com/other", "Core FX fee: 3.5% for residents of Germany.")];
@@ -196,26 +196,26 @@ describe.skipIf(!enabled)(
       const fetch = async (url: string) => docs.find(doc => doc.url === url)!;
       const first = await syncAdapter(a, new Budget(1), { fetch, extract: async (_a, input, budget) => {
         expect(input).toHaveLength(1);
-        if (input[0].url === docs[1].url) throw new Error("Second source failed");
+        if (input[0].url === docs[failedIndex].url) throw new Error("Source failed");
         budget.reserve(0.01); budget.settle(0.01, 0.006, 100, 20);
-        return { extraction: extraction(input[0], 2.5), documents: input, issues: [] };
+        return { extraction: extraction(input[0], failedIndex ? 2.5 : 3.5), documents: input, issues: [] };
       } });
       expect(first.status).toBe("failed");
       expect((await readCache("cards/example"))?.payload).toBe(before?.payload);
       const retry = await syncAdapter(a, new Budget(1), { fetch, extract: async (_a, input, budget) => {
-        expect(input.map(doc => doc.url)).toEqual([docs[1].url]);
+        expect(input.map(doc => doc.url)).toEqual([docs[failedIndex].url]);
         budget.reserve(0.01); budget.settle(0.01, 0.008, 200, 30);
-        return { extraction: extraction(input[0], 3.5), documents: input, issues: [] };
+        return { extraction: extraction(input[0], failedIndex ? 3.5 : 2.5), documents: input, issues: [] };
       } });
-      expect(retry).toMatchObject({ status: "published", changed: 1, reused: 1, costUsd: 0.008 });
-      expect((await read()).products![0].tiers![0].fees![0]).toMatchObject({ calculation: "percentage", ratePercent: 1.5 });
+      expect(retry).toMatchObject({ status: "review", changed: 1, reused: 1, costUsd: 0.008 });
+      expect((await read()).products![0].tiers![0].fees![0]).toMatchObject({ calculation: "percentage", ratePercent: 1.5, status: "unconfirmed" });
       expect(retry.issues!.some(issue => issue.includes("Conflicting source claims"))).toBe(true);
       const usage = (await db().query("SELECT sum(cost_usd)::float AS cost, sum(input_tokens)::int AS input, sum(output_tokens)::int AS output FROM card_extractions")).rows[0];
       expect(usage).toEqual({ cost: 0.014, input: 300, output: 50 });
       const stable = await readCache("cards/example");
       const versions = (await db().query("SELECT count(*) AS n FROM card_versions")).rows[0].n;
       const warm = await syncAdapter(a, new Budget(0), { fetch, extract: async () => { throw new Error("Validated sources must be reused"); } });
-      expect(warm).toMatchObject({ status: "unchanged", changed: 0, reused: 2, costUsd: 0 });
+      expect(warm).toMatchObject({ status: "review", changed: 0, reused: 2, costUsd: 0 });
       expect((await readCache("cards/example"))?.payload).toBe(stable?.payload);
       expect((await db().query("SELECT count(*) AS n FROM card_versions")).rows[0].n).toBe(versions);
     });

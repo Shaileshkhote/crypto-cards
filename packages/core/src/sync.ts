@@ -166,35 +166,42 @@ export async function syncAdapter(
       // Cache each validated source immediately. A later failure retains that
       // work without publishing an incomplete provider or losing accepted data.
       const batches = adapter.config.discovery ? [pending] : pending.map(doc => [doc]);
+      const sourceFailures: string[] = [];
       for (const batch of batches.filter(batch => batch.length)) {
         const before = { cost: budget.spent, input: budget.inputTokens, output: budget.outputTokens };
-        const extracted = await (deps.extract || extract)(
-          adapter,
-          batch,
-          budget,
-          adapter.config.discovery
-            ? async (url) => {
-                const doc = await fetcher(url);
-                await store(doc);
-                return doc;
-              }
-            : undefined,
-        );
-        const parsed = Extraction.parse(extracted.extraction);
-        if (!parsed.complete)
-          throw new Error("Incomplete extraction; published data retained");
-        const allDocs = extracted.documents;
-        if (allDocs.some((d) => d.status !== "ok"))
-          throw new Error(
-            "Discovered source is unreadable; published data retained",
+        let parsed: ExtractionData, allDocs: Document[];
+        try {
+          const extracted = await (deps.extract || extract)(
+            adapter,
+            batch,
+            budget,
+            adapter.config.discovery
+              ? async (url) => {
+                  const doc = await fetcher(url);
+                  await store(doc);
+                  return doc;
+                }
+              : undefined,
           );
+          parsed = Extraction.parse(extracted.extraction);
+          if (!parsed.complete)
+            throw new Error("Incomplete extraction; published data retained");
+          allDocs = extracted.documents;
+          if (allDocs.some((d) => d.status !== "ok"))
+            throw new Error(
+              "Discovered source is unreadable; published data retained",
+            );
+          candidate(adapter, [parsed], accepted, allDocs);
+          result.issues.push(...extracted.issues);
+        } catch (error) {
+          if (error instanceof RunError) throw error;
+          sourceFailures.push(`${batch.map(doc => doc.url).join(", ")}: ${error instanceof Error ? error.message : String(error)}`);
+          continue;
+        }
         const effectiveInventory = [
           ...new Set([...inventory, ...allDocs.map((d) => d.url)]),
         ].sort();
-        // Validate the complete result before storing it as reusable extraction.
-        candidate(adapter, [parsed], accepted, allDocs);
         extractions.push(parsed);
-        result.issues.push(...extracted.issues);
         for (const doc of allDocs) {
           if (!snapshots.some((d) => d.url === doc.url)) snapshots.push(doc);
           const part = {
@@ -216,6 +223,7 @@ export async function syncAdapter(
           );
         }
       }
+      if (sourceFailures.length) throw new Error(sourceFailures.join("\n"));
       const reconciled = preserveSourceDisagreements({
         complete: extractions.every(extraction => extraction.complete),
         products: extractions.flatMap(extraction => extraction.products),
@@ -227,7 +235,7 @@ export async function syncAdapter(
       const built = candidate(adapter, extractions, accepted, snapshots);
       const unconfirmed = accepted
         ? markUnconfirmed(accepted, [
-            ...pending,
+            ...snapshots,
             ...prior.filter(source => !inventory.includes(source.url) && source.snapshot).map(source => source.snapshot!),
           ], extractions, built.data)
         : undefined;

@@ -341,8 +341,11 @@ export const extract: Extractor = async (
     presented.set(key, texts);
   };
   const numeric = (text: string) => /[$€£¥₹]|\d[\d.,]*\s*%/.test(text) || currencyAmount.test(text) ||
-    text.includes("|") && /\d/.test(text) || /\b(?:\d[\d.,]*\s+(?:[\w-]+\s+){0,3}(?:transactions?|payments?|withdrawals?|cards?|times)|(?:fees?|charges?|costs?)\s*[:|]?\s*0(?:\.0+)?\b|0(?:\.0+)?\s+(?:annual|monthly|issuance)\s+fees?)\b/i.test(text);
-  const priced = (text: string) => (numeric(text) || /\b(?:free|zero|none|waived|unlimited|no (?:[\w-]+\s+){0,3}(?:fees?|charges?|costs?|limits?))\b/i.test(text)) && /fee|charge|cost|limit|atm|withdraw|cashback|assetback|reward|price|interest|conversion|exchange|issuance/i.test(text);
+    text.includes("|") && /\d/.test(text) || /(?<![\d-])\b(?:\d+(?:[,.]\d+)*\s+(?:(?:atm|cash|bank|additional|more|consecutive|failed|declined|physical|virtual|active|free|fee-free|successful|card)\s+){0,3}(?:transactions?|payments?|withdrawals?|cards?|times)|(?:fees?|charges?|costs?)\s*[:|]?\s*0(?:\.0+)?\b|0(?:\.0+)?\s+(?:annual|monthly|issuance)\s+fees?)\b/i.test(text);
+  const priced = (text: string) => {
+    const valueText = text.replace(/\btoll[- ]free\b/gi, "");
+    return (numeric(valueText) || /\b(?:free|zero|none|waived|unlimited|no (?:[\w-]+\s+){0,3}(?:fees?|charges?|costs?|limits?))\b/i.test(valueText)) && /fee|charge|cost|limit|atm|withdraw|cashback|assetback|reward|price|interest|conversion|exchange|issuance/i.test(text);
+  };
   const preview = documents.map(doc => {
     const available = blocks(doc), selected = available.filter(block => priced(block.text));
     // Supply the required financial inventory before generation. A five-block
@@ -624,9 +627,11 @@ export const extract: Extractor = async (
       }
       continue;
     }
-    if (choice.finish_reason !== "stop")
+    if (choice.finish_reason !== "stop" && choice.finish_reason !== "length")
       throw new Error(`Incomplete extraction: ${choice.finish_reason}`);
     try {
+      if (choice.finish_reason === "length")
+        throw new Error("Incomplete extraction: length. The response reached the output limit. Return compact complete JSON without formatting whitespace or repeated source text; preserve every supported fact. Never return a partial result.");
       const referenceErrors: string[] = [];
       const hydrate = (value: unknown): unknown => {
         if (Array.isArray(value)) return value.map(hydrate);
