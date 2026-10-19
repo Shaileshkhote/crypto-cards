@@ -11,6 +11,36 @@ import { adapter, document, extraction } from "./helpers";
 import { Card } from "@cards/core/schema";
 import { documentFromText } from "@cards/core/crawler";
 describe("deterministic merge and protection", () => {
+  it("rejects fee-free ATM allowances as hard limits while accepting separately stated withdrawal caps", () => {
+    const doc = documentFromText("https://example.com/limits", "Tier | Basic ; Free ATM limit (Monthly) | USD 200 ; ATM withdrawal limit | Monthly USD 5000", "Limits", [], true), e = extraction(doc);
+    e.facts[0] = { ...e.facts[0], field: "limits", value: [{ id: "atm", kind: "atm", amount: { amount: "200", currency: "USD" }, period: "month", scope: {}, calculable: true }] };
+    expect(() => candidate(adapter(), [e], undefined, [doc])).toThrow("is an allowance, not a hard withdrawal limit");
+    e.facts[0].value = [{ id: "atm", kind: "atm", amount: { amount: "5000", currency: "USD" }, period: "month", scope: {}, calculable: true }];
+    expect(candidate(adapter(), [e], undefined, [doc]).data.products![0].tiers![0].limits![0]).toMatchObject({ amount: { amount: "5000" } });
+    const both = documentFromText(doc.url, "Tier | Basic ; Free ATM limit (Monthly) | USD 200 ; ATM withdrawal limit (Monthly) | USD 200", "Limits", [], true);
+    const same = extraction(both);
+    same.facts[0] = { ...same.facts[0], field: "limits", value: [{ id: "atm", kind: "atm", amount: { amount: "200", currency: "USD" }, period: "month", scope: {}, calculable: true }] };
+    expect(() => candidate(adapter(), [same], undefined, [both])).not.toThrow();
+    const freePlan = documentFromText(doc.url, "Plan | Amount ; Free plan ATM hard limit | USD 200", "Limits", [], true);
+    const plan = extraction(freePlan);
+    plan.facts[0] = { ...plan.facts[0], field: "limits", value: [{ id: "atm", kind: "atm", amount: { amount: "200", currency: "USD" }, period: "month", scope: {}, calculable: true }] };
+    expect(() => candidate(adapter(), [plan], undefined, [freePlan])).not.toThrow();
+  });
+  it("does not turn an unlimited withdrawal amount into zero while preserving explicit no-fee charges", () => {
+    const doc = documentFromText("https://example.com/limits", "Yearly ATM withdrawal limit (USD): None."), e = extraction(doc);
+    e.facts[0] = { ...e.facts[0], field: "limits", value: [{ id: "atm", kind: "atm", amount: { amount: "0", currency: "USD" }, period: "year", scope: {}, calculable: true }] };
+    expect(() => candidate(adapter(), [e], undefined, [doc])).toThrow("Financial value 0 is absent");
+    const fee = documentFromText(doc.url, "ATM fee: None."), free = extraction(fee, 0);
+    free.facts[0].value = [{ id: "atm", kind: "atm", scope: {}, calculation: "percentage", ratePercent: 0, calculable: true }];
+    expect(() => candidate(adapter(), [free], undefined, [fee])).not.toThrow();
+  });
+  it("keeps bank withdrawals over ACH separate from ATM cash withdrawals", () => {
+    const doc = documentFromText("https://example.com/fees", "Withdraw CASH from your account using standard ACH: Free."), e = extraction(doc, 0);
+    e.facts[0].value = [{ id: "withdrawal", kind: "atm", scope: { paymentRails: ["ach"] }, calculation: "percentage", ratePercent: 0, calculable: true }];
+    expect(() => candidate(adapter(), [e], undefined, [doc])).toThrow("are not ATM cash withdrawals");
+    e.facts[0].value = [{ id: "withdrawal", kind: "other", serviceId: "bank-withdrawal", scope: { paymentRails: ["ach"] }, calculation: "percentage", ratePercent: 0, calculable: true }];
+    expect(() => candidate(adapter(), [e], undefined, [doc])).not.toThrow();
+  });
   it("holds a legacy limit's calculability transition for review without leaking fields between variants", () => {
     const identity = { id: "example", name: "Example", website: "https://example.com" };
     const accepted = Card.parse({ ...identity, limits: [{ id: "legacy-limit", kind: "spending", period: "transaction", scope: {}, calculable: true, amount: { amount: "1000", currency: "USD" } }] });

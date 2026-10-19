@@ -66,6 +66,22 @@ describe.skipIf(!enabled)(
         1,
       );
     });
+    it("re-extracts a cached record that fails current evidence checks without changing accepted values", async () => {
+      await run();
+      const before = await readCache("cards/example"), doc = document();
+      await db().query("UPDATE card_extractions SET data=$1", [JSON.stringify(extraction(doc, 99))]);
+      let calls = 0;
+      const repaired = await run(1.5, async () => {
+        calls++;
+        return { extraction: extraction(doc), documents: [doc], issues: [] };
+      });
+      expect(repaired).toMatchObject({ status: "unchanged", changed: 1, reused: 0 });
+      expect(repaired.issues?.some(issue => issue.includes("Cached extraction needs re-extraction"))).toBe(true);
+      expect(calls).toBe(1);
+      expect((await readCache("cards/example"))?.payload).toBe(before?.payload);
+      expect((await run(1.5, async () => { throw new Error("Repaired cache must be reused"); })).status).toBe("unchanged");
+      expect((await readCache("cards/example"))?.payload).toBe(before?.payload);
+    });
     it("persists distinct material fees, reuses them warm and holds a changed price for review", async () => {
       const a = adapter();
       const sync = async (price: number, warm = false) => {

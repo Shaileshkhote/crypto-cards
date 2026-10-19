@@ -41,6 +41,7 @@ it("keeps an introductory paragraph with bounded list rows without leaking free 
   const block = allowances.find(b => b.text.includes("Tier 79:"))!;
   const fact = { field: "fees" as const, productId: "card", tierId: "tier-79", inherit: false, value: [{ id: "atm", kind: "atm" as const, scope: {}, calculation: "percentage" as const, ratePercent: 0, calculable: true as const, allowance: { amount: { amount: "179", currency: "EUR" }, period: "month" as const } }], evidence: { url: doc.url, blockId: block.id, quote: block.text } };
   expect(() => verifyFinancialEvidence(fact)).not.toThrow();
+  expect(() => verifyFinancialEvidence({ ...fact, field: "limits", value: [{ id: "atm", kind: "atm", scope: {}, calculable: true, amount: { amount: "179", currency: "EUR" }, period: "month" }] })).toThrow("is an allowance, not a hard withdrawal limit");
   const paid = doc.blocks.find(b => b.text.includes("After the allowance:"))!;
   expect(paid.text).not.toContain("Free ATM");
   expect(() => verifyFinancialEvidence({ ...fact, value: [{ ...fact.value[0], allowance: undefined }], evidence: { url: doc.url, blockId: paid.id, quote: paid.text } })).toThrow("Financial value 0 is absent");

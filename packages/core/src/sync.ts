@@ -8,6 +8,7 @@ import {
   type ExtractionData,
 } from "./schema";
 import { Crawler } from "./crawler";
+import { verifyEvidence, verifyFinancialEvidence } from "./evidence";
 import {
   extract,
   fingerprint,
@@ -59,7 +60,7 @@ export async function syncAdapter(
       input: budget.inputTokens,
       output: budget.outputTokens,
     };
-    const result: SyncResult = {
+    const result: SyncResult & { issues: string[] } = {
       cardId: adapter.config.id,
       status: "unchanged",
       changed: 0,
@@ -68,6 +69,7 @@ export async function syncAdapter(
       costUsd: 0,
       inputTokens: 0,
       outputTokens: 0,
+      issues: [],
     };
     try {
       const id = adapter.config.id;
@@ -145,9 +147,19 @@ export async function syncAdapter(
           )
         ).rows[0];
         if (cached && !deps.force) {
-          extractions.push(Extraction.parse(cached.data));
-          result.reused++;
-        } else if (!deps.staticOnly) pending.push(doc);
+          try {
+            const parsed = Extraction.parse(cached.data);
+            if (!parsed.complete || parsed.facts.some(fact => !verifyEvidence(fact.evidence, [doc])))
+              throw new Error("Incomplete extraction or invalid source citation");
+            for (const fact of parsed.facts) verifyFinancialEvidence(fact);
+            extractions.push(parsed);
+            result.reused++;
+            continue;
+          } catch (error) {
+            result.issues.push(`Cached extraction needs re-extraction: ${doc.url}: ${error instanceof Error ? error.message : String(error)}`);
+          }
+        }
+        if (!deps.staticOnly) pending.push(doc);
       }
       result.changed = pending.length;
       if (pending.length) {
@@ -282,7 +294,7 @@ export async function syncAdapter(
         : version === (acceptedRow?.version || 0)
           ? "unchanged"
           : "published";
-      result.issues = built.discrepancies.map((x) => `Static precedence: ${x}`);
+      result.issues.push(...built.discrepancies.map((x) => `Static precedence: ${x}`));
       try {
         await rebuildCache();
       } catch (e) {

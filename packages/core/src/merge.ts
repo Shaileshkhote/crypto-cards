@@ -8,7 +8,7 @@ import {
 } from "./schema";
 import { canonical, hash, slug } from "./serialize";
 import { verifyEvidence, verifyFinancialEvidence } from "./evidence";
-export const MERGE_VERSION = "13";
+export const MERGE_VERSION = "14";
 type ObjectValue = Record<string, unknown>;
 const isObject = (v: unknown): v is ObjectValue =>
   !!v && typeof v === "object" && !Array.isArray(v);

@@ -90,7 +90,7 @@ const FeeBase = {
     "transaction_decline",
     "small_transaction",
     "other",
-  ]).describe("fx is fiat currency exchange; conversion is crypto/asset conversion. atm is withdrawal; atm_decline and atm_balance_inquiry are separate services. refund applies only to processing a refund. delivery is shipping, separate from issuance. cross_border, late_payment and returned_payment are separate from ordinary purchase transaction fees."),
+  ]).describe("fx is fiat currency exchange; conversion is crypto/asset conversion. atm is cash withdrawal at an ATM, never a bank-account withdrawal over ACH, wire or SEPA; those use other with a bank-withdrawal serviceId. atm_decline and atm_balance_inquiry are separate services. refund applies only to processing a refund. delivery is shipping, separate from issuance. cross_border, late_payment and returned_payment are separate from ordinary purchase transaction fees."),
   minFee: Money.optional(),
   serviceId: Id.describe("Required only for kind other: stable kebab-case name of the charged service. Omit for known kinds.").optional(),
   maxFee: Money.optional(),
