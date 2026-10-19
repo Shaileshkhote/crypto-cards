@@ -29,7 +29,7 @@ export const extractionSettings = () => ({
   maxOutputTokens: MAX_OUTPUT_TOKENS,
   requestTimeoutMs: REQUEST_TIMEOUT_MS,
   temperature: "0 when supported",
-  reasoning: "medium when supported",
+  reasoning: "high when supported",
   provider: process.env.EXTRACTION_PROVIDER || null,
 });
 export const fingerprint = (
@@ -367,7 +367,7 @@ export const extract: Extractor = async (
       tools,
       tool_choice: step === 11 ? "none" : "auto",
       ...(prices.temperature ? { temperature: 0 } : {}),
-      ...(prices.reasoning ? { reasoning: { effort: "medium", exclude: true } } : {}),
+      ...(prices.reasoning ? { reasoning: { effort: "high", exclude: true } } : {}),
       max_tokens: MAX_OUTPUT_TOKENS,
       usage: { include: true },
       provider: {
