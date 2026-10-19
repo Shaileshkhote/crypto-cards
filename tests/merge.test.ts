@@ -127,6 +127,23 @@ describe("deterministic merge and protection", () => {
     const grouped = documentFromText(doc.url, "Foreign exchange fee: 1,000%.");
     expect(() => candidate(adapter(), [extraction(grouped, 1)], undefined, [grouped])).toThrow("Financial value 1 is absent");
   });
+  it("distinguishes monetary currencies in otherwise identical rules without hiding same-currency price conflicts", () => {
+    const a = adapter(), doc = documentFromText("https://example.com/fees", "ATM fee: 2%, minimum 1.99 EUR or 1.99 GBP. The EUR minimum may instead be 2.99 EUR."), e = extraction(doc);
+    e.facts[0].value = (["EUR", "GBP"] as const).map(currency => ({ id: `atm-${currency.toLowerCase()}`, kind: "atm", scope: {}, calculation: "percentage", ratePercent: 2, minFee: { amount: "1.99", currency }, calculable: true }));
+    const card = candidate(a, [e], undefined, [doc]).data;
+    const fees = card.products![0].tiers![0].fees!;
+    expect(fees).toHaveLength(2);
+    expect(new Set(fees.map(fee => fee.id)).size).toBe(2);
+    const changed = structuredClone(e);
+    changed.facts[0].value = [structuredClone((e.facts[0].value as Record<string, unknown>[])[0])];
+    ((changed.facts[0].value as Record<string, unknown>[])[0].minFee as { amount: string }).amount = "2.99";
+    const incoming = candidate(a, [changed], undefined, [doc]).data;
+    expect(incoming.products![0].tiers![0].fees![0].id).toBe(fees.find(fee => fee.minFee?.currency === "EUR")!.id);
+    const held = merge(card, incoming);
+    expect(held.changes.length).toBeGreaterThan(0);
+    expect(held.published).toEqual(card);
+    expect(() => candidate(a, [e, changed], undefined, [doc])).toThrow("Conflicting extracted facts");
+  });
   it("rejects a real citation to the wrong financial row and accepts explicit scaled amounts", () => {
     const a = adapter(), doc = documentFromText("https://example.com/limits", "Per purchase: 1.5k USD.\nAnnual transaction count: 1,040."), e = extraction(doc);
     e.facts[0] = { ...e.facts[0], field: "limits", value: [{ id: "count", kind: "transaction_count", count: 1040, period: "year", scope: {}, calculable: true }] };

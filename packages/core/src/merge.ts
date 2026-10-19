@@ -8,7 +8,7 @@ import {
 } from "./schema";
 import { canonical, hash, slug } from "./serialize";
 import { verifyEvidence, verifyFinancialEvidence } from "./evidence";
-export const MERGE_VERSION = "11";
+export const MERGE_VERSION = "12";
 type ObjectValue = Record<string, unknown>;
 const isObject = (v: unknown): v is ObjectValue =>
   !!v && typeof v === "object" && !Array.isArray(v);
@@ -198,16 +198,26 @@ function coalesceRules(values: ObjectValue[], field: string) {
     ? { ...rule, description: [...descriptions.get(id)!].sort().join("\n") }
     : rule);
 }
+function moneyCurrencies(value: unknown): string[] {
+  if (Array.isArray(value)) return [...new Set(value.flatMap(moneyCurrencies))].sort();
+  if (!isObject(value)) return [];
+  return [...new Set([
+    ...(typeof value.amount === "string" && typeof value.currency === "string" ? [value.currency] : []),
+    ...Object.values(value).flatMap(moneyCurrencies),
+  ])].sort();
+}
 function rules(value: unknown, field: string, target: string, origin: unknown): unknown {
   if (!Array.isArray(value) || !["fees", "rewards", "limits"].includes(field)) return value;
   return coalesceRules(value.map(r => {
     const obj = ordered(r) as ObjectValue;
+    const currencies = moneyCurrencies(obj);
     const id = `${field.slice(0, -1)}-${hash({
       target, kind: obj.kind || "cashback",
       serviceId: obj.kind === "other" ? obj.serviceId : undefined,
       rewardAsset: field === "rewards" ? obj.rewardAsset : undefined,
       requirements: field === "rewards" ? ordered(obj.requirements) : undefined,
       period: field === "limits" ? obj.period : undefined,
+      currencies: currencies.length ? currencies : undefined,
       scope: ordered(obj.scope || {}),
     }).slice(0, 20)}`;
     return { ...obj, scope: ordered(obj.scope || {}), id, source: origin, status: "verified" };
