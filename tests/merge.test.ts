@@ -620,3 +620,17 @@ it('recognizes an explicit /mo subscription or withdrawal cap without inventing 
     expect(() => candidate(adapter(), [e], undefined, [doc])).not.toThrow();
   }
 });
+
+it("confirms fresh canonical tier evidence when source IDs resolve through a known name", () => {
+  const a = adapter(), doc = document(), e = extraction(doc);
+  e.tiers = [{ id: "source-core", productId: "card", name: "Core" }];
+  e.facts[0].tierId = "source-core";
+  const incoming = candidate(a, [e], undefined, [doc]).data;
+  const accepted = structuredClone(incoming);
+  const confirmed = markUnconfirmed(accepted, [doc], [e], incoming);
+  expect(confirmed.products![0].tiers!.find(t => t.id === "core")!.unconfirmedFields).toBeUndefined();
+  expect(confirmed.products![0].tiers!.find(t => t.id === "core")!.fees![0].status).toBe("verified");
+  const absent = { ...e, facts: [] };
+  const missing = markUnconfirmed(accepted, [doc], [absent], candidate(a, [absent], undefined, [doc]).data);
+  expect(missing.products![0].tiers!.find(t => t.id === "core")!.unconfirmedFields).toContain("fees");
+});

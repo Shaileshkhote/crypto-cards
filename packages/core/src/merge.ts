@@ -9,7 +9,7 @@ import {
 } from "./schema";
 import { canonical, hash, slug } from "./serialize";
 import { verifyEvidence, verifyFinancialEvidence } from "./evidence";
-export const MERGE_VERSION = "17";
+export const MERGE_VERSION = "18";
 type ObjectValue = Record<string, unknown>;
 const isObject = (v: unknown): v is ObjectValue =>
   !!v && typeof v === "object" && !Array.isArray(v);
@@ -737,7 +737,15 @@ export function markUnconfirmed(
         const missingCardType = field === "cardTypes" && isObject(v[field]) && Object.keys(v[field]).some(kind =>
           !isObject(fresh) || !isObject(fresh[field]) || !(kind in fresh[field]),
         );
-        if (missingCardType || affected.some(o => !seen.has(`${product}/${tier}/${field}/${o.url}`)))
+        const freshOrigins = isObject(fresh) && isObject(fresh.fieldSources)
+          ? fresh.fieldSources[field] : undefined;
+        const observedOrigins = (Array.isArray(freshOrigins) ? freshOrigins : [freshOrigins]).filter(isObject);
+        // Candidate assembly resolves source aliases to canonical product/tier IDs.
+        // Its fresh origins confirm those identities without retaining raw aliases.
+        const observed = (url: unknown) => incoming
+          ? observedOrigins.some(origin => origin.url === url)
+          : seen.has(`${product}/${tier}/${field}/${url}`);
+        if (missingCardType || affected.some(o => !observed(o.url)))
           unconfirmed.add(field);
         else unconfirmed.delete(field);
       }
