@@ -284,6 +284,8 @@ export function preserveSourceDisagreements(extraction: ExtractionData, sources?
   for (const fact of extraction.facts) verifyFinancialEvidence(fact);
   type Entry = { fact: number; value: ObjectValue; source: string };
   const groups = new Map<string, Entry[]>();
+  const cardTypes = new Map<string, Entry[]>();
+  const scalarClaims = new Map<string, Entry[]>();
   const lists = new Map<string, Map<string, { facts: number[]; values: string[] }>>();
   for (const [index, fact] of extraction.facts.entries()) {
     const target = [fact.productId, fact.tierId].filter(Boolean).join("/");
@@ -296,16 +298,45 @@ export function preserveSourceDisagreements(extraction: ExtractionData, sources?
         entries.push({ fact: index, value, source: `${fact.evidence.url}#${fact.evidence.blockId}` });
         groups.set(id, entries);
       }
-    } else if (["residentCountries", "excludedResidentCountries"].includes(fact.field) && Array.isArray(fact.value)) {
+    } else if (fact.field === "cardTypes" && isObject(fact.value)) {
+      for (const [kind, value] of Object.entries(fact.value)) {
+        const id = `${key}/${kind}`, entries = cardTypes.get(id) || [];
+        entries.push({ fact: index, value: { [kind]: value }, source: `${fact.evidence.url}#${fact.evidence.blockId}` });
+        cardTypes.set(id, entries);
+      }
+    } else if (!["terms", "requirements", "features"].includes(fact.field) && Array.isArray(fact.value) && fact.value.every(value => typeof value === "string")) {
       const sources = lists.get(key) || new Map();
       const page = sources.get(fact.evidence.url) || { facts: [], values: [] };
       page.facts.push(index);
       page.values.push(...fact.value as string[]);
       sources.set(fact.evidence.url, page);
       lists.set(key, sources);
+    } else if (fact.value !== null && fact.value !== undefined && !Array.isArray(fact.value)) {
+      const entries = scalarClaims.get(key) || [];
+      entries.push({ fact: index, value: { value: fact.value }, source: `${fact.evidence.url}#${fact.evidence.blockId}` });
+      scalarClaims.set(key, entries);
     }
   }
   const removedRules = new Map<number, Set<string>>(), removedLists = new Set<number>(), disputed = new Set<string>();
+  const removedTypes = new Map<number, Set<string>>();
+  for (const [key, entries] of scalarClaims) {
+    if (entries.every(entry => compatible(entry.value, entries[0].value))) continue;
+    if (entries.some((entry, index) => entries.slice(0, index).some(prior => prior.source === entry.source && !compatible(prior.value, entry.value))))
+      throw new Error(`Conflicting ${extraction.facts[entries[0].fact].field} in the same source block: ${key}; correct or separately scope the facts`);
+    disputed.add(key);
+    for (const entry of entries) removedLists.add(entry.fact);
+  }
+  for (const [key, entries] of cardTypes) {
+    if (entries.every(entry => compatible(entry.value, entries[0].value))) continue;
+    if (entries.some((entry, index) => entries.slice(0, index).some(prior => prior.source === entry.source && !compatible(prior.value, entry.value))))
+      throw new Error(`Conflicting cardTypes in the same source block: ${key}; correct or separately scope the facts`);
+    disputed.add(key);
+    for (const entry of entries) {
+      const removed = removedTypes.get(entry.fact) || new Set();
+      removed.add(Object.keys(entry.value)[0]);
+      removedTypes.set(entry.fact, removed);
+    }
+  }
   for (const [key, entries] of groups) {
     if (entries.some((entry, index) => entries.slice(0, index).some(prior => prior.source === entry.source && !compatible(prior.value, entry.value))))
       throw new Error(`Ambiguous ${extraction.facts[entries[0].fact].field} identity: ${key}; qualify distinct services in the same source block`);
@@ -333,7 +364,12 @@ export function preserveSourceDisagreements(extraction: ExtractionData, sources?
   const facts: ExtractionData["facts"] = [];
   for (const [index, fact] of extraction.facts.entries()) {
     const removed = removedRules.get(index);
-    if (!removed && !removedLists.has(index)) { facts.push(fact); continue; }
+    const types = removedTypes.get(index);
+    if (!removed && !removedLists.has(index) && !types) { facts.push(fact); continue; }
+    if (types) {
+      const retained = Object.fromEntries(Object.entries(fact.value as ObjectValue).filter(([kind]) => !types.has(kind)));
+      if (Object.keys(retained).length) facts.push(Fact.parse({ ...fact, value: retained }));
+    }
     if (removed) {
       const target = [fact.productId, fact.tierId].filter(Boolean).join("/");
       const retained = (fact.value as ObjectValue[]).filter(rule => !removed.has(String((rules([rule], fact.field, target, fact.evidence) as ObjectValue[])[0].id)));
@@ -661,6 +697,13 @@ export function markUnconfirmed(
     if (!isObject(v)) return v;
     const out = { ...v };
     const unconfirmed = new Set((v.unconfirmedFields || []) as string[]);
+    const freshProduct = incoming?.products?.find((p) => p.id === product);
+    const fresh: unknown = tier
+      ? freshProduct?.tiers?.find((t) => t.id === tier)
+      : product
+        ? freshProduct
+        : incoming;
+
     for (const [field, origin] of Object.entries(
       (v.fieldSources || {}) as ObjectValue,
     ))
@@ -668,16 +711,13 @@ export function markUnconfirmed(
         const origins = (Array.isArray(origin) ? origin : [origin]).filter(isObject);
         const affected = origins.filter(o => typeof o.url === "string" && changed.has(o.url));
         if (!affected.length) continue;
-        if (affected.some(o => !seen.has(`${product}/${tier}/${field}/${o.url}`)))
+        const missingCardType = field === "cardTypes" && isObject(v[field]) && Object.keys(v[field]).some(kind =>
+          !isObject(fresh) || !isObject(fresh[field]) || !(kind in fresh[field]),
+        );
+        if (missingCardType || affected.some(o => !seen.has(`${product}/${tier}/${field}/${o.url}`)))
           unconfirmed.add(field);
         else unconfirmed.delete(field);
       }
-    const freshProduct = incoming?.products?.find((p) => p.id === product);
-    const fresh: unknown = tier
-      ? freshProduct?.tiers?.find((t) => t.id === tier)
-      : product
-        ? freshProduct
-        : incoming;
     for (const field of ["fees", "rewards", "limits"])
       if (Array.isArray(v[field])) {
         out[field] = (v[field] as ObjectValue[]).map((rule) => {

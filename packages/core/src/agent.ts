@@ -288,7 +288,9 @@ function validationFeedback(issues: z.ZodIssue[]): string {
         ? { code: issue.code, path: issue.path, received: issue.received, message: "Currency fields accept ISO 4217 fiat codes only. USDC, USDT and other crypto units must remain in scope.conditions or narrative terms/descriptions, never be relabeled USD. Omit a typed money cap if its source unit is unsupported." }
         : issue.code === "invalid_enum_value" && issue.path.at(-1) === "period"
           ? { ...issue, message: `${issue.message}. A transaction_count rule requires a sourced calendar period. For consecutive counts without a calendar period, use a non-calculable limit with a source-supported description; omit count, amount and period instead of inventing a day.` }
-          : issue),
+          : issue.code === "invalid_enum_value" && issue.path.at(-1) === "kind" && issue.options.includes("fx")
+            ? { ...issue, message: "Fee kind names the charged service. unknown is a calculation, never a fee kind. Use the supported named service, or other with a stable serviceId for an unlisted service; retain calculation unknown only when the formula is unrepresentable." }
+            : issue),
   ]);
 }
 
@@ -729,7 +731,7 @@ export const extract: Extractor = async (
         const block = { url: page.url, blockId, text };
         if (JSON.stringify([...correctionBlocks, block]).length <= 24_000) correctionBlocks.push(block);
       }
-      const coverage = missing.length ? `Uncovered financial or eligibility source blocks: ${JSON.stringify(missing)}. Source text for correction: ${JSON.stringify(correctionBlocks)}. Preserve each supported claim, including competing claims from different sources. Use separately cited terms for unrepresentable clauses; do not silently choose one source. Illustrations, legal liability caps and unrelated services must remain qualified narrative terms, never current card fees or guaranteed limits.` : "";
+      const coverage = missing.length ? `Uncovered financial or eligibility source blocks: ${JSON.stringify(missing)}. Source text for correction: ${JSON.stringify(correctionBlocks)}. Include at least one separately cited fact for EACH listed block. For an illustration, marketing statement, legal notice or unrepresentable clause, use field terms with a brief qualified summary retaining its figures; do not discard it as boilerplate or turn it into a current card fee or guaranteed limit. Keep representable payable fees, rewards and limits typed. Preserve competing source claims independently; never silently choose one.` : "";
       try { candidate(adapter, [extraction], undefined, documents); }
       catch (error) { throw new Error([error instanceof Error ? error.message : String(error), coverage].filter(Boolean).join("\n")); }
       if (coverage) throw new Error(coverage);
@@ -742,6 +744,8 @@ export const extract: Extractor = async (
         message += " Return only url and blockId for evidence; omit quote. The application copies the exact source text.";
       if (message.includes("Ambiguous fees identity"))
         message += " If the source explicitly charges different components, identify each source-named component in scope.conditions (such as FX padding versus exchange processing, or ATM withdrawals versus card purchases). Never invent conditions to separate conflicting prices for the same charge; preserve those conflicting clauses in terms.";
+      if (message.includes("Ambiguous rewards identity") || message.includes("/rewards;"))
+        message += " Scope each reward to its actual balance/spending band, award variant, cap and merchant category. A generic tier-dependent condition does not distinguish different rates. When a block lists conditional alternatives without their individual conditions, use one non-calculable reward preserving the full conditional clause, not multiple conflicting rates with identical scopes. Cite separately scoped rows when available; never invent a band or condition.";
       // Storage uses content hashes; the model saw short page/block selectors.
       // Return those same selectors when asking it to correct a wrong citation.
       for (const doc of documents)

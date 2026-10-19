@@ -118,3 +118,43 @@ it.each(fixtures)("preserves both $provider source observations without choosing
   const proposed = applyChanges(result.published, result.changes).products!.find(p => p.id === fixture.productId)!;
   for (const doc of docs) expect(proposed.terms).toContain(doc.content);
 });
+
+it("preserves independent card-type disagreements while retaining the undisputed form factor", async () => {
+  const { adapter: exampleAdapter } = await import('./helpers');
+  const adapter = exampleAdapter();
+  const docs = [documentFromText('https://example.com/card', 'Physical and virtual cards are available.'), documentFromText('https://example.com/terms', 'Virtual cards are available; physical cards are not available.')];
+  const incoming = Extraction.parse({ complete: true, products: [], tiers: [], facts: docs.map((doc, index) => ({ productId: 'card', tierId: 'core', inherit: false, field: 'cardTypes', value: { physical: index === 0, virtual: true }, evidence: { url: doc.url, blockId: doc.blocks[0].id, quote: doc.content } })) });
+  const resolved = preserveSourceDisagreements(incoming);
+  expect(resolved.extraction.facts.filter(fact => fact.field === 'terms').map(fact => fact.value)).toEqual(docs.map(doc => [doc.content]));
+  const built = candidate(adapter, [resolved.extraction], undefined, docs).data;
+  expect(built.products![0].tiers![0].cardTypes).toEqual({ virtual: true });
+  const accepted = candidate(adapter, [{ ...incoming, facts: [incoming.facts[0]] }], undefined, docs).data;
+  const retained = merge(markUnconfirmed(accepted, docs, [resolved.extraction], built), built).published.products![0].tiers![0];
+  expect(retained.cardTypes).toEqual({ physical: true, virtual: true });
+  expect(retained.unconfirmedFields).toContain('cardTypes');
+});
+
+it("requires same-block card-type contradictions to be corrected and combines complementary claims", async () => {
+  const { adapter: exampleAdapter } = await import('./helpers');
+  const doc = documentFromText('https://example.com/card', 'Physical and virtual cards are available.');
+  const fact = { productId: 'card', tierId: 'core', inherit: false, field: 'cardTypes', value: { physical: true }, evidence: { url: doc.url, blockId: doc.blocks[0].id, quote: doc.content } };
+  const incoming = Extraction.parse({ complete: true, products: [], tiers: [], facts: [fact, { ...fact, value: { physical: false } }] });
+  expect(() => preserveSourceDisagreements(incoming)).toThrow('same source block');
+  const complementary = preserveSourceDisagreements(Extraction.parse({ ...incoming, facts: [fact, { ...fact, value: { virtual: true } }] })).extraction;
+  expect(candidate(exampleAdapter(), [complementary], undefined, [doc]).data.products![0].tiers![0].cardTypes).toEqual({ physical: true, virtual: true });
+});
+
+it.each([
+  { field: 'chains', values: [['Ethereum', 'Optimism'], ['Ethereum', 'Base']], texts: ['Supported chains: Ethereum and Optimism.', 'Supported chains: Ethereum and Base.'] },
+  { field: 'network', values: ['visa', 'mastercard'], texts: ['The card uses Visa.', 'The card uses Mastercard.'] },
+  { field: 'issuer', values: [{ id: 'bank-one', name: 'Bank One' }, { id: 'bank-two', name: 'Bank Two' }], texts: ['The card is issued by Bank One.', 'The card is issued by Bank Two.'] },
+])('preserves independent $field claims without selecting an incompatible value', async ({ field, values, texts }) => {
+  const { adapter: exampleAdapter } = await import('./helpers');
+  const docs = texts.map((text, i) => documentFromText(`https://example.com/source-${i}`, text));
+  const incoming = Extraction.parse({ complete: true, products: [], tiers: [], facts: docs.map((doc, i) => ({ productId: 'card', tierId: 'core', inherit: false, field, value: values[i], evidence: { url: doc.url, blockId: doc.blocks[0].id, quote: doc.content } })) });
+  const resolved = preserveSourceDisagreements(incoming);
+  expect(resolved.extraction.facts.map(fact => fact.field)).toEqual(['terms', 'terms']);
+  expect(resolved.extraction.facts.map(fact => fact.value)).toEqual(docs.map(doc => [doc.content]));
+  const built = candidate(exampleAdapter(), [resolved.extraction], undefined, docs).data;
+  expect(built.products![0].tiers![0][field as 'chains' | 'network' | 'issuer']).toBeUndefined();
+});
