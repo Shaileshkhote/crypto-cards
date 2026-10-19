@@ -146,9 +146,16 @@ describe("deterministic merge and protection", () => {
     expect(candidate(a, [e], undefined, [doc]).data.products![0].tiers![0].fees![0]).toMatchObject({ ratePercent: 0 });
   });
   it("does not treat a possible or refused waiver as an explicit free charge", () => {
-    for (const text of ["The fee is not waived.", "The fee may be waived.", "An additional fee applies.", "Monthly, annual, or inactivity card fees may be waived.", "The bank may not charge fees.", "The bank may not be charged a fee.", "The bank doesn't waive the fee.", "The bank will not waive the fee."]) {
+    for (const text of ["Card upgrade: Not waived.", "Card upgrade: May be waived.", "The fee is not waived.", "The fee may be waived.", "An additional fee applies.", "Monthly, annual, or inactivity card fees may be waived.", "The bank may not charge fees.", "The bank may not be charged a fee.", "The bank doesn't waive the fee.", "The bank will not waive the fee."]) {
       const doc = documentFromText("https://example.com/fees", text), e = extraction(doc, 0);
       expect(() => candidate(adapter(), [e], undefined, [doc])).toThrow("Financial value 0 is absent");
+    }
+  });
+  it("accepts an explicit waived charge in a labeled value or table cell", () => {
+    for (const text of ["Card upgrade: Waived", "Service | Price ; Card upgrade | Waived"]) {
+      const doc = documentFromText("https://example.com/fees", text), e = extraction(doc, 0);
+      e.facts[0].value = [{ id: "upgrade", kind: "other", serviceId: "card-upgrade", scope: {}, calculation: "percentage", ratePercent: 0, calculable: true }];
+      expect(candidate(adapter(), [e], undefined, [doc]).data.products![0].tiers![0].fees![0]).toMatchObject({ ratePercent: 0 });
     }
   });
   it("accepts an explicit no-charge list with commas and conjunctions", () => {

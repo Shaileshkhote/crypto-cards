@@ -24,7 +24,8 @@ function financialNumbers(quote: string, implicitZero = true) {
   });
   if (implicitZero && (/\b(free|zero|none|(?:no|without) (?:[\w-]+(?:,\s*|\s+)){0,5}(?:fees?|charges?|cost|markup))\b/i.test(quote) ||
       /\b(?:(?:will|shall|do|does|is|are)\s+not|(?:wo|sha|do(?:es)?)n't)\s+(?:be\s+)?charg(?:e|ed)\s+(?:(?:a|an|any)\s+)?(?:[\w-]+\s+){0,3}fees?\b/i.test(quote.replace(/[’‘]/g, "'")) ||
-      /\b(?:fees?|charges?|cost)\s+(?:is\s+)?(?:currently\s+)?waived\b/i.test(quote))) numbers.push("0");
+      /\b(?:fees?|charges?|cost)\s+(?:is\s+)?(?:currently\s+)?waived\b/i.test(quote) ||
+      /[:|]\s*waived\s*(?:[.;|]|$)/i.test(quote))) numbers.push("0");
   return numbers;
 }
 // A real citation alone is insufficient: a table's adjacent row must not

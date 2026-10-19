@@ -16,7 +16,7 @@ import { normalizeUrl, verifyEvidence } from "./crawler";
 import { candidate } from "./merge";
 import { verifyFinancialEvidence } from "./evidence";
 
-export const PROMPT_VERSION = "28";
+export const PROMPT_VERSION = "29";
 const MAX_OUTPUT_TOKENS = 24_000;
 const REQUEST_TIMEOUT_MS = 300_000;
 export const modelName = () =>
@@ -666,7 +666,7 @@ export const extract: Extractor = async (
         for (const [index, block] of doc.blocks.entries())
           message = message.replaceAll(`${doc.url}#${block.id}`, `${doc.url}#p${documents.indexOf(doc) + 1}b${index + 1}`);
       if (++corrections > 2 || step === 11) throw new Error(message);
-      messages.push({ role: "user", content: `Candidate validation failed: ${message}. Correct the candidate using the existing sources and schema. Keep all supported facts; never invent facts to satisfy validation.` });
+      messages.push({ role: "user", content: `Candidate validation failed: ${message}. Return the entire corrected extraction JSON, including all supported facts from the previous draft. Do not return only the changed facts. Correct the candidate using the existing sources and schema; never invent facts to satisfy validation.` });
     }
   }
   throw new Error("Agent step limit exceeded");
