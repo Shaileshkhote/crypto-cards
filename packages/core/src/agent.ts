@@ -16,9 +16,8 @@ import { normalizeUrl, verifyEvidence } from "./crawler";
 import { candidate, preserveSourceDisagreements } from "./merge";
 import { verifyFinancialEvidence } from "./evidence";
 
-export const PROMPT_VERSION = "40";
-const SOURCE_BATCH_BYTES = 64_000;
-const REASONING_EFFORT = "medium";
+export const PROMPT_VERSION = "41";
+const REASONING_EFFORT = "low";
 const MAX_OUTPUT_TOKENS = 24_000;
 const REQUEST_TIMEOUT_MS = 300_000;
 const currencyAmount = new RegExp(`\\b(?:${Currency.options.join("|")})\\s*\\d|\\d\\s*(?:${Currency.options.join("|")})\\b`, "i");
@@ -29,8 +28,8 @@ export const extractionSettings = () => ({
   prompt: PROMPT_VERSION,
   schema: SCHEMA_VERSION,
   maxSteps: 12,
-  sourceBatchBytes: SOURCE_BATCH_BYTES,
-  toolChoice: "required on the first turn; auto thereafter; none on the final turn",
+  sourceBatching: "one configured document per sync extraction",
+  toolChoice: "auto; none on the final turn",
   outputFormat: "json_schema with optional fields; strict runtime schema validation",
   maxOutputTokens: MAX_OUTPUT_TOKENS,
   requestTimeoutMs: REQUEST_TIMEOUT_MS,
@@ -293,34 +292,12 @@ function validationFeedback(issues: z.ZodIssue[]): string {
   ]);
 }
 
-export const extract: Extractor = async (adapter, initial, budget, discover) => {
-  if (initial.length < 2 || discover || Buffer.byteLength(canonical(initial.map(doc => doc.blocks))) <= SOURCE_BATCH_BYTES)
-    return extractDocuments(adapter, initial, budget, discover);
-  // Source-level cache records already exist. Keep large catalogs independent
-  // during generation so one response cannot mix pages or exhaust its output.
-  const results: AgentResult[] = [];
-  for (const doc of initial)
-    results.push(await extractDocuments(adapter, [doc], budget, undefined, true));
-  const documents = results.flatMap(result => result.documents);
-  const reconciled = preserveSourceDisagreements({
-    complete: results.every(result => result.extraction.complete),
-    products: results.flatMap(result => result.extraction.products),
-    tiers: results.flatMap(result => result.extraction.tiers),
-    facts: results.flatMap(result => result.extraction.facts),
-  }, adapter.sources);
-  if (!reconciled.extraction.facts.length && adapter.sources.urls.every(url => initial.some(doc => normalizeUrl(doc.url) === normalizeUrl(url))))
-    throw new Error("Empty full-inventory extraction; published data retained");
-  candidate(adapter, [reconciled.extraction], undefined, documents);
-  return { extraction: reconciled.extraction, documents, issues: [...new Set([...results.flatMap(result => result.issues), ...reconciled.issues])] };
-};
-
-const extractDocuments = async (
-  adapter: Adapter,
-  initial: Document[],
-  budget: Budget,
-  discover?: Parameters<Extractor>[3],
-  sourceBatch = false,
-): Promise<AgentResult> => {
+export const extract: Extractor = async (
+  adapter,
+  initial,
+  budget,
+  discover,
+) => {
   if (adapter.config.retired)
     throw new Error(`Adapter is retired: ${adapter.config.id}`);
   if (!process.env.OPENROUTER_API_KEY)
@@ -456,7 +433,7 @@ const extractDocuments = async (
       model: modelName(),
       messages,
       tools,
-      tool_choice: step === 0 ? "required" : step === 11 ? "none" : "auto",
+      tool_choice: step === 11 ? "none" : "auto",
       ...(prices.temperature ? { temperature: 0 } : {}),
       ...(prices.reasoning ? { reasoning: { effort: REASONING_EFFORT, exclude: true } } : {}),
       max_tokens: MAX_OUTPUT_TOKENS,
@@ -688,7 +665,7 @@ const extractDocuments = async (
       };
       const hydrated = removeOptionalNulls(hydrate(JSON.parse(choice.message.content || "")), Extraction);
       const parsed = Extraction.safeParse(hydrated);
-      if (!sourceBatch && parsed.success && parsed.data.complete && !parsed.data.facts.length && adapter.sources.urls.every(url => initial.some(doc => normalizeUrl(doc.url) === normalizeUrl(url))))
+      if (parsed.success && parsed.data.complete && !parsed.data.facts.length && adapter.sources.urls.every(url => initial.some(doc => normalizeUrl(doc.url) === normalizeUrl(url))))
         throw new Error("Empty full-inventory extraction; published data retained. Extract supported source facts before marking the full inventory complete. Return the entire corrected extraction.");
       const incomplete = (hydrated as { complete?: unknown } | null)?.complete === false;
       if (!parsed.success || referenceErrors.length || incomplete) {
@@ -726,7 +703,6 @@ const extractDocuments = async (
         candidate(adapter, [extraction], undefined, documents);
         throw error;
       }
-      const fullInventory = sourceBatch || adapter.sources.urls.every(url => initial.some(doc => normalizeUrl(doc.url) === normalizeUrl(url)));
       const coverageText = (text: string) => text.normalize("NFKC").toLowerCase().replace(/\s+/g, " ").trim();
       const cited = (url: string, id: string, fields: string[]) => {
         const block = documents.find(doc => doc.url === url)!.blocks[Number(id.split("b")[1]) - 1];
@@ -741,7 +717,7 @@ const extractDocuments = async (
         url: doc.url,
         blockIds: blocks(doc).filter(block => /(?:countries|regions).{0,100}(?:eligible to apply|can apply)|(?:eligible to apply|can apply).{0,100}(?:countries|regions)/i.test(block.text) && !cited(doc.url, block.id, ["residentCountries", "terms"])).map(block => block.id),
       }));
-      const missing = fullInventory ? [...financialMissing, ...eligibilityMissing].filter(page => page.blockIds.length) : [];
+      const missing = [...financialMissing, ...eligibilityMissing].filter(page => page.blockIds.length);
       const correctionBlocks: { url: string; blockId: string; text: string }[] = [];
       for (const page of missing) for (const blockId of page.blockIds) {
         const text = documents.find(doc => doc.url === page.url)!.blocks[Number(blockId.split("b")[1]) - 1].text;

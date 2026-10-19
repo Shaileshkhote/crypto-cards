@@ -19,6 +19,7 @@ import {
 } from "./agent";
 import {
   candidate,
+  preserveSourceDisagreements,
   merge,
   markUnconfirmed,
   publicationHash,
@@ -162,11 +163,14 @@ export async function syncAdapter(
         if (!deps.staticOnly) pending.push(doc);
       }
       result.changed = pending.length;
-      if (pending.length) {
-        const before = budget.spent;
+      // Cache each validated source immediately. A later failure retains that
+      // work without publishing an incomplete provider or losing accepted data.
+      const batches = adapter.config.discovery ? [pending] : pending.map(doc => [doc]);
+      for (const batch of batches.filter(batch => batch.length)) {
+        const before = { cost: budget.spent, input: budget.inputTokens, output: budget.outputTokens };
         const extracted = await (deps.extract || extract)(
           adapter,
-          pending,
+          batch,
           budget,
           adapter.config.discovery
             ? async (url) => {
@@ -190,6 +194,7 @@ export async function syncAdapter(
         // Validate the complete result before storing it as reusable extraction.
         candidate(adapter, [parsed], accepted, allDocs);
         extractions.push(parsed);
+        result.issues.push(...extracted.issues);
         for (const doc of allDocs) {
           if (!snapshots.some((d) => d.url === doc.url)) snapshots.push(doc);
           const part = {
@@ -204,13 +209,21 @@ export async function syncAdapter(
               JSON.stringify({ [doc.url]: doc.hash }),
               JSON.stringify(part),
               modelName(),
-              Math.ceil((budget.inputTokens - start.input) / allDocs.length),
-              Math.ceil((budget.outputTokens - start.output) / allDocs.length),
-              (budget.spent - before) / allDocs.length,
+              Math.ceil((budget.inputTokens - before.input) / allDocs.length),
+              Math.ceil((budget.outputTokens - before.output) / allDocs.length),
+              (budget.spent - before.cost) / allDocs.length,
             ],
           );
         }
       }
+      const reconciled = preserveSourceDisagreements({
+        complete: extractions.every(extraction => extraction.complete),
+        products: extractions.flatMap(extraction => extraction.products),
+        tiers: extractions.flatMap(extraction => extraction.tiers),
+        facts: extractions.flatMap(extraction => extraction.facts),
+      }, adapter.sources);
+      extractions.splice(0, extractions.length, reconciled.extraction);
+      result.issues.push(...reconciled.issues);
       const built = candidate(adapter, extractions, accepted, snapshots);
       const unconfirmed = accepted
         ? markUnconfirmed(accepted, [
