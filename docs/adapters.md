@@ -40,3 +40,13 @@ export default {
 Run `pnpm cards validate` then add representative regression fixtures. Loader errors include provider, filename and field. Never reinterpret a broad geographic label as an ISO country set; use explicit ISO alpha-2 countries or maintained EU/EEA region codes. An unknown country list is null/omitted, not every country in the world.
 
 The supplied legacy adapter migration preserves catalog data, not the old pipeline's instructions or exceptions. See [adapter-import.md](adapter-import.md). Review its source URLs, lifecycle states and branding origins before a real publication. Conditional scraping rules must be re-extracted with verifiable source quotes.
+
+## Retiring an adapter
+
+Set `retired: true` at the top level of `config.ts`. SafePal and Gnosis Pay use this flag. It retires the entire adapter independently of individual product/tier lifecycle metadata. The default loader excludes retired adapters; `loadAdapters(undefined, { includeRetired: true })` retains them for validation and maintenance. `pnpm cards validate` reports active and retired counts separately.
+
+Run `pnpm db:migrate` and `pnpm cards cache` with the database binding after applying configuration changes, or redeploy: worker startup applies retirement before reporting readiness. Cache rebuilding updates `cards.retired` and public projections in one transaction. Retired cards are excluded from active SQL counts, published-card reads, pending reviews and cache output; old per-provider cache entries are removed. Canonical facts, versions, source snapshots, extractions and review records are retained. Historical jobs and spending remain in the audit.
+
+Bulk sync, benchmarks and model evaluations exclude retired adapters. Explicit sync requests are rejected, including `--force`; already queued requests are skipped without source/model calls. Review approval and in-flight publication cannot publish a database row marked retired. A new retired adapter never creates a card through ingestion.
+
+Remove the flag or set it to false and rebuild the cache to reactivate an adapter from its retained publication. The retirement flag is excluded from extraction fingerprints, so toggling this flag alone does not invalidate accepted source extraction caches. Product/tier lifecycle metadata remains independently maintained.

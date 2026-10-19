@@ -36,14 +36,16 @@ export const fingerprint = (
   doc: Document,
   adapter: Adapter,
   inventory = adapter.sources.urls,
-) =>
-  hash({
+) => {
+  const { retired: _retired, ...config } = adapter.config;
+  return hash({
     document: doc.hash,
     inventory: [...inventory].sort(),
     settings: extractionSettings(),
-    config: adapter.config,
+    config,
     sources: adapter.sources,
   });
+};
 export class RunError extends Error {}
 export class BudgetError extends RunError {}
 export class Budget {
@@ -260,6 +262,8 @@ export const extract: Extractor = async (
   budget,
   discover,
 ) => {
+  if (adapter.config.retired)
+    throw new Error(`Adapter is retired: ${adapter.config.id}`);
   if (!process.env.OPENROUTER_API_KEY)
     throw new Error(
       "OPENROUTER_API_KEY is required for changed sources; unchanged cached extraction needs no key",

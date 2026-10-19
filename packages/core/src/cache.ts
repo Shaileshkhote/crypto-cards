@@ -9,6 +9,7 @@ import {
 import { canonical, hash } from "./serialize";
 import { overlay } from "./merge";
 import { REGIONS } from "./regions";
+import { loadAdapters } from "./adapters";
 export interface DirectoryRow {
   id: string;
   providerId: string;
@@ -252,10 +253,16 @@ async function put(
   );
 }
 export async function rebuildCache() {
+  const adapters = await loadAdapters(undefined, { includeRetired: true });
+  const configuredIds = adapters.map(a => a.config.id);
+  const retiredIds = adapters.filter(a => a.config.retired).map(a => a.config.id);
   // One transaction and a global lock prevent an older rebuild overwriting newer publication.
   await transaction(async (c) => {
     await c.query("SELECT pg_advisory_xact_lock(hashtextextended('cache',0))");
-    const { rows } = await c.query<CardRow>("SELECT * FROM cards ORDER BY id");
+    // Retirement is operational metadata, separate from accepted facts/history.
+    await c.query("UPDATE cards SET retired=(id=ANY($1::text[])) WHERE id=ANY($2::text[]) AND retired IS DISTINCT FROM (id=ANY($1::text[]))", [retiredIds, configuredIds]);
+    await c.query("DELETE FROM cache_entries e WHERE e.key LIKE 'cards/%' AND NOT EXISTS (SELECT 1 FROM cards c WHERE NOT c.retired AND e.key='cards/'||c.id)");
+    const { rows } = await c.query<CardRow>("SELECT * FROM cards WHERE NOT retired ORDER BY id");
     for (const row of rows)
       await put(c, `cards/${row.id}`, Card.parse(row.data), row.version);
     await put(c, "cards", directory(rows.map((x) => Card.parse(x.data))));
@@ -272,7 +279,7 @@ export async function readCache(key: string) {
 export async function cacheMismatch() {
   return (
     await db().query<{ count: string }>(
-      "SELECT count(*) FROM cards c LEFT JOIN cache_entries e ON e.key='cards/'||c.id WHERE e.card_version IS DISTINCT FROM c.version",
+      "SELECT count(*) FROM cards c LEFT JOIN cache_entries e ON e.key='cards/'||c.id WHERE NOT c.retired AND e.card_version IS DISTINCT FROM c.version",
     )
   ).rows[0].count;
 }

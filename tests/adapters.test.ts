@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { loadAdapters } from "@cards/core/adapters";
 it("automatically discovers all 36 migrated providers with three files each", async () => {
-  const a = await loadAdapters();
+  const a = await loadAdapters(undefined, { includeRetired: true });
   expect(a).toHaveLength(36);
   expect(a.every((x) => x.config.discovery === false)).toBe(true);
   expect(a.find((x) => x.config.id === "mexc")?.config.products).toHaveLength(
@@ -14,6 +14,13 @@ it("automatically discovers all 36 migrated providers with three files each", as
     9,
   );
 }, 20000);
+it("excludes retired adapters by default and retains their configuration for validation", async () => {
+  const active = await loadAdapters();
+  const all = await loadAdapters(undefined, { includeRetired: true });
+  expect(active).toHaveLength(34);
+  expect(active.some(a => ["safepal", "gnosis-pay"].includes(a.config.id))).toBe(false);
+  expect(all.filter(a => a.config.retired).map(a => a.config.id).sort()).toEqual(["gnosis-pay", "safepal"]);
+});
 it("fails with adapter filename and field instead of silently skipping", async () => {
   const root = await mkdtemp(join(tmpdir(), "cards-adapters-"));
   await mkdir(join(root, "broken"));

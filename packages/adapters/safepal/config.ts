@@ -3,6 +3,7 @@ import type { CardConfig } from "@cards/core/schema";
 export default {
   id: "safepal",
   name: "SafePal",
+  retired: true,
   website: "https://safepal.com",
   discovery: false,
   products: [

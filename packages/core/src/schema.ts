@@ -335,6 +335,7 @@ export const Config = z
     name: z.string().min(1),
     website: z.string().url(),
     discovery: z.boolean().default(false),
+    retired: z.boolean().optional(),
     products: z.array(Hint).default([]),
     tiers: z
       .array(

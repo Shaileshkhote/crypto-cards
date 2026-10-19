@@ -7,12 +7,11 @@ export async function enqueue(
   cardId: string | null = null,
   force = false,
 ) {
-  if (
-    kind === "sync" &&
-    cardId &&
-    !(await loadAdapters()).some((a) => a.config.id === cardId)
-  )
-    throw new Error(`Unknown adapter: ${cardId}`);
+  if (kind === "sync" && cardId) {
+    const adapter = (await loadAdapters(undefined, { includeRetired: true })).find(a => a.config.id === cardId);
+    if (!adapter) throw new Error(`Unknown adapter: ${cardId}`);
+    if (adapter.config.retired) throw new Error(`Adapter is retired: ${cardId}`);
+  }
   const id = randomUUID();
   await db().query(
     "INSERT INTO jobs(id,kind,card_id,force) VALUES($1,$2,$3,$4)",
@@ -38,7 +37,7 @@ export async function status() {
   const [jobs, counts, cost, cache] = await Promise.all([
     db().query<JobRow>("SELECT * FROM jobs ORDER BY created_at DESC LIMIT 50"),
     db().query<{ cards: string; reviews: string; failures: string }>(
-      "SELECT (SELECT count(*) FROM cards) cards,(SELECT count(*) FROM card_reviews WHERE status='pending') reviews,(SELECT count(*) FROM jobs WHERE status='failed') failures",
+      "SELECT (SELECT count(*) FROM cards WHERE NOT retired) cards,(SELECT count(*) FROM card_reviews r JOIN cards c ON c.id=r.card_id WHERE r.status='pending' AND NOT c.retired) reviews,(SELECT count(*) FROM jobs WHERE status='failed') failures",
     ),
     db().query<{ total: string }>(
       "SELECT coalesce(sum(cost_usd),0) total FROM jobs",

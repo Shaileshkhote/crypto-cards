@@ -3,6 +3,7 @@ import type { CardConfig } from "@cards/core/schema";
 export default {
   id: "gnosis-pay",
   name: "Gnosis Pay",
+  retired: true,
   website: "https://gnosispay.com",
   discovery: false,
   products: [

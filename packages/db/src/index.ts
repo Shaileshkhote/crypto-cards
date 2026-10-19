@@ -2,6 +2,7 @@ import pg from "pg";
 export type Connection = Pick<pg.PoolClient, "query">;
 export type CardRow = {
   id: string;
+  retired: boolean;
   data: unknown;
   version: number;
   publication_hash: string;
@@ -91,6 +92,7 @@ export async function publish(
   );
   if ((rows[0]?.version ?? 0) !== baseVersion)
     throw new Error("Published version changed; refresh review");
+  if (rows[0]?.retired) throw new Error(`Adapter is retired: ${id}`);
   if (rows[0]?.publication_hash === publicationHash) return baseVersion;
   const version = baseVersion + 1;
   await c.query(
@@ -104,10 +106,10 @@ export async function publish(
   return version;
 }
 export async function listPublishedCards() {
-  return (await db().query<CardRow>("SELECT * FROM cards ORDER BY id")).rows;
+  return (await db().query<CardRow>("SELECT * FROM cards WHERE NOT retired ORDER BY id")).rows;
 }
 export async function getPublishedCard(id: string) {
-  return (await db().query<CardRow>("SELECT * FROM cards WHERE id=$1", [id]))
+  return (await db().query<CardRow>("SELECT * FROM cards WHERE id=$1 AND NOT retired", [id]))
     .rows[0];
 }
 export async function listCardSources(id: string) {

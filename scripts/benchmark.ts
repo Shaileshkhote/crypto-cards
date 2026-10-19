@@ -10,12 +10,12 @@ async function run() {
     throw new Error("Use --all alone or list provider IDs");
   const selected = ids[0] === "--all" ? all.map(a => a.config.id) : ids.length
     ? ids
-    : ["etherfi", "avici", "mexc", "gnosis-pay", "nexo-card", "revolut"];
+    : ["etherfi", "avici", "mexc", "nexo-card", "revolut"];
   const adapters = all.filter((x) =>
     selected.includes(x.config.id),
   );
   if (adapters.length !== selected.length)
-    throw new Error("Unknown benchmark provider");
+    throw new Error("Unknown or retired benchmark provider");
   // Cold and warm passes share the run's cap, including changed warm sources.
   const budget = new Budget();
   let coldUsd = 0, warmUsd = 0;

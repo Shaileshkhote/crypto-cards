@@ -29,7 +29,7 @@ import { canonical } from "./serialize";
 import { rebuildCache } from "./cache";
 export interface SyncResult {
   cardId: string;
-  status: "published" | "unchanged" | "review" | "failed" | "not_run";
+  status: "published" | "unchanged" | "review" | "failed" | "not_run" | "retired";
   changed: number;
   reused: number;
   proposed: number;
@@ -51,6 +51,8 @@ export async function syncAdapter(
   budget: Budget,
   deps: Dependencies = {},
 ): Promise<SyncResult> {
+  if (adapter.config.retired)
+    return { cardId: adapter.config.id, status: "retired", changed: 0, reused: 0, proposed: 0, costUsd: 0, inputTokens: 0, outputTokens: 0, issues: ["Retired adapter; ingestion skipped"] };
   return withLock(`sync:${adapter.config.id}`, async () => {
     const start = {
       cost: budget.spent,
@@ -72,6 +74,8 @@ export async function syncAdapter(
       const acceptedRow = (
         await db().query<CardRow>("SELECT * FROM cards WHERE id=$1", [id])
       ).rows[0];
+      if (acceptedRow?.retired)
+        return { ...result, status: "retired", issues: ["Retired adapter; ingestion skipped"] };
       const accepted = acceptedRow ? Card.parse(acceptedRow.data) : undefined;
       const prior = (
         await db().query<{

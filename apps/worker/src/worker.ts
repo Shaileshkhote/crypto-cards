@@ -2,7 +2,7 @@ import { executeJob } from "@cards/core/runner";
 import { writeFile } from "node:fs/promises";
 import { db, closeDb } from "@cards/db";
 import { claimJob, reclaimJobs } from "@cards/core/jobs";
-import { loadAdapters } from "@cards/core/adapters";
+import { rebuildCache } from "@cards/core/cache";
 let stopping = false;
 process.on("SIGTERM", () => {
   stopping = true;
@@ -11,7 +11,7 @@ process.on("SIGINT", () => {
   stopping = true;
 });
 async function run() {
-  await loadAdapters();
+  await rebuildCache();
   await db().query("SELECT count(*) FROM jobs");
   console.log("Worker ready; polling PostgreSQL jobs");
   while (!stopping) {

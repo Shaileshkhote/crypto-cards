@@ -8,6 +8,8 @@ The checked-in model-evaluation corpus is `tests/fixtures/live-providers.json`: 
 
 Other tested routes included GPT-6 Sol/Astra, GPT-5.4 Mini, Claude Haiku, Gemini and DeepSeek. Some passed earlier corpus versions; others rejected the schema or missed labels. Those runs used different prompt/schema revisions and do not establish a controlled model ranking. Luna remains a measured low-cost candidate. No tested route has established full-provider accuracy for the final contract within this allocation; the full-provider run and manual field checks remain the acceptance test.
 
+Model evaluation skips fixtures whose adapters are retired and reports their IDs under `retiredSkipped`. SafePal and Gnosis Pay are retired; historical scores above retain their original denominators.
+
 Run the live evaluation with a securely injected key:
 
 ```sh

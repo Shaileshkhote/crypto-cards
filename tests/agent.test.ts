@@ -1,10 +1,26 @@
 import { afterEach, it, expect, vi } from "vitest";
-import { Budget, extract, modelName, RunError } from "@cards/core/agent";
+import { Budget, extract, fingerprint, modelName, RunError } from "@cards/core/agent";
+import { syncAdapter } from "@cards/core/sync";
 import { adapter, document, extraction } from "./helpers";
 import { documentFromText } from "@cards/core/crawler";
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.unstubAllEnvs();
+});
+it("skips retired adapters before any database, fetch or model work even when forced", async () => {
+  const a = adapter(), doc = document(), before = fingerprint(doc, a);
+  const fetch = vi.fn(), extractor = vi.fn();
+  vi.stubGlobal("fetch", fetch);
+  a.config.retired = true;
+  expect(fingerprint(doc, a)).toBe(before);
+  const budget = new Budget(0);
+  expect(await syncAdapter(a, budget, { force: true, fetch, extract: extractor })).toMatchObject({ status: "retired", changed: 0, costUsd: 0 });
+  await expect(extract(a, [doc], budget)).rejects.toThrow("Adapter is retired");
+  expect(fetch).not.toHaveBeenCalled();
+  expect(extractor).not.toHaveBeenCalled();
+  expect(budget.requests).toBe(0);
+  a.config.retired = false;
+  expect(fingerprint(doc, a)).toBe(before);
 });
 it("shares a conservative request budget across adapters", () => {
   const b = new Budget(4.99);

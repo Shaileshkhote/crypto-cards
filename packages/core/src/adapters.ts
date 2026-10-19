@@ -17,6 +17,7 @@ export function adapterDirectory() {
 }
 export async function loadAdapters(
   directory = adapterDirectory(),
+  { includeRetired = false }: { includeRetired?: boolean } = {},
 ): Promise<Adapter[]> {
   const entries = await readdir(directory, { withFileTypes: true });
   const out: Adapter[] = [];
@@ -78,7 +79,7 @@ export async function loadAdapters(
         throw new Error(
           `${dir.name}/config.ts: alias target ${target} is unknown`,
         );
-    out.push(a);
+    if (includeRetired || !a.config.retired) out.push(a);
   }
   return out;
 }

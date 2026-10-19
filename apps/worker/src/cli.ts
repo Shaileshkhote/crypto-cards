@@ -19,9 +19,10 @@ const usage = `Usage:
 export async function main(args = process.argv.slice(2)) {
   const [command, arg] = args;
   if (command === "validate") {
-    const a = await loadAdapters();
+    const a = await loadAdapters(undefined, { includeRetired: true });
+    const active = a.filter(x => !x.config.retired);
     console.log(
-      `Validated ${a.length} providers, ${a.reduce((n, x) => n + x.sources.urls.length, 0)} configured URLs`,
+      `Validated ${a.length} adapters: ${active.length} active, ${a.length - active.length} retired; ${active.reduce((n, x) => n + x.sources.urls.length, 0)} active source URLs`,
     );
     return;
   }

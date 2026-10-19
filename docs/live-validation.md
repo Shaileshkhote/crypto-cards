@@ -4,11 +4,13 @@ Complete production ingestion acceptance remains open. Code checks, source acces
 
 ## Application and sources
 
-TypeScript, ESLint and **107 tests** pass with PostgreSQL integration. The Next.js production build passes. CI additionally builds/runs the three-service Compose application: migrations, authenticated HTTP, cache jobs, restart persistence and dump/restore. Inspect the PR checks for the exact tested commit. The final local HTTP smoke covered all four admin screens, anonymous rejection, public POST denial, cache ETag/304, and visible fixed-fee conditions, minimums, maximums and allowances using a labeled synthetic fixture.
+TypeScript, ESLint and **111 tests** pass with PostgreSQL integration. The Next.js production build passes. CI additionally builds/runs the three-service Compose application: migrations, authenticated HTTP, cache jobs, restart persistence and dump/restore. Inspect the PR checks for the exact tested commit. The final local HTTP smoke covered all four admin screens, anonymous rejection, public POST denial, cache ETag/304, and visible fixed-fee conditions, minimums, maximums and allowances using a labeled synthetic fixture.
 
 The maintained inventory is **36 providers / 433 configured URLs**. The fresh approved HTTPS proxy audit fetched 418 successfully; 15 Gnosis Pay help articles explicitly disallow this crawler. All ten available text PDFs parsed through bounded Poppler extraction. Native public DNS still returns EAI_AGAIN, including outside the process sandbox. See [source maintenance](source-maintenance.md).
 
 The subsequent [remaining-card fixes](card-fixes.md) used offline data only: Revolut validates from unchanged recorded output, and six manually reviewed candidates publish in a copied database. That dataset has 17 cards with 17 unchanged warm passes and all original accepted values retained. These results do not replace the historical paid replay below.
+
+SafePal and Gnosis Pay have since been retired through adapter configuration. The active inventory is now **34 adapters / 404 URLs**; archived configurations and historical measurements remain available. Retirement tests verify zero model/source work, exclusion from active database/cache counts, and retention of canonical data and history. See [adapter retirement](adapters.md#retiring-an-adapter).
 
 ## Final inventory replay
 

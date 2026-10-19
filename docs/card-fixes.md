@@ -36,8 +36,10 @@ Schema **8 / prompt 22** is the current contract, using the selected Luna/high m
 
 ## Checks and remaining work
 
-TypeScript, ESLint and **107 tests**, including PostgreSQL integration, pass. Nine manually reviewed source-excerpt fixtures cover the new representations. Additional tests exercise repeated tool reads, conditional-price sorting and a material-fee price change held until version-checked approval. The production build and CI results are recorded on the PR.
+TypeScript, ESLint and **111 tests**, including PostgreSQL integration, pass. Nine manually reviewed source-excerpt fixtures cover the new representations. Additional tests exercise repeated tool reads, conditional-price sorting and a material-fee price change held until version-checked approval. The production build and CI results are recorded on the PR.
 
 Some failures remain real source or output problems: Bitget's eligibility lists differ; MEXC's sources state different APAC transaction fees; KAST states both $250 and $500 per ATM withdrawal; Payitfast's official charges conflict. Other saved outputs need corrected scopes, citations or complete responses. Gnosis help pages still disallow the crawler. No source was removed and no conflicting price was selected merely to make a candidate pass.
 
-A fresh full inventory run with functioning native DNS, source access and the final model contract remains required. The hard $4.99 invocation ceiling is unchanged; a complete successful ingestion below $5 is not yet demonstrated. Conservative accounting remains **$9.978259/$10** for model testing and **$14.970552/$15** for adapters, **$24.948811/$25** combined.
+SafePal and Gnosis Pay were subsequently retired by adapter configuration. They are excluded from active runs and counts; the remaining active inventory contains 34 adapters and 404 URLs. The earlier Gnosis access failure is historical, not an active-provider blocker.
+
+A fresh full active-inventory run with functioning native DNS, source access and the final model contract remains required. The hard $4.99 invocation ceiling is unchanged; a complete successful ingestion below $5 is not yet demonstrated. Conservative accounting remains **$9.978259/$10** for model testing and **$14.970552/$15** for adapters, **$24.948811/$25** combined.

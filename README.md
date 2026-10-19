@@ -4,6 +4,8 @@ A TypeScript pnpm monorepo for extracting, reviewing, and publishing source-back
 
 The supplied adapter archive was migrated into **36 providers, 446 source URLs**, with exactly `config.ts`, `sources.ts`, and `static.ts` per provider. See [the import inventory](docs/adapter-import.md) for what was retained and which legacy assumptions require review. The maintained inventory now has 433 URLs after verified source updates; see [source maintenance](docs/source-maintenance.md). Imported adapters are not claims that their sources or financial values have been verified.
 
+There are **34 active adapters / 404 active source URLs**. SafePal and Gnosis Pay are retired. Their configuration and any stored history remain available, but retired providers are excluded from ingestion, active published-card counts, pending reviews and public data. See [adapter retirement](docs/adapters.md#retiring-an-adapter).
+
 ## Develop in the cloud
 
 Use Node 24, pnpm 11.25.0 and Poppler (`pdftotext`, provided by `poppler-utils` on Debian/Ubuntu). Use the existing checkout; a cloud task is already isolated.

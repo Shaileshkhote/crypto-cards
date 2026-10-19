@@ -20,11 +20,12 @@ export async function executeJob(job: JobRow) {
         await rebuildCache();
         return;
       }
-      const all = await loadAdapters();
+      const all = await loadAdapters(undefined, { includeRetired: true });
+      await rebuildCache();
       const adapters = job.card_id
         ? all.filter((a) => a.config.id === job.card_id)
-        : all;
-      if (!adapters.length) throw new Error("No matching adapters");
+        : all.filter(a => !a.config.retired);
+      if (job.card_id && !adapters.length) throw new Error("No matching adapters");
       let haltReason: string | undefined;
       for (const adapter of adapters) {
         const result: SyncResult = haltReason

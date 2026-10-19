@@ -11,7 +11,7 @@ import { rebuildCache } from "./cache";
 export async function listReviews(cardId?: string) {
   return (
     await db().query<ReviewRow>(
-      "SELECT * FROM card_reviews WHERE status='pending' AND ($1::text IS NULL OR card_id=$1) ORDER BY created_at",
+      "SELECT r.* FROM card_reviews r JOIN cards c ON c.id=r.card_id WHERE r.status='pending' AND NOT c.retired AND ($1::text IS NULL OR r.card_id=$1) ORDER BY r.created_at",
       [cardId || null],
     )
   ).rows;

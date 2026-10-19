@@ -1,8 +1,9 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { randomUUID } from "node:crypto";
 import { executeJob } from "@cards/core/runner";
 import { beforeAll, beforeEach, afterAll, describe, it, expect, vi } from "vitest";
-import { db, closeDb, publish, transaction, type CardRow } from "@cards/db";
+import { db, closeDb, publish, transaction, getPublishedCard, listPublishedCards, type CardRow } from "@cards/db";
 import { migrate } from "../packages/db/src/migrate";
 import { syncAdapter } from "@cards/core/sync";
 import * as syncFunctions from "@cards/core/sync";
@@ -10,7 +11,7 @@ import { Budget, RunError, type Extractor } from "@cards/core/agent";
 import { listReviews, approveReview, rejectReview } from "@cards/core/review";
 import { readCache, rebuildCache } from "@cards/core/cache";
 import { publicationHash } from "@cards/core/merge";
-import { enqueue, claimJob } from "@cards/core/jobs";
+import { enqueue, claimJob, status } from "@cards/core/jobs";
 import { adapter, document, extraction } from "./helpers";
 import { Card } from "@cards/core/schema";
 import { loadAdapters } from "@cards/core/adapters";
@@ -250,6 +251,53 @@ describe.skipIf(!enabled)(
       await rebuildCache();
       expect(await readCache("cards")).toBeTruthy();
     });
+    it("archives retired cards from counts, reviews and caches while retaining accepted data and history", async () => {
+      await run();
+      const retiredIds = ["safepal", "gnosis-pay"], reviewIds: string[] = [];
+      for (const id of retiredIds) {
+        const card = Card.parse({ id, name: id, website: "https://example.com", kyc: false });
+        await transaction(c => publish(c, id, card, publicationHash(card), 0));
+        await db().query("INSERT INTO card_sources(card_id,url,fetch_status) VALUES($1,$2,'ok')", [id, `https://example.com/${id}`]);
+        await db().query("INSERT INTO card_extractions(card_id,fingerprint,source_hashes,data,model) VALUES($1,$1,'{}','{}','fixture')", [id]);
+        const reviewId = randomUUID();
+        reviewIds.push(reviewId);
+        await db().query("INSERT INTO card_reviews(id,card_id,base_version,changes) VALUES($1,$2,1,'[]')", [reviewId, id]);
+        await db().query("INSERT INTO cache_entries(key,payload,content_hash,card_version) VALUES($1,$2,'old-cache',1)", [`cards/${id}`, JSON.stringify(card)]);
+      }
+      const before = (await db().query("SELECT id,data,version,publication_hash FROM cards ORDER BY id")).rows;
+      await rebuildCache();
+      const after = (await db().query("SELECT id,data,version,publication_hash FROM cards ORDER BY id")).rows;
+      expect(after).toEqual(before);
+      expect((await db().query("SELECT id FROM cards WHERE retired ORDER BY id")).rows.map(r => r.id)).toEqual(["gnosis-pay", "safepal"]);
+      expect((await listPublishedCards()).map(r => r.id)).toEqual(["example"]);
+      expect(await status()).toMatchObject({ cards: "1", reviews: "0", cacheMismatches: 0 });
+      expect(await listReviews()).toEqual([]);
+      expect((JSON.parse((await readCache("cards"))!.payload) as { providerId: string }[]).every(row => row.providerId === "example")).toBe(true);
+      for (const [index, id] of retiredIds.entries()) {
+        expect(await readCache(`cards/${id}`)).toBeUndefined();
+        expect(await getPublishedCard(id)).toBeUndefined();
+        await expect(enqueue("sync", id, true)).rejects.toThrow("Adapter is retired");
+        await expect(approveReview(reviewIds[index], "test-admin")).rejects.toThrow("Adapter is retired");
+        expect((await db().query("SELECT count(*)::int AS n FROM card_versions WHERE card_id=$1", [id])).rows[0].n).toBe(1);
+        expect((await db().query("SELECT count(*)::int AS n FROM card_sources WHERE card_id=$1", [id])).rows[0].n).toBe(1);
+        expect((await db().query("SELECT count(*)::int AS n FROM card_extractions WHERE card_id=$1", [id])).rows[0].n).toBe(1);
+      }
+      expect((await db().query("SELECT count(*)::int AS n FROM card_reviews WHERE status='pending'")).rows[0].n).toBe(2);
+      expect((await db().query("SELECT count(*)::int AS n FROM jobs")).rows[0].n).toBe(0);
+    });
+    it("skips an already queued retired-provider job without fetching or extracting", async () => {
+      const id = randomUUID();
+      await db().query("INSERT INTO jobs(id,kind,card_id,force) VALUES($1,'sync','gnosis-pay',true)", [id]);
+      const fetch = vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("Network must not run"));
+      try {
+        const job = await executeJob((await claimJob())!);
+        expect(job.status).toBe("completed");
+        expect(job.progress).toMatchObject({ requests: 0, results: [{ cardId: "gnosis-pay", status: "retired", costUsd: 0 }] });
+        expect(fetch).not.toHaveBeenCalled();
+        expect((await db().query("SELECT count(*)::int AS n FROM card_sources")).rows[0].n).toBe(0);
+        expect((await db().query("SELECT count(*)::int AS n FROM cards")).rows[0].n).toBe(0);
+      } finally { fetch.mockRestore(); }
+    });
     it("continues all-adapter work after an accounted timeout, but halts on budget exhaustion", async () => {
       for (const haltRun of [false, true]) {
         const mocked = vi.spyOn(syncFunctions, "syncAdapter").mockImplementation(async (a) => ({
@@ -263,6 +311,7 @@ describe.skipIf(!enabled)(
           const result = await executeJob(claimed!);
           expect(result.status).toBe("failed");
           expect(mocked.mock.calls.length).toBe(haltRun ? 1 : (await loadAdapters()).length);
+          expect(mocked.mock.calls.some(([a]) => a.config.retired || ["safepal", "gnosis-pay"].includes(a.config.id))).toBe(false);
           if (haltRun) expect((result.progress.results as { error?: string }[])[1].error).toBe("Run stopped: Budget exhausted: no new OpenRouter request sent");
         } finally { mocked.mockRestore(); }
       }

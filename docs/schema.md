@@ -2,6 +2,8 @@
 
 Runtime schemas and exported TypeScript types live in `packages/core/src/schema.ts`. All objects are strict. Schema and prompt versions participate in extraction fingerprints; update their constants after incompatible extraction changes.
 
+Adapter-level `config.retired` is operational metadata, not an extracted fact. Migration `002_adapter_retirement.sql` adds `cards.retired`; worker startup and cache rebuilding reconcile it from configuration. Active reads/counts exclude retired rows while canonical data and history stay intact. Retirement is excluded from extraction fingerprints. See [adapter retirement](adapters.md#retiring-an-adapter).
+
 Provider → products → tiers each support common feature fields. A fact belongs to its declared scope. Directory projections expose provider defaults, product defaults, and leaf facts separately. Ancestor fields are inherited only when listed explicitly in `inheritFields`, supported by source evidence or static data. Leaf values override inherited defaults. The agent defaults `inherit` to false; set it true only when the source explicitly applies the fact to every child. Lifecycle, retirement dates and external slugs belong to adapter configuration; model output cannot overwrite them.
 
 Money is `{ amount: "10.50", currency: "EUR" }`. Strings preserve decimal precision; leading integer zeros and trailing decimal zeros are removed canonically, including source notation such as `00.00`. Ambiguous thousands/decimal notation is not guessed. Rate fields use percentage points (`ratePercent: 1.5` means 1.5%). Countries must be real ISO 3166-1 alpha-2 codes. EU and EEA have centralized, distinct memberships. APAC, Europe, international and legacy region labels have no invented membership.
