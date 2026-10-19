@@ -1,21 +1,17 @@
 # Validation status
 
-The implementation is in draft PR #1 on `codex/phase-1-crypto-cards`. It has not been merged or deployed to Coolify. **Complete production ingestion acceptance remains open.** Model and budget failures are reported rather than masked.
+**Ingestion is not production-ready yet.** Ready, SafePal and Gnosis Pay are retired; **33 active adapters / 396 URLs** remain, with all configurations and historical data preserved.
 
-- Node 24 / pnpm 11.25 frozen installation and adapter validation pass: 33 active adapters / 396 active URLs, three retired adapters, three declarative files per provider. The archive retains 36 configurations / 433 URLs.
-- TypeScript, ESLint and 124 tests pass with disposable PostgreSQL integration. The production Next.js build passes. CI also tests the complete Compose stack, migrations, authenticated HTTP, cache jobs, restart persistence and dump/restore.
-- SafePal, Gnosis Pay and Ready are retired. Tests verify forced-sync rejection, zero network/model work, exclusion from bulk jobs and active database/cache/review counts, stale-cache removal, and preservation of accepted data, versions, sources, extractions and pending review records. The additive migration and retirement reconciliation were also applied to the local development database without paid requests.
-- Final HTTP checks cover all four admin screens, anonymous rejection, ETag/304, public POST denial and visible fee conditions/minimums/maximums/allowances.
-- The earlier schema-7/prompt-21 Luna/high profile passed 10/11 labeled cases; Avici's issuance prices remain untyped narrative. These short passages do not measure complete provider accuracy.
-- The schema-6/prompt-20 medium-reasoning replay attempted the 36-provider inventory for $0.425622 under a $0.445 diagnostic cap. It published 10 providers; 9 unchanged passes made zero model calls. Other providers failed extraction/source checks or reached the test budget. The current schema-8/prompt-23 high profile still needs a complete inventory acceptance run.
-- Bybit's tenth warm attempt exposed inconsistent ID normalization for repeated regional tier names. The final fix resolves normalized IDs and explicit aliases before ambiguous names. An offline replay of its 17 actual cached extractions now preserves publication byte-for-byte without model calls or changes.
-- All published records pass the final schema and stored citation/numeric-evidence checks. Additional label checks exposed two missing/misclassified full-provider claims; formal validation alone is insufficient.
-- The real replay dataset was restored into a separate database with matching counts and complete-row fingerprints across all eight tables. This proves stored-data preservation, not complete source extraction.
-- The HTTPS proxy audit fetched 418/433 configured URLs. Fifteen Gnosis help articles deny the crawler. Native DNS fails even outside the process sandbox; native crawling remains unverified.
-- Conservative accounting remains within allocation: **model tests $9.978259/$10; adapters $14.970552/$15; combined $24.948811/$25**.
+- **147 tests and implementation CI pass**, including PostgreSQL integration, production build and the Compose job.
+- Fresh Luna full replay plus targeted repair: **31/33 validated candidates**. Bybit and Jupiter fail. KAST, MEXC, Payitfast and Bitget also need source-conflict/scope resolution; formal validation does not establish complete extraction.
+- Fresh labeled evaluation: **11/11 active cases**. Current records: **567 facts / 375 source extractions**, zero citation/financial-evidence errors.
+- A separate cached pass of the **31 validated adapters** made zero model requests. One repeat EtherFi cache rebuild timed out; an isolated zero-cost recheck succeeded. The initial failure remains recorded. Pending reviews, immutable versions and public cache payloads stayed identical.
+- Accepted values from **17/17 original cards** remain. Dump/restore preserved complete rows across all eight tables. No production database was used.
+- Latest full attempt: **$0.189563670**, targeted repair **$0.087627770**, broader validation cycle **$2.996888155**. These failed/incomplete results do not prove complete ingestion below $5.
+- Additional allocation conservative upper bound: **$5.834418890/$10**, separate from the earlier **$24.9488113742/$25**. No paid model work remains running.
 
-Offline fixes subsequently recovered Revolut from its unchanged recorded output and six other full candidates after manual source review. Shared-core publication in a copied database reached 17 cards; 17 warm passes were unchanged and all ten original cards retained their accepted values. No additional paid requests were made. See [remaining-card fixes](card-fixes.md) for the exact scope and limitations.
+Changed financial values require immutable, version-checked review. Missing or failed extractions preserve accepted values. Do not approve the unresolved candidates as complete.
 
-See [live validation](live-validation.md) for every provider, exact settings, budget cutoffs and accounting. Remaining work includes source access/contradictions, complete field/scope accuracy, native crawling and production deployment/authorization/off-host backups. No model credential was committed, published in the PR or bound in saved environment configuration.
+Native crawling remains unverified because cloud DNS fails; actual Coolify deployment, production authorization/TLS and off-host backups are unverified. [Draft PR #1](https://github.com/Shaileshkhote/crypto-cards/pull/1) contains the code and has not been merged or deployed. See [live validation](live-validation.md), [card fixes](card-fixes.md) and [evaluation](evaluation.md).
 
-The cloud setup draft records reusable installation/start instructions, the final repository revision and the secret requirement. Review/save and publish it in environment settings to activate it.
+The reusable cloud setup draft records startup instructions and the repository revision. Review/save and publish it in environment settings to activate it. Credential values are absent from Git, PR text and saved configuration.

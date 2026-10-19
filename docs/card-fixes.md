@@ -1,70 +1,43 @@
-# Remaining-card fixes — 19 October 2026 (IST)
+# Card fixes — 19 October 2026 UTC
 
-The shared ingestion code now represents the conditions that caused several card candidates to collide. Verification used saved source snapshots and recorded responses, with **no additional OpenRouter requests or spending**. These results are separate from a fresh model benchmark or production deployment.
+Ready, SafePal and Gnosis Pay are retired through `config.retired`. The active inventory is **33 adapters / 396 URLs**; the archive retains all 36 configurations and 433 URLs. Retirement excludes providers from ingestion and public data while preserving accepted records and history. Force does not bypass retirement.
 
-## Verified recovery
+## Shared fixes
 
-An offline replay through the extractor's current decoder and publication validator accepts Revolut's previously rejected recorded output without editing its extracted values. Six other full candidates validate after manual review corrected their source interpretation:
+- Missing source facts preserve accepted values and mark them unconfirmed. Review proposals now derive uncertainty from current state, so unchanged runs retain the same immutable review. Acknowledging an uncertainty-only review does not recreate it on every run or turn an unconfirmed value into confirmed data.
+- Tool continuations retain provider reasoning state. Corrections retain the newest complete JSON draft and all source/tool text, replacing superseded invalid drafts and feedback while omitting opaque completed-draft reasoning. A real Coinbase draft contained over 110 KB of opaque state; resending it exhausted context before correction. Context/output limits remain unchanged.
+- Financial correction feedback uses the same short page/block selectors the model saw, identifies the incorrect rule and shows the current cited block when its reference resolves. Invalid references use only the URL and short selector; the application copies the exact quote. It reports construction conflicts alongside citation errors in the same correction, rather than revealing them only after numeric errors are fixed. Stored evidence retains content hashes. This lets a correction find Bybit's actual fee row rather than guessing from a storage-only hash.
+- Explicit zero-fee wording accepts definite “does not have any fees” clauses, waived price cells, comma/conjunction lists and definite “will not charge fees” clauses. Definite contractions and passive wording such as “will not be charged a fee” also support zero; possible/refused waivers still fail; typed money still requires source currency evidence.
+- Approximate partner fees remain unknown fee rules, exact provider markups remain separately scoped, and FX conversions use the FX kind. Monetary free allowances retain their typed amount and period alongside withdrawal-count conditions. When the free allowance and the above-allowance fee occur in different blocks, separately cited zero-fee and above-allowance rules preserve both without joining evidence or copying prices between blocks.
+- Initial source previews and financial search prioritize blocks with explicit money or percentages, keeping original offsets. A KAST spot-check found that two early ATM marketing matches had hidden the later USD 250 limit; this is a shared retrieval fix, not a provider override.
+- Unambiguous short decimal-comma percentages such as `1,5%` validate as 1.5%. Three-digit grouping and ambiguous money notation such as `10.000$` retain their prior treatment.
+- Monetary currencies participate in rule identity, including minimums, caps and allowances. EUR/GBP alternatives no longer collide; different prices in the same currency still conflict, and a changed price keeps its identity for review. Merge version 14 preserves existing accepted records while holding changed rule identities for review.
+- Table-cell line breaks and paragraph boundaries remain spaces before rows are normalized, preserving labels such as “Free ATM withdrawals.” A paragraph directly introducing an HTML list stays with its bounded row groups. Free monthly ATM allowances retain the actual “free” context in each cited block; following paid-fee paragraphs remain separate. This fixes Nexo without weakening numeric or citation evidence.
+- Fee-free ATM table/list amounts cannot become hard withdrawal limits, and an unlimited/“None” limit does not become zero. Bank-account withdrawals over ACH/wire/SEPA are named services rather than ATM cash withdrawals. Cached records are checked against current schema and evidence rules; only invalid records are re-extracted, while accepted values remain protected.
+- A complete full-inventory response containing no source facts is corrected or rejected, preventing empty records from being accepted as a finished provider run. Empty incremental results remain valid when other configured sources are outside the invocation.
+- A calculability change replaces incompatible union fields instead of retaining an old amount/count on an unknown limit. The change still requires review; VaultLeap recovered from its cached extraction without a model call.
+- Crypto.com’s regional programs are products and its named plans are tiers. The data-only adapter hints cover nine programs and 45 plan variants, remove an ambiguous prepaid-to-GCC alias, and contain no static prices.
+- Existing conditions distinguish debit/credit funding, standard/fast ACH, spending bands, first/additional cards and conversion types. Reward kinds distinguish cashback, salary matching, yield and referral. Cash advances remain separate from ATM withdrawals.
 
-| Card | Verified correction |
+No provider-specific extractor, fallback model, additional agent or queue was added. No evidence check, request timeout, context bound or review requirement was relaxed.
+
+## Source disagreements
+
+The model must preserve independently cited conflicting clauses and omit disputed typed values when the sources do not establish an authority. Accepted values remain protected by review. This is the required extraction behavior; the latest manual audit still found KAST, MEXC and Bitget choosing or omitting parts of these disagreements. These candidates must not be treated as complete or approved without resolving the disputed scopes.
+
+| Card | Source disagreement |
 | --- | --- |
-| Ethena Pay | Monthly spending bands have separate conditions; yield and referral rewards have distinct program kinds. |
-| Exa | `$00.00` normalizes to zero. Complementary feature lists combine across pages. The ambiguous weekly limit `10.000$` remains non-calculable source text. |
-| Jupiter Card | Rain and DCS issuers stay on their respective tiers. Issuer-assignment and reward-balance explanations remain cited terms. |
-| Karta | Metal and plastic companion-card prices have separate conditions. Cash advances are distinct from ATM withdrawals. |
-| Kolo | Card-payment conversion and stablecoin conversion retain separate conditions, as do first-30-day and later cashback rules. |
-| Kraken | Cashback and salary matching have separate program identities. |
-| Revolut | Explicit wording such as “without any fees” supports zero instead of failing numeric evidence validation. |
-
-The six manually corrected inputs are not fresh model successes. Corrected source scopes demonstrate that the application can represent and publish these facts; they do not establish that the final model will produce every correction automatically. The original replay reports remain historical measurements.
-
-The publication check cloned the earlier disposable database containing ten cards. It used the shared sync, candidate, publication, review and cache functions with explicitly labeled offline extraction records. Seven previously unpublished cards were published, bringing that copied dataset to **17 cards**. Of the ten existing cards, five cold passes were unchanged and five held differences for review. No reviews were approved. Recursive checks confirmed that accepted values from **all ten original cards were retained**.
-
-All **17/17 warm passes** were unchanged, used cached extraction without calling the fixture extractor, and produced byte-identical cache payloads. This proves repeatability and retention for these stored inputs, not source-fact completeness or native crawling.
-
-## Shared code changes
-
-- Decimal money accepts padded source strings and normalizes leading/trailing zeros; signed, exponent, comma-formatted and incomplete decimal strings remain rejected. Evidence comparisons normalize padded numbers too. Ambiguous thousands/decimal notation is not interpreted automatically.
-- Explicit no-charge and current fee-waiver wording can substantiate zero. Currency evidence remains required for typed money. Possible or refused waivers do not substantiate zero. These checks are not a semantic proof of all conditions.
-- `scope.conditions` preserves explicit applicability that lacks a dedicated typed field. Conditions participate in stable rule identity. Numeric sorting excludes these rules because the directory has no context to evaluate them. Genuine conflicting prices without different sourced conditions still fail.
-- Reward kinds distinguish cashback, salary matching, yield, referral and other programs. Cash advances have their own fee kind. Payment-rail spelling normalizes underscore/case variations to lowercase kebab case.
-- Feature observations are additive across pages, like terms and requirements. Country eligibility lists from different sources must still agree; explicit empty/nonempty conflicts still fail.
-- Repeated tool results reference text already in the conversation. A truncated search excerpt does not hide the full block from a later page read. This removes the reproduced Coinbase context overflow without raising the context bound or dropping source text; that recording still requires a corrected response with explicit rule scopes.
-- Validation errors identify the conflicting rule, conditions and values. Extraction guidance distinguishes tier-specific issuers, program dates from campaign dates, and separate reward programs.
-
-Schema **8 / prompt 23** is the current contract, using the selected Luna/high model setting. It has not received a new paid whole-provider or labeled model evaluation. The earlier 10/11 model score belongs to schema 7 / prompt 21.
-
-## Checks and remaining work
-
-TypeScript, ESLint and **124 tests**, including PostgreSQL integration, pass. Fifteen manually reviewed source-excerpt fixtures cover the representations; four additional source-disagreement fixtures check citation retention and accepted-value preservation. Additional tests exercise repeated tool reads, conditional-price sorting and a material-fee price change held until version-checked approval. The production build and CI results are recorded on the PR.
-
-Some failures remain real source or output problems: Bitget's eligibility lists differ; MEXC's sources state different APAC transaction fees; KAST states both $250 and $500 per ATM withdrawal; Payitfast's official charges conflict. Other saved outputs need corrected scopes, citations or complete responses. Gnosis help pages still disallow the crawler. No source was removed and no conflicting price was selected merely to make a candidate pass.
-
-SafePal, Gnosis Pay and Ready were subsequently retired by adapter configuration. They are excluded from active runs and counts; the remaining active inventory contains 33 adapters and 396 URLs. The earlier Gnosis access failure is historical, not an active-provider blocker.
-
-A fresh full active-inventory run with functioning native DNS, source access and the final model contract remains required. The hard $4.99 invocation ceiling is unchanged; a complete successful ingestion below $5 is not yet demonstrated. Conservative accounting remains **$9.978259/$10** for model testing and **$14.970552/$15** for adapters, **$24.948811/$25** combined.
-
-## Follow-up on the unresolved active cards
-
-Prompt 23 keeps the same strict schema. Missing financial scopes are reported together in one correction instead of exposing only eight paths per turn. It does not fill missing scopes with `{}` automatically. Financial evidence errors now identify the fact, rule, target and exact citation, and report failures across the candidate together. Country-list conflicts show which source differs and the differing values (Bitget's saved disagreement includes CN and SG).
-
-Search results show text around a matching term instead of always showing the first 600 characters. They include the block offset for a full page read and a truncation flag. Different excerpts from the same block remain available; a partial excerpt cannot hide a later full read. Context, request and spending bounds are unchanged. Compose now defaults to the selected Luna model and $4.50 budget, matching the CLI and `.env.example`.
-
-Guidance and source-reviewed tests distinguish debit/credit funding, standard/fast ACH, swap direction, free ATM allowances, approximate partner charges versus provider markup, and crypto units versus fiat currencies. A genuinely disputed value can stay as independently cited narrative clauses while other facts remain usable. The application still rejects competing typed prices, and omission cannot erase accepted values. Product-level narrative additions follow the existing review policy.
-
-Four saved disagreements are explicitly covered without an authority decision:
-
-| Card | Saved source disagreement |
-| --- | --- |
-| KAST | Help article: $500 per withdrawal; product page: $250. |
+| KAST | Help article: USD 500 per withdrawal; product page: USD 250. |
 | MEXC APAC | Comparison table: 0% transaction fee; application article: 1% spending fee. |
 | Payitfast | Pricing: 1% non-USD FX; card terms: 2.2%. |
-| Bitget Wallet | Main card page includes Singapore/mainland China; reward page's application list omits them. Neither the URL nor an omitted country establishes a safe eligibility interpretation. |
+| Bitget Wallet | Main card page includes Singapore/mainland China; reward application list omits them. Omission alone does not resolve card eligibility. |
 
-A replay of the stored responses under prompt 23 still has **17 valid candidates, 17 unresolved active cards and two retired adapters skipped**. Six of those 17 valid candidates still use the earlier manually reviewed inputs. The replay cannot generate corrected responses that are absent from the recording. Improved validation feedback and new representation tests are not new model successes. The seven budget-incomplete cards remain Plasma One, Robinhood Gold, Ruvo, Solayer, Tria, Tuyo and Wirex One; no new provider defect is inferred from a missing response.
+## Verification
 
-The focused regressions and full **124-test** suite pass with PostgreSQL integration, TypeScript and ESLint; the production build passes. Three new labeled paid-model evaluation cases are prepared but unrun. Native DNS was rechecked for KAST, MEXC and Payitfast and still returns `EAI_AGAIN`. There were **zero additional paid model requests**, and the remaining original allocation cannot fund a meaningful complete acceptance run. Source authority decisions and a fresh complete run remain outstanding.
+Fresh prompt-30 requests passed **11/11 active labeled cases** for **$0.009983495**. The full pass plus targeted repair produced valid candidates for **31/33 adapters**; Bybit still cites the wrong financial row and tier, and Jupiter emits conflicting FX rules in the same scope. Formal validity does not resolve the source disagreements above. See [live validation](live-validation.md) for complete outcomes.
 
-A subsequent prompt-23 offline publication check used a new copy of the 17-card dataset: accepted values were retained for 17/17 cards, and all 17 warm passes were unchanged with byte-identical caches. Two cold candidates stayed held for review; no reviews were approved and no model requests were sent.
+The first medium-reasoning full run, prompt 26, attempted all 33 active adapters for **$0.50205312**: 28 valid candidates and five failures. It retained all 17 earlier accepted cards, including archived Ready. Failures exposed opaque draft context (Coinbase/Crypto.com), wrong-row correction feedback (Bybit), explicit no-fee grammar (Nexo), and a PostgreSQL connection timeout under concurrent verification load (Tria). The final acceptance run and audit are recorded in [live validation](live-validation.md).
 
-Ready was subsequently retired through the same top-level adapter flag. It is excluded from new active runs, counts and public data; accepted facts and history remain archived. The active inventory now contains **33 adapters / 396 URLs**. Ready's two new-allocation evaluation cases had finished before the retirement request and remain historical accounting; the upcoming full run excludes Ready.
+Earlier offline recovery used six manually corrected inputs (Ethena, Exa, Jupiter, Karta, Kolo and Kraken) plus unchanged recorded Revolut output. The subsequent fresh full run generated valid candidates for all seven without injecting those corrected outputs. Historical offline reports remain distinct from paid results.
+
+Native source DNS and actual Coolify deployment remain separate acceptance requirements. Source/citation validation does not prove that every source fact or interpretation is complete. See [validation status](validation.md).
