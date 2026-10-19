@@ -2,6 +2,10 @@
 
 Ready, SafePal and Gnosis Pay are retired through `config.retired`. The active inventory is **33 adapters / 396 URLs**; the archive retains all 36 configurations and 433 URLs. Retirement excludes providers from ingestion and public data while preserving accepted records and history. Force does not bypass retirement.
 
+## Six-card follow-up
+
+Schema 8 / prompt 31 / merge 15 adds currency-code financial retrieval, balanced source previews, table-span context, source-supported ATM clauses in correction feedback, independent claim reconciliation and explicit contractual precedence. Source research fetched all 67 configured URLs for these cards; see [source decisions](source-decisions.md). The earlier failures below describe saved prompt-30 model output. They have not yet been replaced by a fresh paid prompt-31 run.
+
 ## Shared fixes
 
 - Missing source facts preserve accepted values and mark them unconfirmed. Review proposals now derive uncertainty from current state, so unchanged runs retain the same immutable review. Acknowledging an uncertainty-only review does not recreate it on every run or turn an unconfirmed value into confirmed data.

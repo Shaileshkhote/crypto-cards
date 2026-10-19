@@ -10,19 +10,27 @@ import * as syncFunctions from "@cards/core/sync";
 import { Budget, RunError, type Extractor } from "@cards/core/agent";
 import { listReviews, approveReview, rejectReview } from "@cards/core/review";
 import { readCache, rebuildCache } from "@cards/core/cache";
-import { publicationHash } from "@cards/core/merge";
+import { publicationHash, preserveSourceDisagreements } from "@cards/core/merge";
 import { enqueue, claimJob, status } from "@cards/core/jobs";
 import { adapter, document, extraction } from "./helpers";
 import { Card } from "@cards/core/schema";
 import { loadAdapters } from "@cards/core/adapters";
 import { documentFromText } from "@cards/core/crawler";
 const enabled = !!process.env.TEST_DATABASE_URL;
+// Confirmation metadata may change immediately while a changed price remains
+// held. All accepted values and their original provenance must stay intact.
+const withoutConfirmation = (value: unknown): unknown => Array.isArray(value)
+  ? value.map(withoutConfirmation)
+  : value && typeof value === "object"
+    ? Object.fromEntries(Object.entries(value).filter(([key]) => !["status", "unconfirmedFields"].includes(key)).map(([key, entry]) => [key, withoutConfirmation(entry)]))
+    : value;
 describe.skipIf(!enabled)(
   "PostgreSQL sync, review, history, jobs and public cache",
   () => {
     beforeAll(async () => {
       process.env.DATABASE_URL = process.env.TEST_DATABASE_URL;
       await migrate();
+      await loadAdapters(undefined, { includeRetired: true });
     });
     beforeEach(async () => {
       await db().query(
@@ -112,9 +120,11 @@ describe.skipIf(!enabled)(
       await run();
       const cache = await readCache("cards/example");
       expect((await run(2)).status).toBe("review");
-      expect((await readCache("cards/example"))?.payload).toBe(cache?.payload);
+      const held = await read();
+      expect(withoutConfirmation(held)).toEqual(withoutConfirmation(JSON.parse(cache!.payload)));
+      expect(held.products![0].tiers![0].fees![0]).toMatchObject({ ratePercent: 1.5, status: "unconfirmed" });
       const [review] = await listReviews();
-      expect(review.base_version).toBe(1);
+      expect(review.base_version).toBe(2);
       expect(
         (review.context as { labels: string[] }).labels.some((label) =>
           label.includes("DE"),
@@ -132,13 +142,19 @@ describe.skipIf(!enabled)(
         ratePercent: 2,
       });
       expect((await db().query("SELECT * FROM card_versions")).rowCount).toBe(
-        2,
+        3,
       );
+      const approvedCache = await readCache("cards/example");
+      expect((await run(2, async () => { throw new Error("Approved unchanged sources must reuse extraction"); })).status).toBe("unchanged");
+      expect((await readCache("cards/example"))?.payload).toBe(approvedCache?.payload);
+      expect((await db().query("SELECT * FROM card_versions")).rowCount).toBe(3);
     });
     it("rejection preserves publication", async () => {
       await run();
-      const before = await readCache("cards/example");
+      const original = await read();
       await run(2);
+      const before = await readCache("cards/example");
+      expect(withoutConfirmation(await read())).toEqual(withoutConfirmation(original));
       const [r] = await listReviews();
       await rejectReview(r.id, "test-admin");
       expect(await listReviews()).toHaveLength(0);
@@ -148,8 +164,8 @@ describe.skipIf(!enabled)(
     });
     it("supersedes an older proposal without allowing approval from an outdated screen", async () => {
       await run();
-      const before = await readCache("cards/example");
       await run(2);
+      const before = await readCache("cards/example");
       const [older] = await listReviews();
       await run(3);
       const [current] = await listReviews();
@@ -168,7 +184,7 @@ describe.skipIf(!enabled)(
       const [r] = await listReviews();
       const changed = { ...(await read()), kyc: true };
       await transaction((c) =>
-        publish(c, "example", changed, publicationHash(changed), 1),
+        publish(c, "example", changed, publicationHash(changed), r.base_version),
       );
       await expect(approveReview(r.id, "admin")).rejects.toThrow("stale");
     });
@@ -277,6 +293,40 @@ describe.skipIf(!enabled)(
       expect(await listReviews()).toHaveLength(0);
       expect((await read()).products?.[0].tiers?.[0].fees![0].status).toBe("unconfirmed");
     });
+    it("keeps an approved source-disagreement acknowledgment stable after publishing its terms", async () => {
+      const a = adapter();
+      const first = document(1.5);
+      const initial = extraction(first);
+      initial.facts[0].tierId = null;
+      expect((await syncAdapter(a, new Budget(0), {
+        fetch: async () => first,
+        extract: async () => ({ extraction: initial, documents: [first], issues: [] }),
+      })).status).toBe("published");
+      const accepted = await read();
+      const second = documentFromText("https://example.com/terms", "Core FX fee: 3%.");
+      a.sources.urls.push(second.url);
+      const conflicting = extraction(second, 3);
+      conflicting.facts[0].tierId = null;
+      const reconciled = preserveSourceDisagreements({ ...initial, facts: [...initial.facts, ...conflicting.facts] });
+      const sync = (warm = false) => syncAdapter(a, new Budget(0), {
+        fetch: async url => url === first.url ? first : second,
+        extract: async () => {
+          if (warm) throw new Error("Unchanged evidence must use cached extraction");
+          return { ...reconciled, documents: [first, second] };
+        },
+      });
+      expect((await sync()).status).toBe("review");
+      const [review] = await listReviews();
+      await approveReview(review.id, "test-admin");
+      const before = await readCache("cards/example");
+      const card = await read();
+      expect(card.products![0].terms).toHaveLength(2);
+      expect(card.products![0].fees).toEqual(accepted.products![0].fees!.map(fee => ({ ...fee, status: "unconfirmed" })));
+      expect(card.products![0].unconfirmedFields).toContain("fees");
+      expect(await sync(true)).toMatchObject({ status: "unchanged", proposed: 0, costUsd: 0 });
+      expect(await listReviews()).toHaveLength(0);
+      expect((await readCache("cards/example"))?.payload).toBe(before?.payload);
+    });
     it("executes a queued job through the same core across SQL claim boundaries", async () => {
       await run();
       const id = await enqueue("cache");
@@ -365,7 +415,7 @@ describe.skipIf(!enabled)(
         },
       );
       expect(JSON.parse(result.stdout)).toMatchObject({
-        cardId: "example", version: 2, cacheUpdated: true,
+        cardId: "example", version: 3, cacheUpdated: true,
       });
       expect((await read()).products?.[0].tiers?.[0].fees?.[0]).toMatchObject({
         ratePercent: 2,

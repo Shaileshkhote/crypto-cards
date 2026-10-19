@@ -163,24 +163,36 @@ export function parseHtml(url: string, html: string): Document {
     'script,style,nav,[role="navigation"],noscript,svg,[aria-hidden="true"]',
   ).remove();
   $("table").each((_, table) => {
-    const rows = $(table)
-      .find("tr")
-      .map((_, tr) =>
-        $(tr)
-          .find("th,td")
-          .map((_, td) => {
-            const cell = $(td).clone();
-            cell.find("br").replaceWith(" ");
-            cell.find("p,div,section").each((_, el) => {
-              $(el).prepend("\n");
-              $(el).append("\n");
-            });
-            return normalize(cell.text()).replaceAll("\n", " ");
-          })
-          .get()
-          .join(" | "),
-      )
-      .get();
+    const elements = $(table).find("tr").filter((_, tr) => $(tr).closest("table")[0] === table).toArray();
+    const grid: string[][] = [];
+    const groupedHeader = elements[0] && $(elements[0]).children("th,td").toArray().some(td => Number($(td).attr("colspan")) > 1);
+    let headerRows = 1, cells = 0;
+    for (const [row, tr] of elements.entries()) {
+      grid[row] ||= [];
+      let column = 0;
+      for (const td of $(tr).children("th,td").toArray()) {
+        while (grid[row][column] !== undefined) column++;
+        const cell = $(td).clone();
+        cell.find("br").replaceWith(" ");
+        cell.find("p,div,section").each((_, el) => { $(el).prepend("\n"); $(el).append("\n"); });
+        const text = normalize(cell.text()).replaceAll("\n", " ");
+        const span = (name: string, bound: number) => Math.min(bound, Math.max(1, Number.parseInt($(td).attr(name) || "1", 10) || 1));
+        const height = $(td).attr("rowspan") === "0" ? elements.length - row : span("rowspan", elements.length - row);
+        const width = span("colspan", 100);
+        cells += height * width;
+        if (cells > 20_000) throw new Error("Expanded HTML table exceeds cell limit");
+        // Bybit and other financial tables use TD header cells spanning two
+        // rows. Keep the subheaders with every later bounded table chunk.
+        if (row === 0 && groupedHeader && height <= 3) headerRows = Math.max(headerRows, height);
+        for (let y = 0; y < height; y++) {
+          grid[row + y] ||= [];
+          for (let x = 0; x < width; x++) grid[row + y][column + x] = text;
+        }
+        column += width;
+      }
+    }
+    const rows = grid.map(row => Array.from({ length: row.length }, (_, i) => row[i] || "").join(" | "));
+    if (headerRows > 1) rows.splice(0, headerRows, rows.slice(0, headerRows).join(" ; "));
     // Keep table headers with their rows in bounded, citable blocks. Splitting
     // every cell row from its header lost plan/currency/period context.
     $(table).replaceWith(`\n${tableBlocks(rows).join("\n")}\n`);

@@ -18,13 +18,13 @@ export default {
       url: "https://web3.bitget.com/card",
       productIds: ["bitget-wallet"],
       kind: "product-page",
-      topics: ["card_type", "product_status", "fees", "rewards"],
+      topics: ["card_type", "product_status", "fees", "rewards", "countries", "requirements"],
     },
     {
       url: "https://web3.bitget.com/card-reward",
       productIds: ["bitget-wallet"],
       kind: "product-page",
-      topics: ["rewards"],
+      topics: ["rewards", "countries", "requirements"],
     },
     {
       url: "https://web3.bitget.com/en/blog/articles/100-million-users",

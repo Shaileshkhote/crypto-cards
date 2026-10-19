@@ -50,3 +50,9 @@ Run `pnpm db:migrate` and `pnpm cards cache` with the database binding after app
 Bulk sync, benchmarks and model evaluations exclude retired adapters. Explicit sync requests are rejected, including `--force`; already queued requests are skipped without source/model calls. Review approval and in-flight publication cannot publish a database row marked retired. A new retired adapter never creates a card through ingestion.
 
 Remove the flag or set it to false and rebuild the cache to reactivate an adapter from its retained publication. The retirement flag is excluded from extraction fingerprints, so toggling this flag alone does not invalidate accepted source extraction caches. Product/tier lifecycle metadata remains independently maintained.
+
+## Explicit source precedence
+
+A source metadata entry may declare `supersedes: ["https://example.com/fees"]` when an explicit, reviewed policy establishes which financial source governs. Both URLs must be different configured sources. This applies only to incompatible financial claims for the same product, tier, rule kind, currencies and scope; it does not replace unrelated facts or rank pages by date. Without established authority, competing verified claims become separately cited terms and the disputed typed values are omitted. Accepted values remain unconfirmed for review.
+
+Payitfast declares its card terms above its pricing schedule because the published pricing and master terms explicitly establish that order. See [the six-card source investigation](source-decisions.md) for the evidence and unresolved KAST, MEXC and Bitget statements. Source notes remain data; no provider-specific extraction function is added.

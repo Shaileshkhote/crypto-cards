@@ -7,6 +7,78 @@ afterEach(() => {
   vi.unstubAllGlobals();
   vi.unstubAllEnvs();
 });
+it("shows currency-code limits alongside early percentage fees in the bounded preview", async () => {
+  vi.stubEnv("OPENROUTER_API_KEY", "fixture-not-a-real-key");
+  const doc = documentFromText("https://example.com/fees", Array.from({ length: 7 }, (_, i) => `FX fee ${i}: 1.5%.`).join("\n") + "\nDaily spending limit: 10,000 USD.");
+  vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+    if (url.endsWith("/models")) return Response.json({ data: [{ id: modelName(), pricing: { prompt: "0", completion: "0" }, supported_parameters: ["tools", "structured_outputs"] }] });
+    const excerpts = JSON.parse(JSON.parse(String(init?.body)).messages[1].content).excerpts;
+    expect(excerpts[0].blocks).toHaveLength(5);
+    expect(excerpts[0].blocks.some((b: { text: string }) => b.text.includes("10,000 USD"))).toBe(true);
+    return Response.json({ usage: { cost: 0 }, choices: [{ finish_reason: "stop", message: { content: JSON.stringify(extraction(doc)) } }] });
+  }));
+  await expect(extract(adapter(), [doc], new Budget(0))).resolves.toBeDefined();
+});
+it("requires each explicit eligibility list before finishing a multi-source country extraction", async () => {
+  vi.stubEnv("OPENROUTER_API_KEY", "fixture-not-a-real-key");
+  const a = adapter();
+  const docs = [documentFromText(a.sources.urls[0], "Users from the following countries are eligible to apply: Singapore."), documentFromText("https://example.com/other", "Users from the following countries are eligible to apply: Japan.")];
+  a.sources.urls = docs.map(doc => doc.url);
+  const facts = docs.map((doc, i) => ({ productId: "card", tierId: null, inherit: false, field: "residentCountries", value: i ? ["JP"] : ["SG"], evidence: { url: doc.url, blockId: doc.blocks[0].id, quote: doc.blocks[0].text } }));
+  let calls = 0;
+  vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+    if (url.endsWith("/models")) return Response.json({ data: [{ id: modelName(), pricing: { prompt: "0", completion: "0" }, supported_parameters: ["tools", "structured_outputs"] }] });
+    if (++calls === 2) expect(JSON.parse(String(init?.body)).messages.at(-1).content).toContain('"p2b1"');
+    return Response.json({ usage: { cost: 0 }, choices: [{ finish_reason: "stop", message: { content: JSON.stringify({ complete: true, products: [], tiers: [], facts: calls === 1 ? facts.slice(0, 1) : facts }) } }] });
+  }));
+  const result = await extract(a, docs, new Budget(0));
+  expect(calls).toBe(2);
+  expect(result.extraction.facts).toHaveLength(2);
+  expect(result.extraction.facts.every(f => f.field === "terms")).toBe(true);
+});
+it("requires the omitted competing financial block, then preserves both claims without selecting a price", async () => {
+  vi.stubEnv("OPENROUTER_API_KEY", "fixture-not-a-real-key");
+  const a = adapter();
+  const docs = [documentFromText(a.sources.urls[0], "ATM withdrawal limit: USD 500 per withdrawal."), documentFromText("https://example.com/overview", "ATM withdrawal limit: USD 250 per withdrawal.")];
+  a.sources.urls = docs.map(d => d.url);
+  const facts = docs.map((doc, i) => ({ productId: "card", tierId: null, inherit: false, field: "limits", value: [{ id: "atm", kind: "atm", scope: {}, amount: { amount: i ? "250" : "500", currency: "USD" }, period: "transaction", calculable: true }], evidence: { url: doc.url, blockId: doc.blocks[0].id, quote: doc.blocks[0].text } }));
+  let calls = 0;
+  vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+    if (url.endsWith("/models")) return Response.json({ data: [{ id: modelName(), pricing: { prompt: "0", completion: "0" }, supported_parameters: ["tools", "structured_outputs"] }] });
+    if (++calls === 2) expect(JSON.parse(String(init?.body)).messages.at(-1).content).toContain('"p2b1"');
+    return Response.json({ usage: { cost: 0 }, choices: [{ finish_reason: "stop", message: { content: JSON.stringify({ complete: true, products: [], tiers: [], facts: calls === 1 ? facts.slice(0, 1) : facts }) } }] });
+  }));
+  const result = await extract(a, docs, new Budget(0));
+  expect(calls).toBe(2);
+  expect(result.issues.some(issue => issue.includes("Conflicting source claims"))).toBe(true);
+  expect(result.extraction.facts).toHaveLength(2);
+  expect(result.extraction.facts.every(fact => fact.field === "terms")).toBe(true);
+  expect(result.extraction.facts.map(fact => fact.evidence.url)).toEqual(docs.map(doc => doc.url));
+});
+it("retains the sourced ATM clause in FX collision feedback so the model can correct the actual service scope", async () => {
+  vi.stubEnv("OPENROUTER_API_KEY", "fixture-not-a-real-key");
+  const doc = documentFromText("https://example.com/fees", "Purchase FX: 1% on non-USD payments. ATM withdrawals in a currency other than USD add an FX fee of $0.30 plus 1%.");
+  const wire = extraction(doc);
+  const clause = "ATM withdrawals in a currency other than USD add an FX fee of $0.30 plus 1%.";
+  wire.facts[0].value = [
+    { id: "purchase-fx", kind: "fx", calculation: "percentage", ratePercent: 1, calculable: true, scope: { excludedTransactionCurrencies: ["USD"] } },
+    { id: "atm-fx", kind: "fx", calculation: "unknown", calculable: false, description: clause, scope: { excludedTransactionCurrencies: ["USD"] } },
+  ];
+  let calls = 0;
+  vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+    if (url.endsWith("/models")) return Response.json({ data: [{ id: modelName(), pricing: { prompt: "0", completion: "0" }, supported_parameters: ["tools", "structured_outputs"] }] });
+    if (++calls === 2) {
+      const feedback = JSON.parse(String(init?.body)).messages.at(-1).content;
+      expect(feedback).toContain(clause);
+      expect(feedback).toContain("ATM withdrawals versus card purchases");
+      (wire.facts[0].value as { scope: Record<string, unknown> }[])[1].scope.conditions = ["ATM withdrawals"];
+    }
+    return Response.json({ usage: { cost: 0 }, choices: [{ finish_reason: "stop", message: { content: JSON.stringify(wire) } }] });
+  }));
+  const result = await extract(adapter(), [doc], new Budget(0));
+  expect(calls).toBe(2);
+  expect((result.extraction.facts[0].value as { description?: string; scope: Record<string, unknown> }[])[1]).toMatchObject({ description: clause, scope: { conditions: ["ATM withdrawals"] } });
+});
 it("corrects an empty full-inventory response instead of accepting complete with no facts", async () => {
   vi.stubEnv("OPENROUTER_API_KEY", "fixture-not-a-real-key");
   const doc = document(), good = extraction(doc);

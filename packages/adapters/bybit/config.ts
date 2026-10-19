@@ -13,6 +13,11 @@ export default {
     },
   ],
   tiers: [
+    { id: "bybit--asia-pacific--tier-1", productId: "bybit", name: "Asia Pacific Tier 1", legacyRegion: "asia-pacific" },
+    { id: "bybit--asia-pacific--tier-2", productId: "bybit", name: "Asia Pacific Tier 2", legacyRegion: "asia-pacific" },
+    { id: "bybit--asia-pacific--tier-3", productId: "bybit", name: "Asia Pacific Tier 3", legacyRegion: "asia-pacific" },
+    { id: "bybit--australia--tier-1", productId: "bybit", name: "Australia Tier 1", legacyRegion: "australia" },
+    { id: "bybit--australia--tier-2", productId: "bybit", name: "Australia Tier 2", legacyRegion: "australia" },
     {
       id: "bybit--argentina--default",
       productId: "bybit",

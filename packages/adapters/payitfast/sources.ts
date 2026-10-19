@@ -19,6 +19,9 @@ export default {
       url: "https://payitfast.com/card-terms",
       productIds: ["payitfast"],
       kind: "cardholder-agreement",
+      // Pricing defers to applicable terms; the master terms' precedence
+      // clause puts product terms above the fee schedule. Reviewed 2026-10-19.
+      supersedes: ["https://payitfast.com/pricing"],
       topics: [
         "card_type",
         "fees",

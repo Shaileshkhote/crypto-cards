@@ -66,6 +66,10 @@ export async function loadAdapters(
         throw new Error(`${dir.name}/sources.ts: untrusted URL ${url}`);
     }
     const products = new Set(a.config.products.map((x) => x.id));
+    for (const hint of a.sources.metadata || [])
+      for (const url of hint.supersedes || [])
+        if (!a.sources.urls.includes(hint.url) || !a.sources.urls.includes(url) || url === hint.url)
+          throw new Error(`${dir.name}/sources.ts: precedence must reference two different configured sources`);
     const tiers = new Set<string>();
     for (const t of a.config.tiers) {
       if (!products.has(t.productId) || tiers.has(t.id))

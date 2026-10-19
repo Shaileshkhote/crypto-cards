@@ -238,9 +238,18 @@ export async function syncAdapter(
           [id, version],
         );
         if (merged.changes.length) {
+          // An approved review can also publish new terms, advancing the
+          // version. Do not ask again to acknowledge identical retained facts.
+          // The key covers their values and provenance, not just field names.
+          const acknowledgmentOnly = merged.changes.every(change =>
+            change.path.at(-1) === "unconfirmedFields" && !!change.uncertaintyKey,
+          );
           const duplicate = await c.query(
-            "SELECT id,status FROM card_reviews WHERE card_id=$1 AND base_version=$2 AND status IN ('pending','rejected','approved') AND changes=$3::jsonb",
-            [id, version, JSON.stringify(merged.changes)],
+            `SELECT id,status FROM card_reviews WHERE card_id=$1 AND (
+              (base_version=$2 AND status IN ('pending','rejected','approved') AND changes=$3::jsonb)
+              OR ($4 AND status IN ('rejected','approved') AND changes @> $3::jsonb)
+            ) ORDER BY resolved_at DESC NULLS LAST LIMIT 1`,
+            [id, version, JSON.stringify(merged.changes), acknowledgmentOnly],
           );
           if (["rejected", "approved"].includes(duplicate.rows[0]?.status)) proposed = 0;
           // A review is immutable: a new proposal supersedes the old one so

@@ -40,6 +40,17 @@ it("preserves line breaks and paragraph boundaries inside financial table cells"
   expect(() => verifyFinancialEvidence(fact)).toThrow("is an allowance, not a hard withdrawal limit");
   expect(() => verifyFinancialEvidence({ ...fact, value: [{ ...fact.value[0], amount: { amount: "5000", currency: "USD" } }] })).not.toThrow();
 });
+it("keeps row-spanned regions and both levels of column headers in bounded financial table blocks", () => {
+  const rows = Array.from({ length: 35 }, (_, i) => `<tr>${i === 0 ? '<td rowspan="35">Asia Pacific</td>' : ''}<td>Tier ${i + 1}</td><td>${1000 + i} USD</td><td>${2000 + i} USD</td></tr>`).join("");
+  const html = `<table><tr><td rowspan="2">Region</td><td rowspan="2">Tier</td><td colspan="2">Spending Limits</td></tr><tr><td>Daily</td><td>Monthly</td></tr>${rows}</table>`;
+  const doc = parseHtml("https://example.com/limits", html);
+  expect(doc.blocks.length).toBeGreaterThan(1);
+  for (const block of doc.blocks) {
+    expect(block.text).toContain("Spending Limits | Spending Limits ; Region | Tier | Daily | Monthly");
+    expect(block.text.length).toBeLessThanOrEqual(1600);
+  }
+  for (let i = 0; i < 35; i++) expect(doc.content).toContain(`Asia Pacific | Tier ${i + 1} | ${1000 + i} USD | ${2000 + i} USD`);
+});
 it("keeps an introductory paragraph with bounded list rows without leaking free context into later charges", () => {
   const rows = Array.from({ length: 80 }, (_, i) => `<li><p>Tier ${i}:</p><p>up to ${100 + i} EUR</p></li>`).join("");
   const doc = parseHtml("https://example.com/allowances", `<p>Free ATM withdrawals per month by tier:</p><ul>${rows}</ul><p>After the allowance: 2% fee.</p>`);

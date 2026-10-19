@@ -53,7 +53,7 @@ export const Scope = z
       .transform(value => value.toLowerCase().replaceAll("_", "-")).pipe(Id)).optional(),
     daysOfWeek: z.array(Weekday).optional(),
     conditions: z.array(z.string().min(1)).min(1)
-      .describe("Explicit source conditions not represented by another scope field, such as metal/plastic material, asset conversion or spending bands. Preserve the condition; never invent one to resolve conflicting prices.")
+      .describe("Explicit source conditions not represented by another scope field, such as metal/plastic material, ATM withdrawals versus card purchases, asset conversion or spending bands. Preserve the condition; never invent one to resolve conflicting prices.")
       .optional(),
   })
   .strict();
@@ -365,6 +365,7 @@ export const Sources = z
             url: z.string().url(),
             productIds: z.array(Id),
             kind: z.string().optional(),
+            supersedes: z.array(z.string().url()).describe("Reviewed explicit source precedence, only for incompatible claims in the same program and scope. Never infer precedence from URL order or article dates.").optional(),
             scope: z.union([z.string(), z.array(z.string())]).optional(),
             topics: z.array(z.string()).optional(),
           })

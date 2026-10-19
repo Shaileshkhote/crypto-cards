@@ -5,10 +5,11 @@ import {
   type ExtractionData,
   type Document,
   Features,
+  Fact,
 } from "./schema";
 import { canonical, hash, slug } from "./serialize";
 import { verifyEvidence, verifyFinancialEvidence } from "./evidence";
-export const MERGE_VERSION = "14";
+export const MERGE_VERSION = "15";
 type ObjectValue = Record<string, unknown>;
 const isObject = (v: unknown): v is ObjectValue =>
   !!v && typeof v === "object" && !Array.isArray(v);
@@ -20,6 +21,7 @@ export interface Change {
   before?: unknown;
   after?: unknown;
   reason: string;
+  uncertaintyKey?: string;
 }
 export function overlay(base: unknown, patch: unknown): unknown {
   if (keyed(base) && keyed(patch) && patch.length > 0) {
@@ -274,6 +276,75 @@ function conflictDetails(first: unknown, second: unknown): string {
       .map(([key, item]) => [key, key === "description" && typeof item === "string" ? item.slice(0, 300) : summary(item)]));
   };
   return canonical({ first: summary(first), second: summary(second) }).slice(0, 4000);
+}
+// Different source blocks may genuinely disagree. Keep each cited statement
+// rather than choosing a price/list or failing every other supported field.
+// Same-block collisions still need correction: they usually lack a qualifier.
+export function preserveSourceDisagreements(extraction: ExtractionData, sources?: Adapter["sources"]) {
+  for (const fact of extraction.facts) verifyFinancialEvidence(fact);
+  type Entry = { fact: number; value: ObjectValue; source: string };
+  const groups = new Map<string, Entry[]>();
+  const lists = new Map<string, Map<string, { facts: number[]; values: string[] }>>();
+  for (const [index, fact] of extraction.facts.entries()) {
+    const target = [fact.productId, fact.tierId].filter(Boolean).join("/");
+    const key = `${target}/${fact.field}`;
+    if (["fees", "rewards", "limits"].includes(fact.field) && Array.isArray(fact.value)) {
+      const normalized = rules(fact.value, fact.field, target, fact.evidence) as ObjectValue[];
+      // Same-block pairs must still be qualified rather than hidden as terms.
+      for (const value of normalized) {
+        const id = `${key}/${value.id}`, entries = groups.get(id) || [];
+        entries.push({ fact: index, value, source: `${fact.evidence.url}#${fact.evidence.blockId}` });
+        groups.set(id, entries);
+      }
+    } else if (["residentCountries", "excludedResidentCountries"].includes(fact.field) && Array.isArray(fact.value)) {
+      const sources = lists.get(key) || new Map();
+      const page = sources.get(fact.evidence.url) || { facts: [], values: [] };
+      page.facts.push(index);
+      page.values.push(...fact.value as string[]);
+      sources.set(fact.evidence.url, page);
+      lists.set(key, sources);
+    }
+  }
+  const removedRules = new Map<number, Set<string>>(), removedLists = new Set<number>(), disputed = new Set<string>();
+  for (const [key, entries] of groups) {
+    if (entries.some((entry, index) => entries.slice(0, index).some(prior => prior.source === entry.source && !compatible(prior.value, entry.value))))
+      throw new Error(`Ambiguous ${extraction.facts[entries[0].fact].field} identity: ${key}; qualify distinct services in the same source block`);
+    if (new Set(entries.map(entry => entry.source)).size < 2 || entries.every((entry, index) => entries.slice(0, index).every(prior => compatible(prior.value, entry.value)))) continue;
+    disputed.add(key);
+    const authoritative = entries.filter(entry => {
+      const url = extraction.facts[entry.fact].evidence.url;
+      const overrides = sources?.metadata?.find(hint => hint.url === url)?.supersedes || [];
+      return entries.every(other => extraction.facts[other.fact].evidence.url === url || overrides.includes(extraction.facts[other.fact].evidence.url));
+    });
+    const resolved = authoritative.length > 0 && authoritative.every((entry, index) => authoritative.slice(0, index).every(prior => compatible(prior.value, entry.value)));
+    for (const entry of entries.filter(entry => !resolved || !authoritative.includes(entry))) {
+      const ids = removedRules.get(entry.fact) || new Set();
+      ids.add(String(entry.value.id));
+      removedRules.set(entry.fact, ids);
+    }
+  }
+  for (const [key, sources] of lists) {
+    const pages = [...sources.values()];
+    if (pages.length < 2 || pages.every(page => canonical(ordered(page.values)) === canonical(ordered(pages[0].values)))) continue;
+    disputed.add(key);
+    for (const page of pages) for (const index of page.facts) removedLists.add(index);
+  }
+  if (!disputed.size) return { extraction, issues: [] as string[] };
+  const facts: ExtractionData["facts"] = [];
+  for (const [index, fact] of extraction.facts.entries()) {
+    const removed = removedRules.get(index);
+    if (!removed && !removedLists.has(index)) { facts.push(fact); continue; }
+    if (removed) {
+      const target = [fact.productId, fact.tierId].filter(Boolean).join("/");
+      const retained = (fact.value as ObjectValue[]).filter(rule => !removed.has(String((rules([rule], fact.field, target, fact.evidence) as ObjectValue[])[0].id)));
+      if (retained.length) facts.push(Fact.parse({ ...fact, value: retained }));
+    }
+    facts.push(Fact.parse({ ...fact, field: "terms", value: [fact.evidence.quote] }));
+  }
+  return {
+    extraction: { ...extraction, facts },
+    issues: [...disputed].sort().map(key => `Conflicting source claims for ${key}; alternative clauses retained for review, typed values retained only with explicit source precedence`),
+  };
 }
 export function candidate(
   adapter: Adapter,
@@ -613,11 +684,16 @@ export function markUnconfirmed(
           const origins = (Array.isArray(rule.source) ? rule.source : [rule.source]).filter(isObject);
           if (!origins.some(source => typeof source.url === "string" && changed.has(source.url)))
             return rule;
-          const present =
+          const observed =
             isObject(fresh) &&
-            Array.isArray(fresh[field]) &&
-            (fresh[field] as ObjectValue[]).some((r) => r.id === rule.id);
-          if (!present) unconfirmed.add(field);
+            Array.isArray(fresh[field])
+              ? (fresh[field] as ObjectValue[]).find((r) => r.id === rule.id)
+              : undefined;
+          const present = observed !== undefined && compatible(rule, observed);
+          // A changed known price already has a review. Mark the retained
+          // rule unconfirmed, without a separate missing-field acknowledgement
+          // that would linger after the new price is approved.
+          if (!observed) unconfirmed.add(field);
           return { ...rule, status: present ? "verified" : "unconfirmed" };
         });
       }
@@ -648,6 +724,10 @@ export function unconfirmedChanges(card: CardData): Change[] {
         // the same proposal instead of losing a transient before/after delta.
         before: node.unconfirmedFields,
         after: node.unconfirmedFields,
+        uncertaintyKey: hash(node.unconfirmedFields.map(field => ({
+          field, value: node[String(field)],
+          sources: (node.fieldSources as ObjectValue | undefined)?.[String(field)],
+        }))),
         reason: "Accepted facts were not found in changed source text; values retained for review",
       });
     for (const field of ["products", "tiers"])

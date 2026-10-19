@@ -1,20 +1,22 @@
 # Live validation — 2026-10-19 UTC
 
-**Ingestion acceptance is incomplete.** The default is `openai/gpt-6-luna`, low reasoning when supported, schema 8 / prompt 30 / merge 14. A fresh-source replay attempted all **33 active adapters / 396 URLs**. It produced 21 valid candidates for **$0.189563670**; a targeted pass after shared citation/feedback fixes recovered 10 of the 12 failures for **$0.087627770**. The combined result is **31/33 validated candidates**, not 33 successful publications. Bybit and Jupiter remain failed. A manual source audit also found unresolved interpretation errors in formally valid candidates.
+Current code uses **schema 8 / prompt 31 / merge 15**. The [six-card source fixes](source-decisions.md) have fresh HTTP/parser evidence and regression coverage. A fresh paid run of this profile has not been performed: no OpenRouter binding is available. The paid measurements below refer to the earlier prompt-30 profile and must not be reported as current-profile acceptance.
+
+**Ingestion acceptance is incomplete.** The previous paid profile used `openai/gpt-6-luna`, low reasoning when supported, schema 8 / prompt 30 / merge 14. A fresh-source replay attempted all **33 active adapters / 396 URLs**. It produced 21 valid candidates for **$0.189563670**; a targeted pass after shared citation/feedback fixes recovered 10 of the 12 failures for **$0.087627770**. The combined result is **31/33 validated candidates**, not 33 successful publications. Bybit and Jupiter remain failed. A manual source audit also found unresolved interpretation errors in formally valid candidates.
 
 ## Verification
 
 - **147 tests**, TypeScript, ESLint, disposable PostgreSQL integration and the production build pass on implementation commit `55980c200e4901bd1a88eff05af6259a5ee7c312`. Its CI checks and Compose job passed. Compose covers migrations, authenticated HTTP, cache jobs, restart persistence and dump/restore. Consult PR checks for subsequent documentation commits.
 - Approved HTTPS proxy snapshots cover **396/396 active URLs**, including **16 PDFs**. All were reparsed after the shared list-context and table-cell spacing fixes; none was unavailable. This does not verify the native crawler.
 - Fresh labeled model requests passed **11/11 active cases**, costing **$0.009983495** across **21 requests**. All 14 original fixtures remain; retirement excludes one SafePal and two Ready fixtures. These short passages do not measure whole-provider precision or recall.
-- The current-profile record audit found **567 facts / 375 extraction records**, with **zero citation or financial-evidence errors**. The missing current-profile records belong to the two failed adapters. Formal evidence checks do not detect every omission or interpretation error.
+- The saved prompt-30 record audit found **567 facts / 375 extraction records**, with **zero citation or financial-evidence errors**. The missing current-profile records belong to the two failed adapters. Formal evidence checks do not detect every omission or interpretation error.
 - A separate **31-adapter** cached pass used **zero model requests / $0**. All 31 first cached calls validated; 30 immediate repeat calls succeeded, while EtherFi's cache rebuild hit a PostgreSQL connection timeout after its transaction committed. A subsequent isolated EtherFi cached sync succeeded with zero model calls, identical canonical data/version and cache payload, and zero cache mismatches. The initial failure remains recorded; no timeout or concurrency setting was increased. Complete pending-review rows, immutable versions and public cache payloads/hashes/versions were unchanged across these checks. Bybit and Jupiter are excluded from the 31-adapter cached set.
 - Accepted values from **17/17 original stored cards**, including archived Ready, remain present. The acceptance database contains **33 active card rows / 34 total rows**; existing rows do not imply successful current-profile extraction. Public projections match committed card data.
 - The saved database was dumped and restored to a new disposable database. Counts and complete-row fingerprints matched across **all eight tables**. These checks establish preservation of stored accepted values, not exhaustive extraction of source facts. No production database was used.
 
 Ready, SafePal and Gnosis Pay are retired. Active ingestion, public reads/counts, jobs, reviews and caches exclude them, including forced sync. The archive retains **36 configurations / 433 URLs**. This acceptance database has an archived Ready row; it never had published SafePal/Gnosis rows. Canonical records and history are retained.
 
-## Latest adapter outcomes
+## Saved prompt-30 adapter outcomes
 
 The table uses the latest completed Luna attempt for each provider. “Review” means a validated candidate with sensitive changes held for review. It does not mean approval or complete replacement of the public record. No review was automatically approved.
 
