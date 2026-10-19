@@ -742,8 +742,10 @@ export const extract: Extractor = async (
         : error instanceof Error ? error.message : String(error);
       if (/Invalid citation/i.test(message))
         message += " Return only url and blockId for evidence; omit quote. The application copies the exact source text.";
+      if (/Unknown fact (?:tier|product): null(?:\s|$)/.test(message))
+        message += ' An untargeted productId or tierId must be JSON null, not the literal string "null"; otherwise use an existing or explicitly declared identity.';
       if (message.includes("Ambiguous fees identity"))
-        message += " If the source explicitly charges different components, identify each source-named component in scope.conditions (such as FX padding versus exchange processing, or ATM withdrawals versus card purchases). Never invent conditions to separate conflicting prices for the same charge; preserve those conflicting clauses in terms.";
+        message += " If the source explicitly charges different components, identify each source-named component in scope.conditions (such as FX padding versus exchange processing, ATM withdrawals versus card purchases, or card funding versus bank transfers). Use supported funding rails, regions and tiers when those actually distinguish the rates. A variable or approximate charge remains one non-calculable fee with its source clause. Never invent conditions to separate conflicting prices for the same charge; preserve those conflicting clauses in terms.";
       if (message.includes("Ambiguous rewards identity") || message.includes("/rewards;"))
         message += " Scope each reward to its actual balance/spending band, award variant, cap and merchant category. A generic tier-dependent condition does not distinguish different rates. When a block lists conditional alternatives without their individual conditions, use one non-calculable reward preserving the full conditional clause, not multiple conflicting rates with identical scopes. Cite separately scoped rows when available; never invent a band or condition.";
       // Storage uses content hashes; the model saw short page/block selectors.

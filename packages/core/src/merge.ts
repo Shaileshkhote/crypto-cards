@@ -287,6 +287,7 @@ export function preserveSourceDisagreements(extraction: ExtractionData, sources?
   for (const fact of extraction.facts) verifyFinancialEvidence(fact);
   type Entry = { fact: number; value: ObjectValue; source: string };
   const groups = new Map<string, Entry[]>();
+  const financialScopes = new Map<string, Entry[]>();
   const cardTypes = new Map<string, Entry[]>();
   const scalarClaims = new Map<string, Entry[]>();
   const lists = new Map<string, Map<string, { facts: number[]; values: string[] }>>();
@@ -300,6 +301,12 @@ export function preserveSourceDisagreements(extraction: ExtractionData, sources?
         const id = `${key}/${value.id}`, entries = groups.get(id) || [];
         entries.push({ fact: index, value, source: `${fact.evidence.url}#${fact.evidence.blockId}` });
         groups.set(id, entries);
+        const baseScope = { ...value.scope as ObjectValue };
+        delete baseScope.conditions;
+        const base = (rules([{ ...value, scope: baseScope }], fact.field, target, fact.evidence, fact.tierId) as ObjectValue[])[0];
+        const baseKey = `${key}/${base.id}`, related = financialScopes.get(baseKey) || [];
+        related.push(entries[entries.length - 1]);
+        financialScopes.set(baseKey, related);
       }
     } else if (fact.field === "cardTypes" && isObject(fact.value)) {
       for (const [kind, value] of Object.entries(fact.value)) {
@@ -322,6 +329,19 @@ export function preserveSourceDisagreements(extraction: ExtractionData, sources?
   }
   const removedRules = new Map<number, Set<string>>(), removedLists = new Set<number>(), disputed = new Set<string>();
   const removedTypes = new Map<number, Set<string>>();
+  // Explicit contractual precedence also covers narrower prose qualifiers on
+  // the same charge. A component-specific rule never overrides another component.
+  for (const [key, entries] of financialScopes) for (const authority of entries) {
+    if (Array.isArray((authority.value.scope as ObjectValue).conditions) && ((authority.value.scope as ObjectValue).conditions as unknown[]).length) continue;
+    const overrides = sources?.metadata?.find(hint => hint.url === extraction.facts[authority.fact].evidence.url)?.supersedes || [];
+    for (const other of entries) {
+      if (!overrides.includes(extraction.facts[other.fact].evidence.url) || compatible(authority.value, other.value)) continue;
+      const removed = removedRules.get(other.fact) || new Set();
+      removed.add(String(other.value.id));
+      removedRules.set(other.fact, removed);
+      disputed.add(key);
+    }
+  }
   for (const [key, entries] of scalarClaims) {
     if (entries.every(entry => compatible(entry.value, entries[0].value))) continue;
     if (entries.some((entry, index) => entries.slice(0, index).some(prior => prior.source === entry.source && !compatible(prior.value, entry.value))))

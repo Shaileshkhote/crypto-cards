@@ -184,3 +184,27 @@ it('keeps static precedence when a fee repeats its containing tier in scope', as
   expect(tier.fees).toHaveLength(1);
   expect(tier.fees![0]).toMatchObject({ ratePercent: 2, source: { origin: 'static' }, scope: { tierIds: ['core'] } });
 });
+
+it('applies an unqualified contractual charge to narrower prose variants of the superseded claim', () => {
+  const fixture = fixtures.find(fixture => fixture.provider === 'payitfast')!;
+  const adapter = adapters.find(adapter => adapter.config.id === fixture.provider)!;
+  const docs = fixture.observations.map(observation => documentFromText(observation.url, observation.text));
+  const prior = fixture.previousValue as Record<string, unknown>[];
+  const incoming = Extraction.parse({ complete: true, products: [], tiers: [], facts: docs.map((doc, index) => ({ productId: fixture.productId, tierId: null, inherit: false, field: 'fees', value: [{ ...prior[0], ratePercent: index ? 2.2 : 1, scope: { excludedTransactionCurrencies: ['USD'], ...(index ? {} : { conditions: ['card payments'] }) } }], evidence: { url: doc.url, blockId: doc.blocks[0].id, quote: doc.content } })) });
+  const resolved = preserveSourceDisagreements(incoming, adapter.sources).extraction;
+  expect(resolved.facts.filter(fact => fact.field === 'fees')).toHaveLength(1);
+  expect(resolved.facts.find(fact => fact.field === 'fees')!.evidence.url).toBe(docs[1].url);
+  expect(resolved.facts.find(fact => fact.field === 'terms')!.value).toEqual([docs[0].content]);
+});
+
+it('does not use component-specific precedence to replace a different named charge component', async () => {
+  const { adapter: exampleAdapter } = await import('./helpers');
+  const adapter = exampleAdapter();
+  const docs = [documentFromText('https://example.com/network', 'Network FX pass-through fee: 1%.'), documentFromText('https://example.com/provider', 'Provider FX markup: 2.2%.')];
+  adapter.sources.urls = docs.map(doc => doc.url);
+  adapter.sources.metadata = [{ url: docs[1].url, productIds: ['card'], supersedes: [docs[0].url] }];
+  const incoming = Extraction.parse({ complete: true, products: [], tiers: [], facts: docs.map((doc, index) => ({ productId: 'card', tierId: 'core', inherit: false, field: 'fees', value: [{ id: 'fx', kind: 'fx', calculation: 'percentage', ratePercent: index ? 2.2 : 1, calculable: true, scope: { conditions: [index ? 'provider markup' : 'network pass-through'] } }], evidence: { url: doc.url, blockId: doc.blocks[0].id, quote: doc.content } })) });
+  const resolved = preserveSourceDisagreements(incoming, adapter.sources).extraction;
+  expect(resolved.facts.filter(fact => fact.field === 'fees')).toHaveLength(2);
+  expect(candidate(adapter, [resolved], undefined, docs).data.products![0].tiers![0].fees).toHaveLength(2);
+});

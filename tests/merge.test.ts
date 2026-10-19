@@ -600,3 +600,14 @@ it("does not assign a late-payment clause to returned-payment fees", () => {
   e.facts[0].evidence = { url: returned.url, blockId: returned.blocks[0].id, quote: returned.blocks[0].text };
   expect(candidate(a, [e], undefined, [returned]).data.products![0].tiers![0].fees![0]).toMatchObject({ kind: "returned_payment", fixed: { amount: "5" } });
 });
+
+it('recognizes an explicit /mo subscription or withdrawal cap without inventing a month from an annual fee', () => {
+  for (const [text, field, value] of [
+    ['Subscribe for $14.99/mo', 'fees', [{ id: 'subscription', kind: 'monthly', calculation: 'fixed', fixed: { amount: '14.99', currency: 'USD' }, scope: {}, calculable: true }]],
+    ['Withdraw up to £750 a day (or up to £4,000/mo).', 'limits', [{ id: 'monthly-atm', kind: 'atm', amount: { amount: '4000', currency: 'GBP' }, period: 'month', scope: {}, calculable: true }]],
+  ] as const) {
+    const doc = documentFromText('https://example.com/pricing', text), e = extraction(doc);
+    e.facts[0] = { ...e.facts[0], field, value: structuredClone(value) } as typeof e.facts[0];
+    expect(() => candidate(adapter(), [e], undefined, [doc])).not.toThrow();
+  }
+});

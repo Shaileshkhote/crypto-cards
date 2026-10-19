@@ -43,6 +43,8 @@ For a containerized database and application, `docker compose up --build -d` sta
 
 Cloud network access must permit configured adapter domains and `openrouter.ai`; see `sources.ts` and the saved environment network draft. A warm source/extraction cache needs no model key. Changed-source extraction requires an OpenRouter binding. Live provider pages, robots policies, redirects, and site-specific rendering limitations must be checked before publishing real facts.
 
+When the cloud supplies `HTTP_PROXY` / `HTTPS_PROXY`, set `NODE_USE_ENV_PROXY=1` for Node's native fetch (or pass `--use-env-proxy`). Preserve the supplied proxy, CA and `NO_PROXY` settings; do not disable TLS verification.
+
 ## CLI
 
 Run from the repository root (inside worker: `/app`). CLI administration trusts access to the worker/container and database; the web UI independently verifies every admin request and action.

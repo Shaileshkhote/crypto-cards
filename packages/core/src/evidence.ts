@@ -72,7 +72,7 @@ export function verifyFinancialEvidence(fact: ExtractionData["facts"][number]) {
     const fee = value as { kind?: string; ratePercent?: number; fixed?: { amount: string }; scope?: { conditions?: string[] } };
     if (fact.field === "fees" && fee.kind === "returned_payment" && !/\b(?:return\w*|revers\w*|dishono[u]?r\w*|bounc\w*)\b|\b(?:check|cheque|payment)\b.{0,40}\b(?:fail\w*|declin\w*)\b/i.test(quote))
       report("Returned-payment fees require a returned, reversed or dishonoured payment in the cited block. A late-payment clause does not support a returned-payment charge.");
-    const periods: Record<string, RegExp> = { day: /\b(?:day|daily|24[-\s]?(?:hours?|hrs?|h))\b/i, week: /\b(?:week|weekly)\b/i, month: /\b(?:month|monthly)\b/i, year: /\b(?:year|yearly|annual|annually|annum)\b/i };
+    const periods: Record<string, RegExp> = { day: /\b(?:day|daily|24[-\s]?(?:hours?|hrs?|h))\b/i, week: /\b(?:week|weekly)\b/i, month: /\b(?:month|monthly)\b|\/mo\b/i, year: /\b(?:year|yearly|annual|annually|annum)\b/i };
     const period = fact.field === "fees" ? ({ monthly: "month", annual: "year" } as Record<string, string>)[fee.kind || ""] : fact.field === "limits" && "calculable" in value && value.calculable === true && "period" in value ? String(value.period) : undefined;
     if (period && periods[period] && !periods[period].test(quote))
       report(`Period ${period} is absent from its cited block. Never invent a calendar period for consecutive transactions or use an annual-fee quote for a monthly fee. Preserve an unsupported limit period as a non-calculable description without amount/count.`);
