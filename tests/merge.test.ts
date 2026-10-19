@@ -178,7 +178,7 @@ describe("deterministic merge and protection", () => {
     }
   });
   it("accepts definite absence of a fee while rejecting uncertain absence", () => {
-    for (const text of ["The card does not have any monthly or annual fees.", "We don't have an annual fee."]) {
+    for (const text of ["The card does not have any monthly or annual fees.", "We don't have an annual fee.", "USD transactions do not incur an additional FX fee.", "Transaction fees are waived for the first $100 per month."]) {
       const doc = documentFromText("https://example.com/fees", text), e = extraction(doc, 0);
       expect(() => candidate(adapter(), [e], undefined, [doc])).not.toThrow();
     }
@@ -554,7 +554,7 @@ it("scopes an explicit zero addition to provider markup and preserves the networ
 });
 
 it("rejects a country inventory cited to a heading instead of the country rows", () => {
-  const a = adapter(), doc = documentFromText("https://example.com/countries", "The card is currently available in:\nSingapore, mainland China.\nUK and Hong Kong.");
+  const a = adapter(), doc = documentFromText("https://example.com/countries", "The card is currently available in:\nSingapore, mainland China.\nUK and Hong Kong.\nMyanmar.");
   const e = extraction(doc);
   const claim = { ...e.facts[0], field: "residentCountries", value: ["SG", "CN"], evidence: { url: doc.url, blockId: doc.blocks[0].id, quote: doc.blocks[0].text } };
   e.facts = [claim];
@@ -563,6 +563,8 @@ it("rejects a country inventory cited to a heading instead of the country rows",
   expect(candidate(a, [e], undefined, [doc]).data.products![0].tiers![0].residentCountries).toEqual(["CN", "SG"]);
   e.facts = [{ ...claim, value: ["GB", "HK"], evidence: { ...claim.evidence, blockId: doc.blocks[2].id, quote: doc.blocks[2].text } }];
   expect(candidate(a, [e], undefined, [doc]).data.products![0].tiers![0].residentCountries).toEqual(["GB", "HK"]);
+  e.facts = [{ ...claim, value: ["MM"], evidence: { ...claim.evidence, blockId: doc.blocks[3].id, quote: doc.blocks[3].text } }];
+  expect(candidate(a, [e], undefined, [doc]).data.products![0].tiers![0].residentCountries).toEqual(["MM"]);
   e.facts = [{ ...claim, value: ["IN"], evidence: { ...claim.evidence, quote: doc.blocks[0].text } }];
   expect(() => candidate(a, [e], undefined, [doc])).toThrow("Country values IN are absent");
 });

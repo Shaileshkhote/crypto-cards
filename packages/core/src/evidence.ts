@@ -24,8 +24,8 @@ function financialNumbers(quote: string, implicitZero = true) {
   });
   if (implicitZero && (/\b(free|zero|none|(?:no|without) (?:[\w-]+(?:,\s*|\s+)){0,5}(?:fees?|charges?|cost|markup))\b/i.test(quote) ||
       /\b(?:(?:will|shall|do|does|is|are)\s+not|(?:wo|sha|do(?:es)?)n't)\s+(?:be\s+)?charg(?:e|ed)\s+(?:(?:a|an|any)\s+)?(?:[\w-]+\s+){0,3}fees?\b/i.test(quote.replace(/[’‘]/g, "'")) ||
-      /\b(?:does|do)(?:\s+not|n't)\s+have\s+(?:(?:a|an|any)\s+)?(?:[\w-]+(?:,\s*|\s+)){0,5}fees?\b/i.test(quote.replace(/[’‘]/g, "'")) ||
-      /\b(?:fees?|charges?|cost)\s+(?:is\s+)?(?:currently\s+)?waived\b/i.test(quote) ||
+      /\b(?:does|do)(?:\s+not|n't)\s+(?:have|incur)\s+(?:(?:a|an|any)\s+)?(?:[\w-]+(?:,\s*|\s+)){0,5}fees?\b/i.test(quote.replace(/[’‘]/g, "'")) ||
+      /\b(?:fees?|charges?|cost)\s+(?:(?:is|are)\s+)?(?:currently\s+)?waived\b/i.test(quote) ||
       /[:|]\s*waived\s*(?:[.;|]|$)/i.test(quote))) numbers.push("0");
   return numbers;
 }
@@ -39,11 +39,12 @@ export function verifyFinancialEvidence(fact: ExtractionData["facts"][number]) {
   }
   if (["residentCountries", "excludedResidentCountries"].includes(fact.field) && Array.isArray(fact.value)) {
     const names = new Intl.DisplayNames(["en"], { type: "region" });
+    const shortNames = new Intl.DisplayNames(["en"], { type: "region", style: "short" });
     const aliases: Record<string, string[]> = { GB: ["UK", "United Kingdom"], US: ["USA", "United States"], HK: ["Hong Kong"], MO: ["Macau", "Macao"], TR: ["Turkey", "Türkiye"], CZ: ["Czech Republic"] };
     const missing = (fact.value as string[]).filter(code => {
       const escape = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       return !new RegExp(`\\b${escape(code)}\\b`).test(fact.evidence.quote) &&
-        ![names.of(code)!, ...(aliases[code] || [])].some(name => new RegExp(`(?:^|\\W)${escape(name)}(?:$|\\W)`, "i").test(fact.evidence.quote));
+        ![names.of(code)!, shortNames.of(code)!, ...(aliases[code] || [])].some(name => new RegExp(`(?:^|\\W)${escape(name)}(?:$|\\W)`, "i").test(fact.evidence.quote));
     });
     if (missing.length) throw new Error(`Country values ${missing.join(", ")} are absent from their cited block. Cite the actual country rows separately, never a heading or an adjacent block; do not infer countries from a region label. Citation ${fact.evidence.url}#${fact.evidence.blockId}.`);
   }

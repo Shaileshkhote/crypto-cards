@@ -9,6 +9,29 @@ afterEach(() => {
   vi.unstubAllGlobals();
   vi.unstubAllEnvs();
 });
+it("extracts large catalogs one source at a time and reconciles competing claims together", async () => {
+  vi.stubEnv("OPENROUTER_API_KEY", "fixture-not-a-real-key");
+  const a = adapter();
+  const docs = [1.5, 2.5, null].map((rate, i) => documentFromText(`https://example.com/source-${i}`, `${rate === null ? "Information directory." : `Core FX fee: ${rate}% for residents of Germany.`}\n${"General program information. ".repeat(1500)}`));
+  a.sources.urls = docs.map(doc => doc.url);
+  let calls = 0;
+  vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+    if (url.endsWith("/models")) return Response.json({ data: [{ id: modelName(), pricing: { prompt: "0", completion: "0" }, supported_parameters: ["tools", "structured_outputs"] }] });
+    const input = JSON.parse(JSON.parse(String(init?.body)).messages[1].content);
+    expect(input.pages).toHaveLength(1);
+    const index = docs.findIndex(doc => doc.url === input.pages[0].url);
+    expect(index).toBe(calls++);
+    const result = extraction(docs[index], index ? 2.5 : 1.5);
+    if (index === 2) result.facts = [];
+    return Response.json({ usage: { cost: 0 }, choices: [{ finish_reason: "stop", message: { content: JSON.stringify(result) } }] });
+  }));
+  const result = await extract(a, docs, new Budget(0));
+  expect(calls).toBe(3);
+  expect(result.documents).toEqual(docs);
+  expect(result.extraction.facts).toHaveLength(2);
+  expect(result.extraction.facts.every(fact => fact.field === "terms")).toBe(true);
+  expect(result.issues.some(issue => issue.includes("Conflicting source claims"))).toBe(true);
+});
 it("supplies the complete financial inventory including late limits and explicit free charges", async () => {
   vi.stubEnv("OPENROUTER_API_KEY", "fixture-not-a-real-key");
   const doc = documentFromText("https://example.com/fees", Array.from({ length: 7 }, (_, i) => `FX fee ${i}: 1.5%.`).join("\n") + "\nDaily spending limit: 10,000 USD.\nMonthly fee: none.\nNo withdrawal limits.\nAnnual fee: 0.\nAt most 3 ATM withdrawals per day.");
@@ -307,20 +330,28 @@ it("excludes unreachable context tiers while reserving advertised cache-write co
     else { await expect(result).resolves.toBeDefined(); expect(paid).toBe(1); }
   }
 });
-it("can finish a provider after reading multiple substantial pages", async () => {
+it("can finish a provider with multiple substantial pages without accumulating their contexts", async () => {
   vi.stubEnv("OPENROUTER_API_KEY", "fixture-not-a-real-key");
   const docs = Array.from({ length: 12 }, (_, i) => documentFromText(`https://example.com/page-${i}`, Array.from({ length: 35 }, (_, j) => `Clause ${j}: ${"Eligible card purchases and exclusions. ".repeat(15)}`).join("\n")));
+  const a = adapter(); a.sources.urls = docs.map(doc => doc.url);
   let calls = 0;
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
     if (url.endsWith("/models")) return Response.json({ data: [{ id: modelName(), pricing: { prompt: "0.0000004", completion: "0.0000016" }, supported_parameters: ["tools", "structured_outputs"] }] });
-    if (++calls === 2) expect(Buffer.byteLength(String(init?.body))).toBeGreaterThan(256_000);
-    return Response.json({ usage: { cost: 0.001 }, choices: [{ finish_reason: calls === 1 ? "tool_calls" : "stop", message: calls === 1
-      ? { content: null, tool_calls: docs.map((d, i) => ({ id: `read-${i}`, function: { name: "readPage", arguments: JSON.stringify({ url: d.url, offset: 0 }) } })) }
-      : { content: JSON.stringify({ complete: true, products: [], tiers: [], facts: [] }) } }] });
+    const body = JSON.parse(String(init?.body)), input = JSON.parse(body.messages[1].content);
+    expect(input.pages).toHaveLength(1);
+    expect(Buffer.byteLength(String(init?.body))).toBeLessThan(256_000);
+    const doc = docs.find(doc => doc.url === input.pages[0].url)!;
+    const first = body.messages.length === 2; calls++;
+    return Response.json({ usage: { cost: 0.001 }, choices: [{ finish_reason: first ? "tool_calls" : "stop", message: first
+      ? { content: null, tool_calls: [{ id: `read-${calls}`, function: { name: "readPage", arguments: JSON.stringify({ url: doc.url, offset: 0 }) } }] }
+      : { content: JSON.stringify({ complete: true, products: [], tiers: [], facts: [{ ...extraction(doc).facts[0], field: "terms", value: [doc.blocks[0].text] }] }) } }] });
   }));
-  await expect(extract(adapter(), docs, new Budget())).resolves.toMatchObject({ extraction: { complete: true } });
-  expect(calls).toBe(2);
+  const result = await extract(a, docs, new Budget());
+  expect(result.extraction.complete).toBe(true);
+  expect(result.extraction.facts).toHaveLength(12);
+  expect(calls).toBe(24);
 });
+
 it("searches later sources even when a long first page contains many matches", async () => {
   vi.stubEnv("OPENROUTER_API_KEY", "fixture-not-a-real-key");
   const first = documentFromText("https://example.com/legal", Array.from({ length: 60 }, (_, i) => `Fee section ${i}: conditions apply.`).join("\n"));

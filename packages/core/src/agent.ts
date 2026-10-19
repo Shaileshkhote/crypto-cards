@@ -16,7 +16,8 @@ import { normalizeUrl, verifyEvidence } from "./crawler";
 import { candidate, preserveSourceDisagreements } from "./merge";
 import { verifyFinancialEvidence } from "./evidence";
 
-export const PROMPT_VERSION = "39";
+export const PROMPT_VERSION = "40";
+const SOURCE_BATCH_BYTES = 64_000;
 const REASONING_EFFORT = "medium";
 const MAX_OUTPUT_TOKENS = 24_000;
 const REQUEST_TIMEOUT_MS = 300_000;
@@ -28,6 +29,7 @@ export const extractionSettings = () => ({
   prompt: PROMPT_VERSION,
   schema: SCHEMA_VERSION,
   maxSteps: 12,
+  sourceBatchBytes: SOURCE_BATCH_BYTES,
   toolChoice: "required on the first turn; auto thereafter; none on the final turn",
   outputFormat: "json_schema with optional fields; strict runtime schema validation",
   maxOutputTokens: MAX_OUTPUT_TOKENS,
@@ -291,12 +293,34 @@ function validationFeedback(issues: z.ZodIssue[]): string {
   ]);
 }
 
-export const extract: Extractor = async (
-  adapter,
-  initial,
-  budget,
-  discover,
-) => {
+export const extract: Extractor = async (adapter, initial, budget, discover) => {
+  if (initial.length < 2 || discover || Buffer.byteLength(canonical(initial.map(doc => doc.blocks))) <= SOURCE_BATCH_BYTES)
+    return extractDocuments(adapter, initial, budget, discover);
+  // Source-level cache records already exist. Keep large catalogs independent
+  // during generation so one response cannot mix pages or exhaust its output.
+  const results: AgentResult[] = [];
+  for (const doc of initial)
+    results.push(await extractDocuments(adapter, [doc], budget, undefined, true));
+  const documents = results.flatMap(result => result.documents);
+  const reconciled = preserveSourceDisagreements({
+    complete: results.every(result => result.extraction.complete),
+    products: results.flatMap(result => result.extraction.products),
+    tiers: results.flatMap(result => result.extraction.tiers),
+    facts: results.flatMap(result => result.extraction.facts),
+  }, adapter.sources);
+  if (!reconciled.extraction.facts.length && adapter.sources.urls.every(url => initial.some(doc => normalizeUrl(doc.url) === normalizeUrl(url))))
+    throw new Error("Empty full-inventory extraction; published data retained");
+  candidate(adapter, [reconciled.extraction], undefined, documents);
+  return { extraction: reconciled.extraction, documents, issues: [...new Set([...results.flatMap(result => result.issues), ...reconciled.issues])] };
+};
+
+const extractDocuments = async (
+  adapter: Adapter,
+  initial: Document[],
+  budget: Budget,
+  discover?: Parameters<Extractor>[3],
+  sourceBatch = false,
+): Promise<AgentResult> => {
   if (adapter.config.retired)
     throw new Error(`Adapter is retired: ${adapter.config.id}`);
   if (!process.env.OPENROUTER_API_KEY)
@@ -664,7 +688,7 @@ export const extract: Extractor = async (
       };
       const hydrated = removeOptionalNulls(hydrate(JSON.parse(choice.message.content || "")), Extraction);
       const parsed = Extraction.safeParse(hydrated);
-      if (parsed.success && parsed.data.complete && !parsed.data.facts.length && adapter.sources.urls.every(url => initial.some(doc => normalizeUrl(doc.url) === normalizeUrl(url))))
+      if (!sourceBatch && parsed.success && parsed.data.complete && !parsed.data.facts.length && adapter.sources.urls.every(url => initial.some(doc => normalizeUrl(doc.url) === normalizeUrl(url))))
         throw new Error("Empty full-inventory extraction; published data retained. Extract supported source facts before marking the full inventory complete. Return the entire corrected extraction.");
       const incomplete = (hydrated as { complete?: unknown } | null)?.complete === false;
       if (!parsed.success || referenceErrors.length || incomplete) {
@@ -702,7 +726,7 @@ export const extract: Extractor = async (
         candidate(adapter, [extraction], undefined, documents);
         throw error;
       }
-      const fullInventory = adapter.sources.urls.every(url => initial.some(doc => normalizeUrl(doc.url) === normalizeUrl(url)));
+      const fullInventory = sourceBatch || adapter.sources.urls.every(url => initial.some(doc => normalizeUrl(doc.url) === normalizeUrl(url)));
       const coverageText = (text: string) => text.normalize("NFKC").toLowerCase().replace(/\s+/g, " ").trim();
       const cited = (url: string, id: string, fields: string[]) => {
         const block = documents.find(doc => doc.url === url)!.blocks[Number(id.split("b")[1]) - 1];
@@ -743,7 +767,7 @@ export const extract: Extractor = async (
         for (const [index, block] of doc.blocks.entries())
           message = message.replaceAll(`${doc.url}#${block.id}`, `${doc.url}#p${documents.indexOf(doc) + 1}b${index + 1}`);
       if (++corrections > 2 || step === 11) throw new Error(message);
-      messages.push({ role: "user", content: `Candidate validation failed: ${message}. Return the entire corrected extraction JSON, including all supported facts from the previous draft. Do not return only the changed facts. Correct the candidate using the existing sources and schema; never invent facts to satisfy validation.` });
+      messages.push({ role: "user", content: `Candidate validation failed: ${message}. Replace or remove each invalid original fact; do not retain it alongside a corrected replacement. Split facts spanning different source blocks into separately cited facts. Return the entire corrected extraction JSON, including all supported facts from the previous draft. Do not return only the changed facts. Correct the candidate using the existing sources and schema; never invent facts to satisfy validation.` });
     }
   }
   throw new Error("Agent step limit exceeded");
