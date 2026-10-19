@@ -1,4 +1,5 @@
 import { it, expect } from "vitest";
+import { verifyFinancialEvidence } from "../packages/core/src/evidence";
 import {
   parseHtml,
   documentFromText,
@@ -29,6 +30,20 @@ it("repeats table headers across bounded blocks without losing rows", () => {
   expect(doc.blocks.length).toBeGreaterThan(1);
   expect(doc.blocks.every(b => b.text.startsWith("Country | Eligibility") && b.text.length <= 1600)).toBe(true);
   for (let i = 0; i < 80; i++) expect(doc.content).toContain(`Country ${i} | Available`);
+});
+it("keeps an introductory paragraph with bounded list rows without leaking free context into later charges", () => {
+  const rows = Array.from({ length: 80 }, (_, i) => `<li><p>Tier ${i}:</p><p>up to ${100 + i} EUR</p></li>`).join("");
+  const doc = parseHtml("https://example.com/allowances", `<p>Free ATM withdrawals per month by tier:</p><ul>${rows}</ul><p>After the allowance: 2% fee.</p>`);
+  const allowances = doc.blocks.filter(b => b.text.includes("Tier "));
+  expect(allowances.length).toBeGreaterThan(1);
+  expect(allowances.every(b => b.text.startsWith("Free ATM withdrawals per month by tier:") && b.text.length <= 1600)).toBe(true);
+  for (let i = 0; i < 80; i++) expect(doc.content).toContain(`Tier ${i}: up to ${100 + i} EUR`);
+  const block = allowances.find(b => b.text.includes("Tier 79:"))!;
+  const fact = { field: "fees" as const, productId: "card", tierId: "tier-79", inherit: false, value: [{ id: "atm", kind: "atm" as const, scope: {}, calculation: "percentage" as const, ratePercent: 0, calculable: true as const, allowance: { amount: { amount: "179", currency: "EUR" }, period: "month" as const } }], evidence: { url: doc.url, blockId: block.id, quote: block.text } };
+  expect(() => verifyFinancialEvidence(fact)).not.toThrow();
+  const paid = doc.blocks.find(b => b.text.includes("After the allowance:"))!;
+  expect(paid.text).not.toContain("Free ATM");
+  expect(() => verifyFinancialEvidence({ ...fact, value: [{ ...fact.value[0], allowance: undefined }], evidence: { url: doc.url, blockId: paid.id, quote: paid.text } })).toThrow("Financial value 0 is absent");
 });
 it("checks quote, URL and block together", () => {
   const doc = documentFromText("https://example.com", "FX: 0%.");

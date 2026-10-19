@@ -177,6 +177,24 @@ export function parseHtml(url: string, html: string): Document {
     // every cell row from its header lost plan/currency/period context.
     $(table).replaceWith(`\n${tableBlocks(rows).join("\n")}\n`);
   });
+  $("ul,ol").each((_, list) => {
+    const paragraph = $(list).prev("p");
+    const context = normalize(paragraph.text()).replaceAll("\n", " ");
+    if (!context.endsWith(":") || $(list).find("ul,ol").length) return;
+    const rows = $(list).children("li").map((_, li) => {
+      const item = $(li).clone();
+      item.find("p,div,section,br").each((_, el) => {
+        $(el).prepend("\n");
+        $(el).append("\n");
+      });
+      return normalize(item.text()).replaceAll("\n", " ");
+    }).get();
+    if (!rows.length) return;
+    // A directly introduced list needs its paragraph, just as table rows
+    // need headers. Repeat that real context across bounded groups of rows.
+    paragraph.remove();
+    $(list).replaceWith($("<div>").text(`\n${tableBlocks([context, ...rows]).join("\n")}\n`));
+  });
   $("h1,h2,h3,h4,p,li,div,section,header,footer,br").each((_, el) => {
     $(el).prepend("\n");
     $(el).append("\n");
