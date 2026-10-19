@@ -162,17 +162,26 @@ export function parseHtml(url: string, html: string): Document {
   $(
     'script,style,nav,[role="navigation"],noscript,svg,[aria-hidden="true"]',
   ).remove();
+  // HTML source formatting is whitespace, not a paragraph boundary. Keep
+  // inline emphasis with its surrounding claim before adding block breaks.
+  $("*").contents().each((_, node) => {
+    if (node.type === "text" && !$(node).parents("pre,code").length)
+      node.data = node.data.replace(/\s+/g, " ");
+  });
   const main = $("main,[role='main']").filter((_, el) => normalize($(el).text()).length > 0).first();
   const articles = $("article").filter((_, el) => normalize($(el).text()).length > 0);
   // React can stream an article outside an initially empty main placeholder.
   const primary = main.length ? main : articles.length === 1 ? articles.first() : $([]);
   if (primary.length) {
-    // Shared site chrome and unrelated product promotions are not article
-    // content. Keep real card-issuer disclosures commonly placed in footers.
+    // Keep page sections outside main and actual footer disclosures: pricing
+    // and issuer clauses are sometimes placed after the main page content.
+    const sections = $("section").filter((_, el) =>
+      !$(el).closest("main,[role='main'],article,header,footer,[role='contentinfo'],aside").length &&
+      !$(el).parents("section").length);
     const disclosures = $("footer p,footer small,[role='contentinfo'] p,[role='contentinfo'] small")
-      .filter((_, el) => !$(el).closest("main,[role='main']").length && /\b(?:issued by|issuing bank|card issuer|issuer of (?:the |your )?card)\b/i.test($(el).text()))
+      .filter((_, el) => !$(el).closest("main,[role='main']").length && /\b(?:issued by|issuing bank|card issuer|issuer of (?:the |your )?card|fees?|charges?|costs?|limits?|markup)\b/i.test($(el).text()))
       .clone();
-    $("body").empty().append(primary, disclosures);
+    $("body").empty().append(primary, sections, disclosures);
   }
   $("table").each((_, table) => {
     const elements = $(table).find("tr").filter((_, tr) => $(tr).closest("table")[0] === table).toArray();

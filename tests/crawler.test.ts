@@ -162,3 +162,18 @@ it("reads a streamed server-rendered article outside an empty main placeholder",
   expect(doc.content).toContain("No monthly card fee.");
   expect(doc.content).not.toContain("99% APY");
 });
+
+it("retains pricing sections outside main and qualified financial footer disclosures", () => {
+  const doc = parseHtml("https://example.com/card", '<main><h1>Card</h1><p>Physical cards available.</p></main><section><p>$300 Annual Fee</p><h2>Apply for your card</h2></section><footer><p>FX conversions are subject to a ~0.5% partner pass-through fee on all tiers. No provider markup.</p><p>Unrelated staking product: 99% APY.</p></footer>');
+  expect(doc.content).toContain("$300 Annual Fee");
+  expect(doc.content).toContain("~0.5% partner pass-through fee");
+  expect(doc.content).toContain("No provider markup.");
+  expect(doc.content).not.toContain("99% APY");
+});
+
+it("treats formatting newlines around inline emphasis as part of one source claim", () => {
+  const doc = parseHtml("https://example.com/card", '<main><div>\n The\n <strong>first 10,000 users</strong> who register will enjoy\n <strong>zero fees within 600 USDT monthly spending</strong> and a special card face.\n</div><p>Annual fee: USD 10.<br>Physical card delivery: USD 5.</p></main>');
+  expect(doc.blocks.some(block => block.text === "The first 10,000 users who register will enjoy zero fees within 600 USDT monthly spending and a special card face.")).toBe(true);
+  expect(doc.blocks.some(block => block.text === "Annual fee: USD 10.")).toBe(true);
+  expect(doc.blocks.some(block => block.text === "Physical card delivery: USD 5.")).toBe(true);
+});
