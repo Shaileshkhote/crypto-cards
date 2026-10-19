@@ -36,7 +36,7 @@ it("preserves line breaks and paragraph boundaries inside financial table cells"
   expect(doc.content).toContain("Free ATM withdrawals | USD 200 per month");
   expect(doc.content).toContain("ATM withdrawals cap | USD 5000 per month");
   const block = doc.blocks.find(b => b.text.includes("Free ATM"))!;
-  const fact = { field: "limits" as const, productId: "card", tierId: "basic", inherit: false, value: [{ id: "atm", kind: "atm", scope: {}, amount: { amount: "200", currency: "USD" }, period: "month", calculable: true }], evidence: { url: doc.url, blockId: block.id, quote: block.text } };
+  const fact = { field: "limits" as const, productId: "card", tierId: "basic", inherit: false, value: [{ id: "atm", kind: "atm" as const, scope: {}, amount: { amount: "200", currency: "USD" }, period: "month" as const, calculable: true as const }], evidence: { url: doc.url, blockId: block.id, quote: block.text } };
   expect(() => verifyFinancialEvidence(fact)).toThrow("is an allowance, not a hard withdrawal limit");
   expect(() => verifyFinancialEvidence({ ...fact, value: [{ ...fact.value[0], amount: { amount: "5000", currency: "USD" } }] })).not.toThrow();
 });

@@ -31,7 +31,7 @@ export const extractionSettings = () => ({
   maxOutputTokens: MAX_OUTPUT_TOKENS,
   requestTimeoutMs: REQUEST_TIMEOUT_MS,
   temperature: "0 when supported",
-  reasoning: "low when supported",
+  reasoning: "medium when supported",
   provider: process.env.EXTRACTION_PROVIDER || null,
 });
 export const fingerprint = (
@@ -410,7 +410,7 @@ export const extract: Extractor = async (
       tools,
       tool_choice: step === 11 ? "none" : "auto",
       ...(prices.temperature ? { temperature: 0 } : {}),
-      ...(prices.reasoning ? { reasoning: { effort: "low", exclude: true } } : {}),
+      ...(prices.reasoning ? { reasoning: { effort: "medium", exclude: true } } : {}),
       max_tokens: MAX_OUTPUT_TOKENS,
       usage: { include: true },
       provider: {
@@ -632,6 +632,8 @@ export const extract: Extractor = async (
       };
       const hydrated = removeOptionalNulls(hydrate(JSON.parse(choice.message.content || "")), Extraction);
       const parsed = Extraction.safeParse(hydrated);
+      if (parsed.success && parsed.data.complete && !parsed.data.facts.length && adapter.sources.urls.every(url => initial.some(doc => normalizeUrl(doc.url) === normalizeUrl(url))))
+        throw new Error("Empty full-inventory extraction; published data retained. Extract supported source facts before marking the full inventory complete. Return the entire corrected extraction.");
       const incomplete = (hydrated as { complete?: unknown } | null)?.complete === false;
       if (!parsed.success || referenceErrors.length || incomplete) {
         const errors = [...referenceErrors, ...(!parsed.success ? [validationFeedback(parsed.error.issues)] : []), ...(incomplete ? ["Agent marked extraction incomplete; finish reading the available sources"] : [])];

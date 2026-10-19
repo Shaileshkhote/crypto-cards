@@ -7,6 +7,28 @@ afterEach(() => {
   vi.unstubAllGlobals();
   vi.unstubAllEnvs();
 });
+it("corrects an empty full-inventory response instead of accepting complete with no facts", async () => {
+  vi.stubEnv("OPENROUTER_API_KEY", "fixture-not-a-real-key");
+  const doc = document(), good = extraction(doc);
+  let calls = 0;
+  vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+    if (url.endsWith("/models")) return Response.json({ data: [{ id: modelName(), pricing: { prompt: "0", completion: "0" }, supported_parameters: ["tools", "structured_outputs"] }] });
+    if (++calls === 2) expect(JSON.parse(String(init?.body)).messages.at(-1).content).toContain("Empty full-inventory extraction");
+    return Response.json({ usage: { cost: 0 }, choices: [{ finish_reason: "stop", message: { content: JSON.stringify(calls === 1 ? { complete: true, products: [], tiers: [], facts: [] } : good) } }] });
+  }));
+  await expect(extract(adapter(), [doc], new Budget(0))).resolves.toMatchObject({ extraction: good });
+  expect(calls).toBe(2);
+});
+it("allows an empty changed-source result when other configured sources remain outside the invocation", async () => {
+  vi.stubEnv("OPENROUTER_API_KEY", "fixture-not-a-real-key");
+  const a = adapter(), doc = document();
+  a.sources.urls.push("https://example.com/unchanged");
+  const empty = { complete: true, products: [], tiers: [], facts: [] };
+  vi.stubGlobal("fetch", vi.fn(async (url: string) => url.endsWith("/models")
+    ? Response.json({ data: [{ id: modelName(), pricing: { prompt: "0", completion: "0" }, supported_parameters: ["tools", "structured_outputs"] }] })
+    : Response.json({ usage: { cost: 0 }, choices: [{ finish_reason: "stop", message: { content: JSON.stringify(empty) } }] })));
+  await expect(extract(a, [doc], new Budget(0))).resolves.toMatchObject({ extraction: empty });
+});
 it("skips retired adapters before any database, fetch or model work even when forced", async () => {
   const a = adapter(), doc = document(), before = fingerprint(doc, a);
   const fetch = vi.fn(), extractor = vi.fn();
@@ -341,7 +363,7 @@ it("shows late search matches and different excerpts from the same block without
       : { name: "readPage", arguments: JSON.stringify({ url: doc.url, offset: 0 }) };
     return Response.json({ usage: { cost: 0 }, choices: [{ finish_reason: turn < 4 ? "tool_calls" : "stop", message: turn < 4
       ? { content: null, tool_calls: [{ id: `tool-${turn}`, function: tool }] }
-      : { content: JSON.stringify({ complete: true, products: [], tiers: [], facts: [] }) } }] });
+      : { content: JSON.stringify({ complete: true, products: [], tiers: [], facts: [{ productId: "card", tierId: null, inherit: false, field: "fees", value: [{ id: "fast-ach", kind: "other", serviceId: "fast-ach", scope: { paymentRails: ["ach"], conditions: ["Fast ACH"] }, calculation: "unknown", calculable: false, description: "Fast ACH: $1 plus 0.75%." }], evidence: { url: doc.url, blockId: doc.blocks[0].id, quote: doc.blocks[0].text } }] }) } }] });
   }));
   await extract(adapter(), [doc], new Budget(0));
   expect(calls).toBe(4);
