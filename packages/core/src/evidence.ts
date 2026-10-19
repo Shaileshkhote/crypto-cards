@@ -15,7 +15,7 @@ export function verifyEvidence(
 function financialNumbers(quote: string, implicitZero = true) {
   // A short comma fraction immediately before % is unambiguous (e.g. 1,5%).
   // Keep three-digit grouping and ambiguous money such as 10.000$ unchanged.
-  const numericText = quote.replace(/(?<![\d.,-])(\d+),(\d{1,2})(?=\s*%)/g, "$1.$2");
+  const numericText = quote.replace(/([A-Za-z])(?=\d+(?:[.,]\d+)?\s*%)/g, "$1 ").replace(/(?<![\d.,-])(\d+),(\d{1,2})(?=\s*%)/g, "$1.$2");
   const numbers = [...numericText.matchAll(/\b(\d+(?:[,\u00a0 ]\d{3})*(?:\.\d+)?)(?:\s*(k|m|thousand|million)\b)?/gi)].map(match => {
     const [whole, fraction = ""] = match[1].replace(/[,\s]/g, "").replace(/^0+(?=\d)/, "").split(".");
     const scale = /^(m|million)$/i.test(match[2] || "") ? 6 : match[2] ? 3 : 0;

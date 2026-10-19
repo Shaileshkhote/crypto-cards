@@ -155,6 +155,15 @@ describe("deterministic merge and protection", () => {
     expect(card.products![0].features).toEqual(["Contactless payments", "Travel insurance"]);
     expect(card.products![0].fieldSources!.features).toHaveLength(2);
   });
+  it("recognizes percentages adjacent to source labels without inventing currency", () => {
+    for (const [text, rate] of [["Service Fee0%", 0], ["FX Fee1.5%", 1.5]] as const) {
+      const doc = documentFromText("https://example.com/fees", text), e = extraction(doc);
+      e.facts[0].value = [{ id: "service", kind: "other", serviceId: "card-service", scope: {}, calculation: "percentage", ratePercent: rate, calculable: true }];
+      expect(candidate(adapter(), [e], undefined, [doc]).data.products![0].tiers![0].fees![0]).toMatchObject({ ratePercent: rate });
+      e.facts[0].value = [{ id: "service", kind: "other", serviceId: "card-service", scope: {}, calculation: "fixed", fixed: { amount: "0", currency: "USD" }, calculable: true }];
+      expect(() => candidate(adapter(), [e], undefined, [doc])).toThrow("Money currency USD is absent");
+    }
+  });
   it("does not invent fixed-money currency for a zero percentage", () => {
     const a = adapter(), doc = documentFromText("https://example.com/fees", "Top-up fee: 0%."), e = extraction(doc);
     e.facts[0].value = [{ id: "topup", kind: "topup", scope: {}, calculation: "fixed", fixed: { amount: "0", currency: "USD" }, calculable: true }];
