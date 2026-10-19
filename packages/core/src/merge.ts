@@ -277,7 +277,22 @@ export function candidate(
     try { verifyFinancialEvidence(fact); return []; }
     catch (error) { return [`facts[${index}]: ${error instanceof Error ? error.message : String(error)}`]; }
   }));
+  // Report structural conflicts alongside wrong citations, rather than hiding
+  // them until a later correction. Nothing can escape with invalid evidence.
+  let built: ReturnType<typeof assembleCandidate>;
+  try { built = assembleCandidate(adapter, extractions, accepted); }
+  catch (error) {
+    if (!evidenceErrors.length) throw error;
+    throw new Error([...evidenceErrors.slice(0, 20), error instanceof Error ? error.message : String(error)].join("\n"));
+  }
   if (evidenceErrors.length) throw new Error(evidenceErrors.slice(0, 20).join("\n"));
+  return built;
+}
+function assembleCandidate(
+  adapter: Adapter,
+  extractions: ExtractionData[],
+  accepted?: CardData,
+): { data: CardData; discrepancies: string[] } {
   const knownProducts = [
     ...adapter.config.products,
     ...(accepted?.products || []),

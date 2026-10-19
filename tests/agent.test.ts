@@ -367,31 +367,36 @@ it("reports every missing financial scope in a single correction without assumin
   expect(calls).toBe(2);
 });
 
-it("keeps source text and tool reasoning while omitting opaque final-draft reasoning from a correction", async () => {
+it("keeps sources and tool reasoning while replacing superseded drafts before corrections exhaust context", async () => {
   vi.stubEnv("OPENROUTER_API_KEY", "offline-fixture-not-a-key");
   const doc = document(), good = extraction(doc), bad = structuredClone(good);
   delete (bad.facts[0].value as Record<string, unknown>[])[0].scope;
+  (bad.facts[0].value as Record<string, unknown>[])[0].description = "superseded draft " + "x".repeat(250_000);
+  const corrected = structuredClone(good);
+  Object.assign((corrected.facts[0].value as Record<string, unknown>[])[0], { ratePercent: 99, description: "current draft " + "y".repeat(250_000) });
   const toolReasoning = [{ type: "reasoning.encrypted", data: "tool-continuation-state" }];
   let calls = 0;
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
     if (url.endsWith("/models")) return Response.json({ data: [{ id: modelName(), pricing: { prompt: "0", completion: "0" }, supported_parameters: ["tools", "structured_outputs"] }] });
     const turn = ++calls, body = JSON.parse(String(init?.body));
-    if (turn === 3) {
+    if (turn === 3 || turn === 4) {
       const assistants = body.messages.filter((m: { role: string }) => m.role === "assistant");
+      expect(assistants).toHaveLength(2);
       expect(assistants[0].reasoning_details).toEqual(toolReasoning);
-      expect(assistants[1].content).toBe(JSON.stringify(bad));
+      expect(assistants[1].content).toBe(JSON.stringify(turn === 3 ? bad : corrected));
       expect(assistants[1].reasoning_details).toBeUndefined();
+      expect(body.messages.filter((m: { role: string; content?: string }) => m.role === "user" && m.content?.startsWith("Candidate validation failed:"))).toHaveLength(1);
       const source = body.messages.find((m: { role: string }) => m.role === "tool");
       expect(JSON.parse(source.content).blocks[0].text).toBe(doc.blocks[0].text);
       expect(Buffer.byteLength(String(init?.body))).toBeLessThan(512_000);
     }
     const message = turn === 1
       ? { content: null, tool_calls: [{ id: "read", function: { name: "readPage", arguments: JSON.stringify({ url: doc.url, offset: 0 }) } }], reasoning_details: toolReasoning }
-      : { content: JSON.stringify(turn === 2 ? bad : good), reasoning_details: [{ type: "reasoning.encrypted", data: "x".repeat(520_000) }] };
+      : { content: JSON.stringify(turn === 2 ? bad : turn === 3 ? corrected : good), reasoning_details: [{ type: "reasoning.encrypted", data: "x".repeat(520_000) }] };
     return Response.json({ usage: { cost: 0 }, choices: [{ finish_reason: turn === 1 ? "tool_calls" : "stop", message }] });
   }));
   expect((await extract(adapter(), [doc], new Budget(0))).extraction).toEqual(good);
-  expect(calls).toBe(3);
+  expect(calls).toBe(4);
 });
 
 it("reports the short source selector and wrong cited text when a financial row needs correction", async () => {

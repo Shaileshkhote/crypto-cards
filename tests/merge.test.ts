@@ -137,6 +137,7 @@ describe("deterministic merge and protection", () => {
       expect(message).toContain("Money currency USD is absent");
       expect(message).toContain("Financial value 10 is absent");
       expect(message).toContain("Financial value 20 is absent");
+      expect(message).toContain("Conflicting extracted facts");
       expect(message).toContain(doc.url);
     }
   });

@@ -496,6 +496,16 @@ export const extract: Extractor = async (
     if (data.error) throw new Error(`OpenRouter: ${data.error.message}`);
     const choice = data.choices?.[0];
     if (!choice) throw new Error("OpenRouter returned no choice");
+    if (!choice.message.tool_calls?.length) {
+      // The newest complete draft replaces earlier invalid drafts and their
+      // feedback. Keep every source/tool message and tool continuation.
+      for (let index = messages.length - 1; index >= 0; index--) {
+        const message = messages[index];
+        if ((message.role === "assistant" && !message.tool_calls) ||
+            (message.role === "user" && typeof message.content === "string" && message.content.startsWith("Candidate validation failed:")))
+          messages.splice(index, 1);
+      }
+    }
     // Tool continuations need their provider reasoning state. A completed
     // draft starts a new turn when corrected: retain its visible JSON, not
     // the opaque reasoning blob that can dwarf the draft and exhaust context.
