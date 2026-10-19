@@ -424,6 +424,7 @@ it("reports unknown source URLs, malformed fields and wrong financial rows toget
   const doc = documentFromText("https://example.com/fees", "FX fee: 1.5%.\nCollateral can be increased voluntarily.");
   const good = extraction(doc), bad = structuredClone(good);
   bad.facts[0].evidence = { url: doc.url, blockId: "p1b2" } as typeof bad.facts[0]["evidence"];
+  bad.complete = false;
   for (const url of ["https://example.com/typo-one", "https://example.com/typo-two"])
     bad.facts.push({ ...good.facts[0], evidence: { url, blockId: "p1b1" } } as typeof bad.facts[number]);
   bad.facts.push({ ...good.facts[0], field: "residentCountries", value: [""] } as typeof bad.facts[number]);
@@ -437,6 +438,7 @@ it("reports unknown source URLs, malformed fields and wrong financial rows toget
       expect(feedback).toContain("https://example.com/typo-one");
       expect(feedback).toContain("https://example.com/typo-two");
       expect(feedback).toContain("invalid_enum_value");
+      expect(feedback).toContain("Agent marked extraction incomplete");
       expect(feedback).not.toContain(doc.blocks[1].id);
     }
     return Response.json({ usage: { cost: 0 }, choices: [{ finish_reason: "stop", message: { content: JSON.stringify(calls === 1 ? bad : good) } }] });

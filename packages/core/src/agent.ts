@@ -630,8 +630,9 @@ export const extract: Extractor = async (
       };
       const hydrated = removeOptionalNulls(hydrate(JSON.parse(choice.message.content || "")), Extraction);
       const parsed = Extraction.safeParse(hydrated);
-      if (!parsed.success || referenceErrors.length) {
-        const errors = [...referenceErrors, ...(!parsed.success ? [validationFeedback(parsed.error.issues)] : [])];
+      const incomplete = (hydrated as { complete?: unknown } | null)?.complete === false;
+      if (!parsed.success || referenceErrors.length || incomplete) {
+        const errors = [...referenceErrors, ...(!parsed.success ? [validationFeedback(parsed.error.issues)] : []), ...(incomplete ? ["Agent marked extraction incomplete; finish reading the available sources"] : [])];
         // A malformed field or URL must not hide independently verifiable
         // wrong financial rows until the next correction. Never publish a
         // partially parsed draft or manufacture a quote for an unknown URL.
@@ -646,7 +647,6 @@ export const extract: Extractor = async (
         throw new Error([...new Set(errors)].join("\n"));
       }
       const extraction = parsed.data;
-      if (!extraction.complete) throw new Error("Agent marked extraction incomplete; finish reading the available sources");
 
       const invalid = extraction.facts.flatMap((f, index) =>
         verifyEvidence(f.evidence, documents) ? [] : [{ index, evidence: f.evidence }],
