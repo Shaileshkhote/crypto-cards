@@ -554,7 +554,7 @@ it("scopes an explicit zero addition to provider markup and preserves the networ
 });
 
 it("rejects a country inventory cited to a heading instead of the country rows", () => {
-  const a = adapter(), doc = documentFromText("https://example.com/countries", "The card is currently available in:\nSingapore, mainland China.\nUK and Hong Kong.\nMyanmar.");
+  const a = adapter(), doc = documentFromText("https://example.com/countries", "The card is currently available in:\nSingapore, mainland China.\nUK and Hong Kong.\nMyanmar.\nCôte d'Ivoire, Saint Kitts and Nevis, Saint Lucia, Saint Vincent and the Grenadines, Trinidad and Tobago, UAE.");
   const e = extraction(doc);
   const claim = { ...e.facts[0], field: "residentCountries", value: ["SG", "CN"], evidence: { url: doc.url, blockId: doc.blocks[0].id, quote: doc.blocks[0].text } };
   e.facts = [claim];
@@ -565,6 +565,8 @@ it("rejects a country inventory cited to a heading instead of the country rows",
   expect(candidate(a, [e], undefined, [doc]).data.products![0].tiers![0].residentCountries).toEqual(["GB", "HK"]);
   e.facts = [{ ...claim, value: ["MM"], evidence: { ...claim.evidence, blockId: doc.blocks[3].id, quote: doc.blocks[3].text } }];
   expect(candidate(a, [e], undefined, [doc]).data.products![0].tiers![0].residentCountries).toEqual(["MM"]);
+  e.facts = [{ ...claim, value: ["CI", "KN", "LC", "VC", "TT", "AE"], evidence: { ...claim.evidence, blockId: doc.blocks[4].id, quote: doc.blocks[4].text } }];
+  expect(candidate(a, [e], undefined, [doc]).data.products![0].tiers![0].residentCountries).toEqual(["AE", "CI", "KN", "LC", "TT", "VC"]);
   e.facts = [{ ...claim, value: ["IN"], evidence: { ...claim.evidence, quote: doc.blocks[0].text } }];
   expect(() => candidate(a, [e], undefined, [doc])).toThrow("Country values IN are absent");
 });
