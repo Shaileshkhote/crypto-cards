@@ -1,3 +1,5 @@
+> Historical report. Current all-active results and limitations are in [validation status](validation.md). Current code uses schema 8 / prompt 41 / merge 18 with shared per-source extraction and caching. The earlier counts, budgets and accepted database described below have not been recovered in this environment.
+
 # Card fixes — 19 October 2026 UTC
 
 Ready, SafePal and Gnosis Pay are retired through `config.retired`. The active inventory is **33 adapters / 396 URLs**; the archive retains all 36 configurations and 433 URLs. Retirement excludes providers from ingestion and public data while preserving accepted records and history. Force does not bypass retirement.

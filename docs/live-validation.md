@@ -1,3 +1,5 @@
+> Historical report. Current all-active results and limitations are in [validation status](validation.md). Current code uses schema 8 / prompt 41 / merge 18 with shared per-source extraction and caching. The earlier counts, budgets and accepted database described below have not been recovered in this environment.
+
 # Live validation — 2026-10-19 UTC
 
 Current code uses **schema 8 / prompt 31 / merge 15**. The [six-card source fixes](source-decisions.md) have fresh HTTP/parser evidence and regression coverage. A fresh paid run of this profile has not been performed: no OpenRouter binding is available. The paid measurements below refer to the earlier prompt-30 profile and must not be reported as current-profile acceptance.
