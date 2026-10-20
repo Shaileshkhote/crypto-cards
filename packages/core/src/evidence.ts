@@ -34,8 +34,9 @@ function financialNumbers(quote: string, implicitZero = true) {
 // supply an amount/count that is absent from the selected evidence block.
 export function verifyFinancialEvidence(fact: ExtractionData["facts"][number]) {
   if (fact.field === "cardTypes" && fact.value && typeof fact.value === "object") {
-    for (const [kind, words] of [["physical", /\b(?:physical|plastic|metal)\b/i], ["virtual", /\b(?:virtual|digital)\b/i]] as const)
-      if (typeof (fact.value as Record<string, unknown>)[kind] === "boolean" && !words.test(fact.evidence.quote))
+    const citedWords = new Set(fact.evidence.quote.normalize("NFC").toLowerCase().match(/[\p{L}\p{M}]+/gu) || []);
+    for (const [kind, words] of [["physical", ["physical", "plastic", "metal", "फ़िज़िकल", "फिजिकल", "भौतिक"]], ["virtual", ["virtual", "digital", "वर्चुअल", "डिजिटल"]]] as const)
+      if (typeof (fact.value as Record<string, unknown>)[kind] === "boolean" && !words.some(word => citedWords.has(word)))
         throw new Error(`${kind} card availability is absent from its cited block. Cite explicit support for each card type separately; one type does not establish the other.`);
   }
   if (["residentCountries", "excludedResidentCountries"].includes(fact.field) && Array.isArray(fact.value)) {

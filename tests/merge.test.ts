@@ -634,3 +634,12 @@ it("confirms fresh canonical tier evidence when source IDs resolve through a kno
   const missing = markUnconfirmed(accepted, [doc], [absent], candidate(a, [absent], undefined, [doc]).data);
   expect(missing.products![0].tiers!.find(t => t.id === "core")!.unconfirmedFields).toContain("fees");
 });
+
+it("recognizes explicit Hindi card types while rejecting an unspecified card", () => {
+  const doc = documentFromText("https://example.com/card", "आपको तुरंत एक वर्चुअल कार्ड मिलता है. स्टोर और ATM उपयोग के लिए आप फ़िज़िकल कार्ड ऑर्डर कर सकते हैं."), e = extraction(doc);
+  e.facts[0] = { ...e.facts[0], field: "cardTypes", value: { physical: true, virtual: true } };
+  expect(candidate(adapter(), [e], undefined, [doc]).data.products![0].tiers![0].cardTypes).toEqual({ physical: true, virtual: true });
+  const generic = documentFromText(doc.url, "कार्ड उपलब्ध है."), unsupported = extraction(generic);
+  unsupported.facts[0] = { ...unsupported.facts[0], field: "cardTypes", value: { virtual: true } };
+  expect(() => candidate(adapter(), [unsupported], undefined, [generic])).toThrow("virtual card availability is absent");
+});
