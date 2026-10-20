@@ -187,7 +187,7 @@ describe("deterministic merge and protection", () => {
     }
   });
   it("accepts definite absence of a fee while rejecting uncertain absence", () => {
-    for (const text of ["The card does not have any monthly or annual fees.", "Fees do not apply to these transfers.", "We don't have an annual fee.", "USD transactions do not incur an additional FX fee.", "Transaction fees are waived for the first $100 per month."]) {
+    for (const text of ["The card does not have any monthly or annual fees.", "Fees do not apply to these transfers.", "No foreign transaction fees2", "We don't have an annual fee.", "USD transactions do not incur an additional FX fee.", "Transaction fees are waived for the first $100 per month."]) {
       const doc = documentFromText("https://example.com/fees", text), e = extraction(doc, 0);
       expect(() => candidate(adapter(), [e], undefined, [doc])).not.toThrow();
     }
