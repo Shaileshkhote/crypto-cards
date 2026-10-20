@@ -1,0 +1,100 @@
+import type { CardSources } from "@cards/core/schema";
+
+export default {
+  urls: [
+    "https://docs.hyperbeat.org/hearts/referral-program",
+    "https://help.hyperbeat.org/en/articles/12674545-how-do-i-get-a-hyperbeat-pay-card",
+    "https://help.hyperbeat.org/en/articles/12674564-what-s-the-foreign-exchange-fx-rate-on-hyperbeat-pay-purchase-transactions",
+    "https://help.hyperbeat.org/en/articles/12674582-in-which-regions-is-hyperbeat-pay-not-available",
+    "https://help.hyperbeat.org/en/articles/12674592-what-are-the-rates-and-fees-for-consumer-hyperbeat-pay-cards",
+    "https://help.hyperbeat.org/en/articles/12674666-how-do-i-add-my-hyperbeat-pay-card-to-apple-wallet-or-google-wallet",
+    "https://help.hyperbeat.org/en/articles/12898397-can-i-withdraw-cash-from-an-atm-will-there-be-an-extra-fee",
+    "https://help.hyperbeat.org/en/articles/13399518-what-is-my-spending-limit",
+    "https://help.hyperbeat.org/en/articles/13512812-in-which-countries-is-hyperbeat-pay-available",
+    "https://help.hyperbeat.org/en/articles/16212140-how-does-cashback-work-on-hyperbeat-pay",
+    "https://hyperbeat.org/",
+    "https://hyperbeat.org/card-terms",
+  ],
+  allowedDomains: ["docs.hyperbeat.org", "help.hyperbeat.org", "hyperbeat.org"],
+  metadata: [
+    {
+      url: "https://docs.hyperbeat.org/hearts/referral-program",
+      productIds: ["hyperbeat"],
+      kind: "product-page",
+      topics: ["rewards", "card_type", "product_status"],
+    },
+    {
+      url: "https://help.hyperbeat.org/en/articles/12674545-how-do-i-get-a-hyperbeat-pay-card",
+      productIds: ["hyperbeat"],
+      kind: "help-article",
+      topics: ["requirements", "card_type"],
+    },
+    {
+      url: "https://help.hyperbeat.org/en/articles/12674564-what-s-the-foreign-exchange-fx-rate-on-hyperbeat-pay-purchase-transactions",
+      productIds: ["hyperbeat"],
+      kind: "fee-schedule",
+      topics: ["fees"],
+    },
+    {
+      url: "https://help.hyperbeat.org/en/articles/12674582-in-which-regions-is-hyperbeat-pay-not-available",
+      productIds: ["hyperbeat"],
+      kind: "availability",
+      topics: ["countries", "requirements", "product_status"],
+    },
+    {
+      url: "https://help.hyperbeat.org/en/articles/12674592-what-are-the-rates-and-fees-for-consumer-hyperbeat-pay-cards",
+      productIds: ["hyperbeat"],
+      kind: "fee-schedule",
+      topics: ["fees", "atm", "limits", "card_type"],
+    },
+    {
+      url: "https://help.hyperbeat.org/en/articles/12674666-how-do-i-add-my-hyperbeat-pay-card-to-apple-wallet-or-google-wallet",
+      productIds: ["hyperbeat"],
+      kind: "help-article",
+      topics: ["integrations", "card_type"],
+    },
+    {
+      url: "https://help.hyperbeat.org/en/articles/12898397-can-i-withdraw-cash-from-an-atm-will-there-be-an-extra-fee",
+      productIds: ["hyperbeat"],
+      kind: "help-article",
+      topics: ["atm", "fees"],
+    },
+    {
+      url: "https://help.hyperbeat.org/en/articles/13399518-what-is-my-spending-limit",
+      productIds: ["hyperbeat"],
+      kind: "help-article",
+      topics: ["limits"],
+    },
+    {
+      url: "https://help.hyperbeat.org/en/articles/13512812-in-which-countries-is-hyperbeat-pay-available",
+      productIds: ["hyperbeat"],
+      kind: "availability",
+      topics: ["countries", "requirements", "product_status"],
+    },
+    {
+      url: "https://help.hyperbeat.org/en/articles/16212140-how-does-cashback-work-on-hyperbeat-pay",
+      productIds: ["hyperbeat"],
+      kind: "help-article",
+      topics: ["rewards"],
+    },
+    {
+      url: "https://hyperbeat.org/",
+      productIds: ["hyperbeat"],
+      kind: "product-page",
+      topics: ["crypto", "card_type", "product_status"],
+    },
+    {
+      url: "https://hyperbeat.org/card-terms",
+      productIds: ["hyperbeat"],
+      kind: "cardholder-agreement",
+      topics: [
+        "fees",
+        "requirements",
+        "card_type",
+        "atm",
+        "limits",
+        "countries",
+      ],
+    },
+  ],
+} satisfies CardSources;

@@ -1,0 +1,100 @@
+import type { CardSources } from "@cards/core/schema";
+
+export default {
+  urls: [
+    "https://metamask.io/card",
+    "https://metamask.io/news/discover-metamask-card-rewards-and-perks",
+    "https://support.metamask.io/trade/metamask-card/card-faq/",
+    "https://support.metamask.io/trade/metamask-card/getting-started-with-card/",
+    "https://support.metamask.io/trade/metamask-card/limits-and-fees/",
+    "https://support.metamask.io/trade/metamask-card/metal-card/",
+    "https://support.metamask.io/trade/metamask-card/using/",
+    "https://support.metamask.io/trade/metamask-card/what-is-metamask-card/",
+    "https://support.metamask.io/trade/metamask-card/what-is-metamask-card/#can-i-sign-up-for-metamask-card",
+    "https://support.metamask.io/trade/metamask-rewards/what-is-metamask-rewards/",
+    "https://support.metamask.io/trade/money-account/",
+  ],
+  allowedDomains: ["metamask.io", "support.metamask.io"],
+  metadata: [
+    {
+      url: "https://metamask.io/card",
+      productIds: ["metamask"],
+      kind: "product-page",
+      topics: ["card_type", "product_status", "rewards", "atm", "countries"],
+    },
+    {
+      url: "https://metamask.io/news/discover-metamask-card-rewards-and-perks",
+      productIds: ["metamask"],
+      kind: "editorial",
+      topics: ["rewards", "requirements", "card_type", "fees", "atm"],
+    },
+    {
+      url: "https://support.metamask.io/trade/metamask-card/card-faq/",
+      productIds: ["metamask"],
+      kind: "help-article",
+      topics: [
+        "fees",
+        "requirements",
+        "crypto",
+        "card_type",
+        "countries",
+        "product_status",
+      ],
+    },
+    {
+      url: "https://support.metamask.io/trade/metamask-card/getting-started-with-card/",
+      productIds: ["metamask"],
+      kind: "help-article",
+      topics: ["countries", "requirements", "card_type", "product_status"],
+    },
+    {
+      url: "https://support.metamask.io/trade/metamask-card/limits-and-fees/",
+      productIds: ["metamask"],
+      kind: "fee-schedule",
+      topics: ["fees", "atm", "limits", "card_type"],
+    },
+    {
+      url: "https://support.metamask.io/trade/metamask-card/metal-card/",
+      productIds: ["metamask"],
+      kind: "help-article",
+      scope: "metal_tier",
+      topics: [
+        "rewards",
+        "fees",
+        "requirements",
+        "card_type",
+        "product_status",
+      ],
+    },
+    {
+      url: "https://support.metamask.io/trade/metamask-card/using/",
+      productIds: ["metamask"],
+      kind: "help-article",
+      topics: ["rewards", "card_type", "integrations", "fees"],
+    },
+    {
+      url: "https://support.metamask.io/trade/metamask-card/what-is-metamask-card/",
+      productIds: ["metamask"],
+      kind: "help-article",
+      topics: ["crypto", "card_type", "requirements"],
+    },
+    {
+      url: "https://support.metamask.io/trade/metamask-card/what-is-metamask-card/#can-i-sign-up-for-metamask-card",
+      productIds: ["metamask"],
+      kind: "help-article",
+      topics: ["countries"],
+    },
+    {
+      url: "https://support.metamask.io/trade/metamask-rewards/what-is-metamask-rewards/",
+      productIds: ["metamask"],
+      kind: "help-article",
+      topics: ["rewards"],
+    },
+    {
+      url: "https://support.metamask.io/trade/money-account/",
+      productIds: ["metamask"],
+      kind: "help-article",
+      topics: ["integrations"],
+    },
+  ],
+} satisfies CardSources;

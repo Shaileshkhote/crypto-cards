@@ -1,0 +1,593 @@
+[
+  {
+    "id": "avici-card-fee-scopes",
+    "provider": "avici",
+    "url": "https://docs.avici.money/getting-started/secured-credit-cards/fees-and-limits",
+    "verifiedAt": "2026-10-18",
+    "text": "### Card Purchase Fees\n#### Virtual Cards\u2013\n* Platinum\u2013 First card costs $15. Subsequent cards: $10 one-time fee, no recurring charges.\n#### Physical Cards\u2013\n* Platinum\u2013 $50 basic card fee, one-time, no recurring charges\n| Feature | Platinum Card | Signature Card |\n| ------------------------ | ---------------------------------------- | ---------------------------------------- |\n| Transaction limit | <p>$1000 per txn</p><p>$3000 per day</p> | <p>$1000 per txn</p><p>$3000 per day</p> |\n| ATM Withdrawal Fees | $1 + 0.65% per transaction | $0 |",
+    "expected": [
+      {
+        "field": "fees",
+        "rule": {
+          "calculation": "fixed",
+          "fixed": {
+            "amount": "15"
+          },
+          "scope": {
+            "cardTypes": [
+              "virtual"
+            ],
+            "cardOrder": "first"
+          }
+        },
+        "productId": "avici",
+        "tierId": "avici--global--platinum"
+      },
+      {
+        "field": "fees",
+        "rule": {
+          "calculation": "fixed",
+          "fixed": {
+            "amount": "10"
+          },
+          "scope": {
+            "cardTypes": [
+              "virtual"
+            ],
+            "cardOrder": "additional"
+          }
+        },
+        "productId": "avici",
+        "tierId": "avici--global--platinum"
+      },
+      {
+        "field": "fees",
+        "rule": {
+          "calculation": "fixed",
+          "fixed": {
+            "amount": "50"
+          },
+          "scope": {
+            "cardTypes": [
+              "physical"
+            ]
+          }
+        },
+        "productId": "avici",
+        "tierId": "avici--global--platinum"
+      },
+      {
+        "field": "fees",
+        "productId": "avici",
+        "tierId": "avici--global--platinum",
+        "rule": {
+          "kind": "atm",
+          "calculation": "unknown",
+          "calculable": false
+        }
+      }
+    ],
+    "forbidden": [
+      {
+        "field": "fees",
+        "productId": "avici",
+        "tierId": "avici--global--platinum",
+        "rule": {
+          "kind": "atm",
+          "calculation": "fixed",
+          "fixed": {
+            "amount": "1"
+          }
+        }
+      },
+      {
+        "field": "fees",
+        "productId": "avici",
+        "tierId": "avici--global--platinum",
+        "rule": {
+          "kind": "atm",
+          "calculation": "percentage",
+          "ratePercent": 0.65
+        }
+      }
+    ]
+  },
+  {
+    "id": "avici-contractual-maximum",
+    "provider": "avici",
+    "url": "https://docs.avici.money/getting-started/legal/terms-of-service-avici-card",
+    "verifiedAt": "2026-10-18",
+    "text": "**Fees**\nThese are not current charges, these are maximum charges that we could charge. Stay tuned on our social media & website for current charges when you apply for a card.\nATM fees below, FX fee is charged for non-USD withdrawals\n3. ATM - Withdrawal Fee: $1.00 + 0.65%",
+    "expected": [
+      {
+        "field": "terms"
+      }
+    ],
+    "forbidden": [
+      {
+        "field": "custodial",
+        "value": false
+      },
+      {
+        "field": "fees",
+        "rule": {
+          "calculable": true
+        }
+      }
+    ]
+  },
+  {
+    "id": "ready-paused-issuance",
+    "provider": "ready",
+    "url": "https://help.ready.co/hc/en-us/articles/28160052020893-Ready-Card-fees-and-payments",
+    "verifiedAt": "2026-10-18",
+    "text": "At the moment, Ready Cards are not available to order.\nWe're currently transitioning to a new card program with a new card partner. During this time, we aren't issuing new physical or virtual cards.",
+    "expected": [],
+    "forbidden": [
+      {
+        "field": "cardTypes",
+        "value": {
+          "physical": false
+        }
+      },
+      {
+        "field": "cardTypes",
+        "value": {
+          "virtual": false
+        }
+      }
+    ]
+  },
+  {
+    "id": "ready-kyc-and-custody",
+    "provider": "ready",
+    "url": "https://help.ready.co/hc/en-us/articles/28160011828893-Ready-Card-privacy-and-security-FAQ",
+    "verifiedAt": "2026-10-18",
+    "text": "Do I need to verify my identity?\nYes. You must complete identity verification before you can receive a Ready Card.\nCompleting identity verification does not affect the self-custodial nature of your wallet. You remain in control of your private keys and your funds at all times.\nUnlike many crypto cards, Ready never holds or controls your funds. Your assets remain in your self-custodial wallet until you authorize a payment.",
+    "expected": [
+      {
+        "field": "kyc",
+        "value": true
+      },
+      {
+        "field": "custodial",
+        "value": false
+      }
+    ],
+    "forbidden": []
+  },
+  {
+    "id": "plasma-payment-rails",
+    "provider": "plasma-one",
+    "url": "https://intercom.help/plasma-6c43763cd799/en/articles/15506070-what-are-the-fees-on-plasma-one",
+    "verifiedAt": "2026-10-18",
+    "text": "Onramp fees\nCurrency | Rail | Lite | Core | Platinum\nUSD | ACH | $1 | $0.50 | $0.50\n| Wire | $15 | $15 | $10",
+    "expected": [
+      {
+        "field": "fees",
+        "rule": {
+          "fixed": {
+            "amount": "1",
+            "currency": "USD"
+          },
+          "scope": {
+            "paymentRails": [
+              "ach"
+            ]
+          }
+        }
+      },
+      {
+        "field": "fees",
+        "rule": {
+          "fixed": {
+            "amount": "10",
+            "currency": "USD"
+          },
+          "scope": {
+            "paymentRails": [
+              "wire"
+            ]
+          }
+        }
+      }
+    ],
+    "forbidden": []
+  },
+  {
+    "id": "safepal-non-usd-fx",
+    "provider": "safepal",
+    "url": "https://safepalsupport.zendesk.com/hc/en-us/articles/22647224575643-Fee-Rates-for-the-SafePal-Fiat-Gateway-and-Mastercard",
+    "verifiedAt": "2026-10-18",
+    "text": "1. The standard deposit/top-up fee is set at 0% .\n2. Mastercard transactions settled in non-USD currencies will incur a 1% currency exchange fee. A processing fee of 1 USD/1 EUR/1 CHF/7 CNH will be charged per refund, depending on the payment currency.",
+    "expected": [
+      {
+        "field": "fees",
+        "rule": {
+          "kind": "topup",
+          "ratePercent": 0
+        }
+      },
+      {
+        "field": "fees",
+        "rule": {
+          "kind": "fx",
+          "ratePercent": 1,
+          "scope": {
+            "excludedTransactionCurrencies": [
+              "USD"
+            ]
+          }
+        }
+      },
+      {
+        "field": "fees",
+        "rule": {
+          "kind": "refund",
+          "fixed": {
+            "amount": "1",
+            "currency": "USD"
+          }
+        }
+      }
+    ],
+    "forbidden": [
+      {
+        "field": "fees",
+        "rule": {
+          "kind": "topup",
+          "calculation": "fixed",
+          "fixed": {
+            "amount": "0",
+            "currency": "USD"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "id": "etherfi-reward-asset",
+    "provider": "etherfi",
+    "url": "https://help.ether.fi/en/articles/262374-how-does-cashback-work",
+    "verifiedAt": "2026-10-18",
+    "text": "Every qualifying transaction with your Cash card, asset traded, or USD/EUR borrowed earns cashback in ETHFI. This will display in your assets list as ETHFI.\nEarned: Once the purchase clears, your cashback is converted to ETHFI at the current price and enters a 7-day lock period.\nClaimable: After the 7-day lock period, your cashback becomes claimable.",
+    "expected": [
+      {
+        "field": "rewards",
+        "rule": {
+          "rewardAsset": "ETHFI",
+          "calculable": false
+        }
+      }
+    ],
+    "forbidden": []
+  },
+  {
+    "id": "revolut-pdf-plan-fees",
+    "provider": "revolut",
+    "url": "https://assets.revolut.com/legal/terms/%5B2026.1%5D%20Revolut%20Consumer%20Prepaid%20Cardholder%20Agreement%20Effective%20April%2030%2C%202026.pdf",
+    "verifiedAt": "2026-10-18",
+    "text": "      Revolut Prepaid Visa\u00ae and Revolut Prepaid Mastercard\u00ae Cardholder Agreement\n\nYou may only purchase and store in connection with the Program the limited currencies that are provided in the Revolut mobile application and the default currency is U.S. Dollars.\n\n                                Revolut \u2013 Kids &                                                      Metal\n                                                       Standard Plan        Premium Plan\n                                     Teens                                                            Plan\n\n Plan Fee (paying monthly)             $0.00                $0.00                $9.99                $16.99",
+    "expected": [
+      {
+        "field": "fees",
+        "rule": {
+          "kind": "monthly",
+          "fixed": {
+            "amount": "9.99",
+            "currency": "USD"
+          }
+        },
+        "productId": "revolut",
+        "tierId": "revolut--united-states--premium"
+      },
+      {
+        "field": "fees",
+        "rule": {
+          "kind": "monthly",
+          "fixed": {
+            "amount": "16.99",
+            "currency": "USD"
+          }
+        },
+        "productId": "revolut",
+        "tierId": "revolut--united-states--metal"
+      }
+    ],
+    "forbidden": [
+      {
+        "field": "issuer",
+        "value": {
+          "name": "Revolut"
+        }
+      },
+      {
+        "field": "network",
+        "value": "visa"
+      },
+      {
+        "field": "network",
+        "value": "mastercard"
+      }
+    ],
+    "preserveLayout": true
+  },
+  {
+    "id": "mexc-money-and-count-limits",
+    "provider": "mexc",
+    "url": "https://www.mexc.com/learn/article/mexc-card-fees-and-limits-global-card-and-mexc-card-apac-compared/1",
+    "verifiedAt": "2026-10-19",
+    "text": "Per transaction \u2014 80,000 USD on the Global Card, 50,000 USD on the MEXC Card (APAC).\nPer day \u2014 1,000,000 USD on the Global Card, 50,000 USD on the MEXC Card (APAC).\nThe APAC card also caps transaction count at 1,040 per year, which works out to about twenty purchases a week.",
+    "expected": [
+      {
+        "field": "limits",
+        "productId": "mexc-global",
+        "rule": {
+          "kind": "spending",
+          "amount": {
+            "amount": "80000",
+            "currency": "USD"
+          },
+          "period": "transaction"
+        }
+      },
+      {
+        "field": "limits",
+        "productId": "mexc-global",
+        "rule": {
+          "kind": "spending",
+          "amount": {
+            "amount": "1000000",
+            "currency": "USD"
+          },
+          "period": "day"
+        }
+      },
+      {
+        "field": "limits",
+        "productId": "mexc-apac",
+        "rule": {
+          "kind": "transaction_count",
+          "count": 1040,
+          "period": "year"
+        }
+      }
+    ],
+    "forbidden": []
+  },
+  {
+    "id": "bitunix-card-service-fees",
+    "provider": "bitunix",
+    "url": "https://www.bitunix.com/hub/helpcenter/article/bitunix-card-fee-usage-limit?id=286",
+    "verifiedAt": "2026-10-19",
+    "text": "Fee Type | Rate and details | Notes\nCard cancellation fee | 0 |\nChargeback | 50 USD / transaction | If you wish to dispute a transaction and request a reversal and refund, please contact customer service for assistance in initiating the dispute and arbitration process with the card network.",
+    "expected": [
+      {
+        "field": "fees",
+        "rule": {
+          "kind": "cancellation",
+          "calculable": true
+        }
+      },
+      {
+        "field": "fees",
+        "rule": {
+          "kind": "chargeback",
+          "calculation": "fixed",
+          "fixed": {
+            "amount": "50",
+            "currency": "USD"
+          },
+          "calculable": true
+        }
+      }
+    ],
+    "forbidden": [
+      {
+        "field": "fees",
+        "rule": {
+          "kind": "replacement"
+        }
+      },
+      {
+        "field": "fees",
+        "rule": {
+          "kind": "transaction"
+        }
+      }
+    ]
+  },
+  {
+    "id": "avalanche-statement-copy-service",
+    "provider": "avalanche-card",
+    "url": "https://legal.avalanchecard.com/legal/avalanche-card-us-card-agreement-bcc089aa",
+    "verifiedAt": "2026-10-19",
+    "text": "Copying Fee: We may charge you a Fee of $10.00 for each copy of a transaction document or a Statement you request, unless they are required to resolve a billing dispute. We will post and treat this Fee as a Purchase transaction.",
+    "expected": [
+      {
+        "field": "fees",
+        "rule": {
+          "kind": "other",
+          "serviceId": "statement-copy",
+          "calculation": "fixed",
+          "fixed": {
+            "amount": "10",
+            "currency": "USD"
+          },
+          "calculable": true
+        }
+      }
+    ],
+    "forbidden": [
+      {
+        "field": "fees",
+        "rule": {
+          "kind": "transaction"
+        }
+      }
+    ]
+  },
+  {
+    "id": "phantom-distinct-funding-and-ach",
+    "provider": "phantom-cash",
+    "url": "https://help.phantom.com/articles/phantom-cash-fees-44800531617939",
+    "verifiedAt": "2026-10-19",
+    "preserveLayout": true,
+    "text": "Action | Fee ; Add Cash with a debit card through Stripe, including Apple Pay and Google Pay | 1.75% ; Add Cash with a credit card through Stripe, including Apple Pay and Google Pay | 3.50%1 ; Add Cash with a direct deposit from a US bank account | 0.30%2 ; Add Cash with a domestic wire from a US bank account | 1.00%2 ; Withdraw CASH from your Cash account with standard ACH | Free ; Withdraw CASH from your Cash account with fast ACH | $1.00 flat + 0.75% (min $1.50)",
+    "expected": [
+      {
+        "field": "fees",
+        "rule": {
+          "kind": "topup",
+          "calculation": "percentage",
+          "ratePercent": 1.75
+        }
+      },
+      {
+        "field": "fees",
+        "rule": {
+          "kind": "topup",
+          "calculation": "percentage",
+          "ratePercent": 3.5
+        }
+      },
+      {
+        "field": "fees",
+        "rule": {
+          "kind": "topup",
+          "calculation": "percentage",
+          "ratePercent": 0.3
+        }
+      },
+      {
+        "field": "fees",
+        "rule": {
+          "kind": "topup",
+          "calculation": "percentage",
+          "ratePercent": 1
+        }
+      },
+      {
+        "field": "fees",
+        "rule": {
+          "kind": "other",
+          "calculation": "percentage",
+          "ratePercent": 0,
+          "scope": {
+            "paymentRails": [
+              "ach"
+            ]
+          }
+        }
+      },
+      {
+        "field": "fees",
+        "rule": {
+          "kind": "other",
+          "calculation": "unknown",
+          "calculable": false,
+          "scope": {
+            "paymentRails": [
+              "ach"
+            ]
+          }
+        }
+      }
+    ],
+    "forbidden": [
+      {
+        "field": "fees",
+        "rule": {
+          "calculation": "percentage",
+          "ratePercent": 0.75
+        }
+      },
+      {
+        "field": "fees",
+        "rule": {
+          "calculation": "fixed",
+          "fixed": {
+            "amount": "1",
+            "currency": "USD"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "id": "picnic-fee-allowance-not-withdrawal-cap",
+    "provider": "picnic",
+    "url": "https://help.usepicnic.com/hc/picnic/articles/complete-picnic-fee-table",
+    "verifiedAt": "2026-10-19",
+    "preserveLayout": true,
+    "text": "Operation | Picnic fee | Other costs ; Top up the card via PIX | 0% | Between 0.3% and 0.5% versus the onchain rate_1_ ; Withdraw from the card via PIX | 0% | Between 0.3% and 0.5% versus the onchain rate_1_ ; Top up the card via crypto (any network) | 0% | Crypto deposit provider's cost and conversion to the Gnosis Chain network ; Card purchases in US dollars (USD) | 0% | \u2014 ; Card purchases in other currencies (BRL, EUR, etc.) | 0% | ~0.3% Visa conversion fee ; ATM withdrawal \u2014 up to 5 withdrawals or 200 USD per month (whichever first) | 0% | Local ATM operator may charge a fee ; ATM withdrawal beyond that limit | 2% per withdrawal | Local ATM operator may charge a fee",
+    "expected": [
+      {
+        "field": "fees",
+        "rule": {
+          "kind": "atm",
+          "ratePercent": 0,
+          "allowance": {
+            "amount": {
+              "amount": "200",
+              "currency": "USD"
+            },
+            "period": "month"
+          }
+        }
+      },
+      {
+        "field": "fees",
+        "rule": {
+          "kind": "atm",
+          "ratePercent": 2
+        }
+      }
+    ],
+    "forbidden": [
+      {
+        "field": "limits",
+        "rule": {
+          "kind": "transaction_count",
+          "count": 5
+        }
+      }
+    ]
+  },
+  {
+    "id": "vaultleap-approximate-partner-fee",
+    "provider": "vaultleap",
+    "url": "https://vaultleap.com/help-center/vaultleap-card-help-support/card-regions-supported",
+    "verifiedAt": "2026-10-19",
+    "preserveLayout": true,
+    "text": "FX conversions are subject to a ~0.5% partner pass-through fee on all tiers. No VaultLeap markup. No additional hidden costs.",
+    "expected": [
+      {
+        "field": "fees",
+        "rule": {
+          "kind": "fx",
+          "calculation": "unknown",
+          "calculable": false
+        }
+      },
+      {
+        "field": "fees",
+        "rule": {
+          "kind": "fx",
+          "calculation": "percentage",
+          "ratePercent": 0
+        }
+      }
+    ],
+    "forbidden": [
+      {
+        "field": "fees",
+        "rule": {
+          "kind": "fx",
+          "calculation": "percentage",
+          "ratePercent": 0.5
+        }
+      }
+    ]
+  }
+]

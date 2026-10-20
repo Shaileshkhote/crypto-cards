@@ -1,0 +1,607 @@
+[
+  {
+    "id": "exa-padded-zero",
+    "provider": "exa",
+    "url": "https://help.exactly.app/en/articles/10707672-exa-card-terms-and-conditions",
+    "text": "(b) Each time a payment on your Account is returned or reversed for any reason or we must return any check, instrument, or transaction you send us because it is incomplete or faulty, we will charge you a returned payment fee of $00.00. However, we will not charge a returned payment fee if we are charging a late fee with respect to the same minimum payment due and will never charge a returned payment fee exceeding the minimum payment due that was due immediately prior to the date on which the payment was returned to us.",
+    "field": "fees",
+    "productId": "exa",
+    "tierId": "exa--international--default",
+    "rules": [
+      {
+        "id": "returned",
+        "kind": "returned_payment",
+        "calculation": "fixed",
+        "scope": {},
+        "fixed": {
+          "amount": "00.00",
+          "currency": "USD"
+        }
+      }
+    ]
+  },
+  {
+    "id": "kraken-distinct-reward-programs",
+    "provider": "kraken",
+    "url": "https://krak.app/pricing",
+    "text": "Tier | 30-Day Average Assets Held (EUR) | Cashback Rate | Salary Match Rate ; Max | \u2265 50,000 | 2% | 1% ; Elite | \u2265 10,000 | 1.5% | 0.75% ; Pro | \u2265 1,000 | 1% | 0.5% ; Lite | \u2265 200 | 0.5% | 0.25% ; Starter | < 200 | 0% | 0%",
+    "field": "rewards",
+    "productId": "kraken",
+    "tierId": "kraken--eea--default",
+    "rules": [
+      {
+        "id": "cashback",
+        "kind": "cashback",
+        "scope": {
+          "conditions": [
+            "\u2265 50,000"
+          ]
+        },
+        "ratePercent": 2,
+        "calculable": true
+      },
+      {
+        "id": "salary",
+        "kind": "salary_match",
+        "scope": {
+          "conditions": [
+            "\u2265 50,000"
+          ]
+        },
+        "ratePercent": 1,
+        "calculable": true
+      }
+    ]
+  },
+  {
+    "id": "ethena-spending-bands",
+    "provider": "ethena-pay",
+    "url": "https://pay.ethena.fi/pricing",
+    "text": "Tier | Portion of monthly spend | Cashback rate ; Standard | $0 \u2013 $2,500 | 4% ; $2,500 \u2013 $4,000 | 1% ; Over $4,000 | 0% ; Pro | $0 \u2013 $8,000 | 4.5% ; $8,000 \u2013 $10,000 | 2% ; $10,000 \u2013 $12,000 | 1% ; Over $12,000 | 0.5% ; VIP | $0 \u2013 $20,000 | 5% ; $20,000 \u2013 $30,000 | 2% ; $30,000 \u2013 $40,000 | 1% ; Over $40,000 | 0.5%",
+    "field": "rewards",
+    "productId": "ethena-pay",
+    "tierId": "ethena-pay--international--standard",
+    "rules": [
+      {
+        "id": "first",
+        "kind": "cashback",
+        "scope": {
+          "conditions": [
+            "$0 \u2013 $2,500"
+          ]
+        },
+        "ratePercent": 4,
+        "rewardAsset": "AVAX",
+        "calculable": false
+      },
+      {
+        "id": "second",
+        "kind": "cashback",
+        "scope": {
+          "conditions": [
+            "$2,500 \u2013 $4,000"
+          ]
+        },
+        "ratePercent": 1,
+        "rewardAsset": "AVAX",
+        "calculable": false
+      }
+    ]
+  },
+  {
+    "id": "karta-material-and-cash-advance",
+    "provider": "karta",
+    "url": "https://content.conkarta.com/docs/card-member-agreements.pdf",
+    "text": " Annual Fee                        $300\n Additional Cards Fee              $150 Companion (Metal) Cards\n                                   $0 Plastic Companion Cards\n                                   * A maximum of five additional cards may be issued per Account,\n                                   subject to approval by the Issuer\n Transaction Fees                  3% of any amount of cash you request and receive\n  - Cash Advance\n Transaction Fees                  $5 or 3% of the ATM withdrawal amount, whichever is greater, plus\n  - ATM Fees                       any foreign exchange conversion fees or markups imposed by the\n                                   ATM operator or network, if applicable\n                                                                                                             1\n\f Transaction Fees                  0%\n  - Foreign Transaction\n  percent of transaction\n Penalty Fees\n  - Late Payment                   $40 or 2.99% of balance, whichever is higher\n  - Returned Payment Fee           $40\nPart B: General Terms and Conditions\nWHEN YOU APPLY FOR A CARD ACCOUNT, ACTIVATE A CARD, OR OTHERWISE PARTICIPATE IN THE PROGRAM IN\nANY WAY, YOU REPRESENT THAT YOU HAVE READ, UNDERSTAND, AND AGREE TO THESE CARD\nTERMS.\nBackground:\nThe Karta Card is provided to you on behalf of Karta in connection with your status as Karta customer and\npursuant to your separate Terms of Service between you and Karta (the \u201cTerms of Service\u201d). The Issuer\nis not a party to the Terms of Service and disclaims any liability for the performance of services covered\ntherein.",
+    "field": "fees",
+    "productId": "karta",
+    "tierId": null,
+    "rules": [
+      {
+        "id": "metal",
+        "kind": "issuance",
+        "calculation": "fixed",
+        "scope": {
+          "cardOrder": "additional",
+          "conditions": [
+            "Companion (Metal) Cards"
+          ]
+        },
+        "fixed": {
+          "amount": "150",
+          "currency": "USD"
+        }
+      },
+      {
+        "id": "plastic",
+        "kind": "issuance",
+        "calculation": "fixed",
+        "scope": {
+          "cardOrder": "additional",
+          "conditions": [
+            "Plastic Companion Cards"
+          ]
+        },
+        "fixed": {
+          "amount": "0",
+          "currency": "USD"
+        }
+      },
+      {
+        "id": "cash",
+        "kind": "cash_advance",
+        "calculation": "percentage",
+        "scope": {},
+        "ratePercent": 3
+      },
+      {
+        "id": "atm",
+        "kind": "atm",
+        "calculation": "unknown",
+        "scope": {},
+        "description": "ATM fee formula requires comparison"
+      }
+    ]
+  },
+  {
+    "id": "kolo-card-and-asset-conversion",
+    "provider": "kolo",
+    "url": "https://kkinvesting.io/en/posts/kolo-card/",
+    "text": "Fee Type | Amount | Notes ; Card issuance | Free | No signup or application fee ; Monthly / annual fee | $0 | No account maintenance fee ; Card transaction (conversion) | 1% | Applied to every card payment ; Non-US merchants (USD card) | +1% (total 2%) | Extra 1% when spending at non-USD merchants ; FX rate | Visa rate + 1% | Pass-through; Kolo does not profit from FX ; Crypto deposit | 0% | Kolo charges nothing; your sending wallet/network may charge gas ; Withdrawal fee | Shown in-app | Fixed fee per network/asset/direction; exact amounts shown at withdrawal time ; ATM single transaction max | $250 USD | Single ATM withdrawal over $250 is automatically declined ; ATM frequency limit | Max 3 per 24 hours | More than 3 ATM withdrawals in 24 hours are declined ; Personal daily spending limit | $9,000 USD | Also the monthly limit ; Minimum card activation deposit | $10 USD equivalent | One-time; not a recurring fee ; USDT / USDC / EURC conversion | 0% markup | Exchange-level rates, no spread added by Kolo",
+    "field": "fees",
+    "productId": "kolo",
+    "tierId": null,
+    "rules": [
+      {
+        "id": "card",
+        "kind": "conversion",
+        "calculation": "percentage",
+        "scope": {
+          "conditions": [
+            "Applied to every card payment"
+          ]
+        },
+        "ratePercent": 1
+      },
+      {
+        "id": "assets",
+        "kind": "conversion",
+        "calculation": "percentage",
+        "scope": {
+          "conditions": [
+            "USDT / USDC / EURC conversion"
+          ]
+        },
+        "ratePercent": 0
+      }
+    ]
+  },
+  {
+    "id": "kast-stablecoin-conversion",
+    "provider": "kast",
+    "url": "https://concierge.kast.xyz/hc/en-us/articles/9850062738703-What-Are-the-Fees-and-Conditions-for-KAST-Cards-and-Accounts",
+    "text": "When you deposit supported stablecoins into your KAST account, your balance is shown in USD. Supported stablecoin deposits are converted to USD at a 1:1 rate with 0% spread.",
+    "field": "fees",
+    "productId": "kast",
+    "tierId": null,
+    "rules": [
+      {
+        "id": "stablecoin",
+        "kind": "conversion",
+        "calculation": "percentage",
+        "scope": {
+          "conditions": [
+            "supported stablecoins"
+          ]
+        },
+        "ratePercent": 0
+      }
+    ]
+  },
+  {
+    "id": "kast-other-asset-conversion",
+    "provider": "kast",
+    "url": "https://concierge.kast.xyz/hc/en-us/articles/9850062738703-What-Are-the-Fees-and-Conditions-for-KAST-Cards-and-Accounts",
+    "text": "Fee / Limit | Amount ; Crypto Deposit Fee (Auto-Conversion to Stablecoins) | Varies by token and is shown before confirmation ; Crypto Deposit Limit | Unlimited",
+    "field": "fees",
+    "productId": "kast",
+    "tierId": null,
+    "rules": [
+      {
+        "id": "crypto",
+        "kind": "conversion",
+        "calculation": "unknown",
+        "scope": {
+          "conditions": [
+            "Auto-Conversion to Stablecoins"
+          ]
+        },
+        "description": "Varies by token and is shown before confirmation"
+      }
+    ]
+  },
+  {
+    "id": "revolut-explicit-no-fee",
+    "provider": "revolut",
+    "url": "https://help.revolut.com/help/wealth/cryptocurrencies/crypto-payments/setting-up-a-virtual-crypto-card/",
+    "text": "We'll automatically convert your crypto to the currency of your purchase without any fees. Fair usage fees may apply depending on your plan. Check out this FAQ about fair usage fees and this FAQ about crypto card payments.",
+    "field": "fees",
+    "productId": "revolut",
+    "tierId": null,
+    "rules": [
+      {
+        "id": "conversion",
+        "kind": "conversion",
+        "calculation": "percentage",
+        "scope": {
+          "conditions": [
+            "Fair usage fees may apply depending on your plan"
+          ]
+        },
+        "ratePercent": 0
+      }
+    ]
+  },
+  {
+    "id": "mexc-current-issuance-waiver",
+    "provider": "mexc",
+    "url": "https://www.mexc.com/support/article/how-to-apply-for-the-mexc-global-card-447067423629599744",
+    "text": "Limited-time card issuance fee waiver: The standard USD 20 card issuance fee is currently waived.",
+    "field": "fees",
+    "productId": "mexc-global",
+    "tierId": null,
+    "rules": [
+      {
+        "id": "waiver",
+        "kind": "issuance",
+        "calculation": "percentage",
+        "scope": {
+          "conditions": [
+            "Limited-time card issuance fee waiver"
+          ]
+        },
+        "ratePercent": 0
+      }
+    ]
+  },
+  {
+    "id": "phantom-funding-and-ach",
+    "provider": "phantom-cash",
+    "url": "https://help.phantom.com/articles/phantom-cash-fees-44800531617939",
+    "text": "Action | Fee ; Add Cash with a debit card through Stripe, including Apple Pay and Google Pay | 1.75% ; Add Cash with a credit card through Stripe, including Apple Pay and Google Pay | 3.50%1 ; Add Cash with a direct deposit from a US bank account | 0.30%2 ; Add Cash with a domestic wire from a US bank account | 1.00%2 ; Withdraw CASH from your Cash account with standard ACH | Free ; Withdraw CASH from your Cash account with fast ACH | $1.00 flat + 0.75% (min $1.50)",
+    "field": "fees",
+    "productId": "phantom-cash",
+    "tierId": "phantom-cash--united-states--default",
+    "rules": [
+      {
+        "id": "debit-card-funding",
+        "scope": {
+          "conditions": [
+            "debit card through Stripe"
+          ]
+        },
+        "description": "Adding Cash with a debit card through Stripe, including Apple Pay and Google Pay.",
+        "kind": "topup",
+        "calculation": "percentage",
+        "ratePercent": 1.75
+      },
+      {
+        "id": "credit-card-funding",
+        "scope": {
+          "conditions": [
+            "credit card through Stripe"
+          ]
+        },
+        "description": "Adding Cash with a credit card through Stripe, including Apple Pay and Google Pay.",
+        "kind": "topup",
+        "calculation": "percentage",
+        "ratePercent": 3.5
+      },
+      {
+        "id": "bank-deposit",
+        "scope": {
+          "conditions": [
+            "direct deposit from a US bank account"
+          ]
+        },
+        "description": "Adding Cash by direct deposit from a US bank account.",
+        "kind": "topup",
+        "calculation": "percentage",
+        "ratePercent": 0.3
+      },
+      {
+        "id": "domestic-wire-deposit",
+        "scope": {
+          "paymentRails": [
+            "wire"
+          ]
+        },
+        "description": "Adding Cash by domestic wire from a US bank account.",
+        "kind": "topup",
+        "calculation": "percentage",
+        "ratePercent": 1
+      },
+      {
+        "id": "standard-ach-withdrawal-free",
+        "scope": {
+          "paymentRails": [
+            "ach"
+          ],
+          "conditions": [
+            "standard ACH"
+          ]
+        },
+        "description": "Withdrawing CASH with standard ACH is free.",
+        "kind": "other",
+        "calculation": "percentage",
+        "ratePercent": 0,
+        "serviceId": "ach-withdrawal"
+      },
+      {
+        "id": "fast-ach-withdrawal",
+        "scope": {
+          "paymentRails": [
+            "ach"
+          ],
+          "conditions": [
+            "fast ACH"
+          ]
+        },
+        "description": "Withdrawing CASH with fast ACH costs $1.00 flat plus 0.75%, with a $1.50 minimum.",
+        "kind": "other",
+        "calculation": "unknown",
+        "serviceId": "ach-withdrawal"
+      }
+    ]
+  },
+  {
+    "id": "phantom-asset-conversion-directions",
+    "provider": "phantom-cash",
+    "url": "https://help.phantom.com/articles/phantom-cash-fees-44800531617939",
+    "text": "Action | Fee ; Withdraw CASH from your Cash account a Phantom username | Setup cost1 if the recipient wallet has never held CASH. Otherwise free. ; Withdraw CASH from your Cash account to a Solana wallet address, including your own Phantom accounts | Setup cost1 if the recipient wallet has never held CASH. Otherwise free. ; Swap USDC, USDT, USDG, PYUSD on Solana into your Cash account | Free ; Swap from your Cash account into USDC | Free ; Swap from your Cash account into USDT, USDG, or PYUSD on Solana | 0.85% ; Swap other tokens into your Cash account | 0.85% ; Swap from your Cash account into other tokens | 0.85%",
+    "field": "fees",
+    "productId": "phantom-cash",
+    "tierId": "phantom-cash--united-states--default",
+    "rules": [
+      {
+        "id": "cash-send-setup-cost",
+        "scope": {
+          "conditions": [
+            "recipient wallet has never held CASH"
+          ]
+        },
+        "description": "Sending CASH to a recipient wallet that has never held CASH may incur a Solana network setup cost; it is not a Phantom fee, varies with SOL price, and may be charged again if the recipient account was fully emptied of CASH.",
+        "kind": "transaction",
+        "calculation": "unknown"
+      },
+      {
+        "id": "swap-stables-into-cash-free",
+        "scope": {
+          "conditions": [
+            "Swap USDC, USDT, USDG, PYUSD on Solana into your Cash account"
+          ]
+        },
+        "description": "Swapping USDC, USDT, USDG, or PYUSD on Solana into the Cash account is free.",
+        "kind": "conversion",
+        "calculation": "percentage",
+        "ratePercent": 0
+      },
+      {
+        "id": "swap-cash-to-usdc-free",
+        "scope": {
+          "conditions": [
+            "Swap from your Cash account into USDC"
+          ]
+        },
+        "description": "Swapping from the Cash account into USDC is free.",
+        "kind": "conversion",
+        "calculation": "percentage",
+        "ratePercent": 0
+      },
+      {
+        "id": "swap-cash-to-other-stables",
+        "scope": {
+          "conditions": [
+            "Swap from your Cash account into USDT, USDG, or PYUSD on Solana"
+          ]
+        },
+        "description": "Swapping from the Cash account into USDT, USDG, or PYUSD on Solana.",
+        "kind": "conversion",
+        "calculation": "percentage",
+        "ratePercent": 0.85
+      },
+      {
+        "id": "swap-other-tokens-into-cash",
+        "scope": {
+          "conditions": [
+            "Swap other tokens into your Cash account"
+          ]
+        },
+        "description": "Swapping other tokens into the Cash account.",
+        "kind": "conversion",
+        "calculation": "percentage",
+        "ratePercent": 0.85
+      },
+      {
+        "id": "swap-cash-to-other-tokens",
+        "scope": {
+          "conditions": [
+            "Swap from your Cash account into other tokens"
+          ]
+        },
+        "description": "Swapping from the Cash account into other tokens.",
+        "kind": "conversion",
+        "calculation": "percentage",
+        "ratePercent": 0.85
+      }
+    ]
+  },
+  {
+    "id": "picnic-atm-allowance",
+    "provider": "picnic",
+    "url": "https://help.usepicnic.com/hc/picnic/articles/complete-picnic-fee-table",
+    "text": "Operation | Picnic fee | Other costs ; Top up the card via PIX | 0% | Between 0.3% and 0.5% versus the onchain rate_1_ ; Withdraw from the card via PIX | 0% | Between 0.3% and 0.5% versus the onchain rate_1_ ; Top up the card via crypto (any network) | 0% | Crypto deposit provider's cost and conversion to the Gnosis Chain network ; Card purchases in US dollars (USD) | 0% | \u2014 ; Card purchases in other currencies (BRL, EUR, etc.) | 0% | ~0.3% Visa conversion fee ; ATM withdrawal \u2014 up to 5 withdrawals or 200 USD per month (whichever first) | 0% | Local ATM operator may charge a fee ; ATM withdrawal beyond that limit | 2% per withdrawal | Local ATM operator may charge a fee",
+    "field": "fees",
+    "productId": "picnic",
+    "tierId": "picnic--global--default",
+    "rules": [
+      {
+        "id": "pix-card-topup",
+        "kind": "topup",
+        "scope": {
+          "paymentRails": [
+            "pix"
+          ]
+        },
+        "description": "Picnic fee for card top-up via PIX.",
+        "calculation": "percentage",
+        "ratePercent": 0
+      },
+      {
+        "id": "crypto-card-topup",
+        "kind": "topup",
+        "scope": {},
+        "description": "Picnic fee for card top-up via crypto on any network; crypto deposit provider costs and conversion costs may be separate.",
+        "calculation": "percentage",
+        "ratePercent": 0
+      },
+      {
+        "id": "usd-purchase",
+        "kind": "transaction",
+        "scope": {
+          "transactionCurrencies": [
+            "USD"
+          ]
+        },
+        "description": "Card purchases in USD.",
+        "calculation": "percentage",
+        "ratePercent": 0
+      },
+      {
+        "id": "non-usd-purchase",
+        "kind": "transaction",
+        "scope": {
+          "excludedTransactionCurrencies": [
+            "USD"
+          ]
+        },
+        "description": "Card purchases in currencies other than USD; the table lists a separate approximate Visa conversion fee under other costs.",
+        "calculation": "percentage",
+        "ratePercent": 0
+      },
+      {
+        "id": "atm-free-withdrawals",
+        "kind": "atm",
+        "scope": {
+          "conditions": [
+            "up to 5 withdrawals or 200 USD per month (whichever first)"
+          ]
+        },
+        "description": "No Picnic fee for up to 5 withdrawals or USD 200 in ATM withdrawals per month, whichever comes first; local ATM operator fees may apply.",
+        "allowance": {
+          "amount": {
+            "amount": "200",
+            "currency": "USD"
+          },
+          "period": "month"
+        },
+        "calculation": "percentage",
+        "ratePercent": 0
+      },
+      {
+        "id": "atm-over-allowance",
+        "kind": "atm",
+        "scope": {
+          "conditions": [
+            "ATM withdrawal beyond that limit"
+          ]
+        },
+        "description": "After the monthly free allowance of 5 withdrawals or USD 200, whichever comes first; local ATM operator fees may also apply.",
+        "calculation": "percentage",
+        "ratePercent": 2
+      }
+    ]
+  },
+  {
+    "id": "redotpay-virtual-issuance-citation",
+    "provider": "redotpay",
+    "url": "https://helpcenter.redotpay.com/en/articles/10721182-how-do-i-get-a-virtual-card",
+    "text": "You'll be charged a one-time 10 USD issuance fee when you get a virtual card. Make sure you have enough funds in your RedotPay account to cover it.",
+    "field": "fees",
+    "productId": "redotpay",
+    "tierId": null,
+    "rules": [
+      {
+        "id": "virtual-card-issuance",
+        "scope": {
+          "cardTypes": [
+            "virtual"
+          ]
+        },
+        "kind": "issuance",
+        "calculation": "fixed",
+        "fixed": {
+          "amount": "10",
+          "currency": "USD"
+        }
+      }
+    ]
+  },
+  {
+    "id": "redotpay-physical-issuance-citation",
+    "provider": "redotpay",
+    "url": "https://helpcenter.redotpay.com/en/articles/10721338-how-do-i-get-a-physical-card",
+    "text": "3. Then tap [Apply for card \u2022 100 USD]. You'll be charged the 100 USD issuance fee when you get a physical card. Make sure you have enough funds in your RedotPay account to cover it.",
+    "field": "fees",
+    "productId": "redotpay",
+    "tierId": null,
+    "rules": [
+      {
+        "id": "physical-card-issuance",
+        "scope": {
+          "cardTypes": [
+            "physical"
+          ]
+        },
+        "kind": "issuance",
+        "calculation": "fixed",
+        "fixed": {
+          "amount": "100",
+          "currency": "USD"
+        }
+      }
+    ]
+  },
+  {
+    "id": "vaultleap-partner-charge-versus-markup",
+    "provider": "vaultleap",
+    "url": "https://vaultleap.com/help-center/vaultleap-card-help-support/card-regions-supported",
+    "text": "FX conversions are subject to a ~0.5% partner pass-through fee on all tiers. No VaultLeap markup. No additional hidden costs.",
+    "field": "fees",
+    "productId": "vaultleap",
+    "tierId": null,
+    "rules": [
+      {
+        "id": "partner-pass-through",
+        "kind": "fx",
+        "scope": {
+          "conditions": [
+            "partner pass-through fee"
+          ]
+        },
+        "calculation": "unknown"
+      },
+      {
+        "id": "provider-markup",
+        "kind": "fx",
+        "scope": {
+          "conditions": [
+            "VaultLeap markup"
+          ]
+        },
+        "calculation": "percentage",
+        "ratePercent": 0
+      }
+    ]
+  }
+]

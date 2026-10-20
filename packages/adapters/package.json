@@ -1,0 +1,8 @@
+{
+  "name": "@cards/adapters",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@cards/core": "workspace:*"
+  }
+}
