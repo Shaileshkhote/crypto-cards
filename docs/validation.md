@@ -22,6 +22,8 @@ Full jobs now start one task per selected active adapter (currently 33), sharing
 
 The concurrency change passes 207 tests, including 23 isolated PostgreSQL integration cases, TypeScript and ESLint. Tests exercise all active adapters overlapping, aggregate/per-card costs, fatal-error draining, reservation contention and query access while all 33 card locks are held. Paid concurrent extraction has not been run; earlier model and warm-cache outcomes below remain prior acceptance evidence.
 
+Before this concurrency change, the local Mac's shared-$0.75 sequential refresh published 10 cards, failed 8, and left 15 not run after the next request could not be reserved. It conservatively accounted for $0.727396265 and retained 130 validated source caches. Network/robots failures affected Bitunix, Bybit, Coinbase, EtherFi and KAST; Exa failed source coverage, Kraken timed out, and MEXC stopped on budget. The local database is distinct from the earlier 33-card acceptance below. Combined conservative accounting, including upstream $10.246623815, prior local $0.037838600 and this refresh, is $11.011858680; the earlier local $0.024099250 outstanding reservation remains included. Neither the historical database nor original private ledgers have been recovered. The concurrency code checks incurred no paid model cost.
+
 ## Fresh adapter outcomes
 
 | Adapter | Sources | Latest formal result | Zero-cost unchanged warm pass |
