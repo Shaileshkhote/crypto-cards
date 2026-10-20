@@ -35,6 +35,36 @@ it("supplies the complete financial inventory including late limits and explicit
   }));
   await expect(extract(adapter(), [doc], new Budget(0))).resolves.toBeDefined();
 });
+it.each(["schema", "citation", "currency", "target"])("reports omitted financial blocks together with a %s failure in the first correction", async (failure) => {
+  vi.stubEnv("OPENROUTER_API_KEY", "fixture-not-a-real-key");
+  const doc = documentFromText("https://example.com/fees", "Core FX fee: 1.5% for residents of Germany.\nAnnual fee: USD 20 per year.\nMonthly fee: USD 2 per month.\nCross-border fee: 0%.");
+  const good = extraction(doc);
+  for (const [index, rule] of [
+    { id: "annual", kind: "annual", calculation: "fixed", fixed: { amount: "20", currency: "USD" }, scope: {}, calculable: true },
+    { id: "monthly", kind: "monthly", calculation: "fixed", fixed: { amount: "2", currency: "USD" }, scope: {}, calculable: true },
+    { id: "border", kind: "cross_border", calculation: "percentage", ratePercent: 0, scope: {}, calculable: true },
+  ].entries()) good.facts.push({ ...good.facts[0], value: [rule], evidence: { url: doc.url, blockId: doc.blocks[index + 1].id, quote: doc.blocks[index + 1].text } } as typeof good.facts[number]);
+  const broken = JSON.parse(JSON.stringify({ ...good, facts: good.facts.slice(0, 1) }));
+  const fee = broken.facts[0].value[0];
+  if (failure === "schema") delete fee.scope;
+  if (failure === "citation") { fee.kind = "monthly"; fee.ratePercent = 0; }
+  if (failure === "currency") { fee.calculation = "fixed"; fee.fixed = { amount: "1.5", currency: "USD" }; delete fee.ratePercent; }
+  if (failure === "target") broken.facts[0].tierId = "undeclared-plan";
+  let calls = 0;
+  vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+    if (url.endsWith("/models")) return Response.json({ data: [{ id: modelName(), pricing: { prompt: "0", completion: "0" }, supported_parameters: ["tools", "structured_outputs"] }] });
+    if (++calls === 2) {
+      const feedback = JSON.parse(String(init?.body)).messages.at(-1).content;
+      expect(feedback).toContain("Uncovered financial");
+      expect(feedback).toContain("Annual fee: USD 20 per year.");
+      expect(feedback).toContain('"p1b4"');
+      expect(feedback).toContain(({ schema: "explicit scope object", citation: "Period month", currency: "Money currency USD", target: "Unknown fact tier" })[failure]);
+    }
+    return Response.json({ usage: { cost: 0 }, choices: [{ finish_reason: "stop", message: { content: JSON.stringify(calls === 1 ? broken : good) } }] });
+  }));
+  await expect(extract(adapter(), [doc], new Budget(0))).resolves.toMatchObject({ extraction: good });
+  expect(calls).toBe(2);
+});
 it("requires each explicit eligibility list before finishing a multi-source country extraction", async () => {
   vi.stubEnv("OPENROUTER_API_KEY", "fixture-not-a-real-key");
   const a = adapter();

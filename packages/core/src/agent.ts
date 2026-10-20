@@ -361,6 +361,30 @@ export const extract: Extractor = async (
     return { url: doc.url, blocks: selected };
   });
   for (const page of preview) for (const block of page.blocks) remember(page.url, block);
+  const coverageFeedback = (facts: ExtractionData["facts"]) => {
+    const coverageText = (text: string) => text.normalize("NFKC").toLowerCase().replace(/\s+/g, " ").trim();
+    const cited = (url: string, id: string, fields: string[]) => {
+      const block = documents.find(doc => doc.url === url)!.blocks[Number(id.split("b")[1]) - 1];
+      return facts.some(fact => fact.evidence.url === url && fields.includes(fact.field) &&
+        (fact.evidence.blockId === block.id || coverageText(fact.evidence.quote).includes(coverageText(block.text))));
+    };
+    const financialMissing = documents.map(doc => ({
+      url: doc.url,
+      blockIds: blocks(doc).filter(block => priced(block.text) && !cited(doc.url, block.id, ["fees", "rewards", "limits", "terms"])).map(block => block.id),
+    }));
+    const eligibilityMissing = documents.map(doc => ({
+      url: doc.url,
+      blockIds: blocks(doc).filter(block => /(?:countries|regions).{0,100}(?:eligible to apply|can apply)|(?:eligible to apply|can apply).{0,100}(?:countries|regions)/i.test(block.text) && !cited(doc.url, block.id, ["residentCountries", "terms"])).map(block => block.id),
+    }));
+    const missing = [...financialMissing, ...eligibilityMissing].filter(page => page.blockIds.length);
+    const correctionBlocks: { url: string; blockId: string; text: string }[] = [];
+    for (const page of missing) for (const blockId of page.blockIds) {
+      const text = documents.find(doc => doc.url === page.url)!.blocks[Number(blockId.split("b")[1]) - 1].text;
+      const block = { url: page.url, blockId, text };
+      if (JSON.stringify([...correctionBlocks, block]).length <= 24_000) correctionBlocks.push(block);
+    }
+    return missing.length ? `Uncovered financial or eligibility source blocks: ${JSON.stringify(missing)}. Source text for correction: ${JSON.stringify(correctionBlocks)}. Include at least one separately cited fact for EACH listed block. For an illustration, marketing statement, legal notice or unrepresentable clause, use field terms with a brief qualified summary retaining its figures; do not discard it as boilerplate or turn it into a current card fee or guaranteed limit. Keep representable payable fees, rewards and limits typed. Preserve competing source claims independently; never silently choose one.` : "";
+  };
   const tools = [
     {
       type: "function",
@@ -688,7 +712,12 @@ export const extract: Extractor = async (
           else try { verifyFinancialEvidence(fact.data); }
           catch (error) { errors.push(`facts[${index}]: ${error instanceof Error ? error.message : String(error)}`); }
         }
-        throw new Error([...new Set(errors)].join("\n"));
+        const usableFacts = Array.isArray(facts) ? facts.flatMap(value => {
+          const fact = Fact.safeParse(value);
+          return fact.success && verifyEvidence(fact.data.evidence, documents) ? [fact.data] : [];
+        }) : [];
+        errors.push(coverageFeedback(usableFacts));
+        throw new Error([...new Set(errors.filter(Boolean))].join("\n"));
       }
       let extraction = parsed.data;
 
@@ -699,41 +728,22 @@ export const extract: Extractor = async (
         return [{ index, url: f.evidence.url, blockId: doc && block >= 0 ? `p${documents.indexOf(doc) + 1}b${block + 1}` : f.evidence.blockId }];
       });
       if (invalid.length) throw new Error(`Invalid citations: ${JSON.stringify(invalid.slice(0, 6))}. Use the exact source selector.`);
-      // Use the publication validator here too, so invalid targets and conflicting
-      // scopes can be corrected within this same bounded extraction.
+      // Coverage is independent of schema/reconciliation failures. Report it in
+      // the same correction so fixing a wrong row does not consume a turn just
+      // to discover the omitted rows afterwards.
+      const coverage = coverageFeedback(extraction.facts);
       let disagreementIssues: string[] = [];
       try {
         const reconciled = preserveSourceDisagreements(extraction, adapter.sources);
         extraction = reconciled.extraction;
         disagreementIssues = reconciled.issues;
-      } catch (error) {
         candidate(adapter, [extraction], undefined, documents);
-        throw error;
+      } catch (error) {
+        let detail = error instanceof Error ? error.message : String(error);
+        try { candidate(adapter, [extraction], undefined, documents); }
+        catch (validationError) { detail = validationError instanceof Error ? validationError.message : String(validationError); }
+        throw new Error([detail, coverage].filter(Boolean).join("\n"));
       }
-      const coverageText = (text: string) => text.normalize("NFKC").toLowerCase().replace(/\s+/g, " ").trim();
-      const cited = (url: string, id: string, fields: string[]) => {
-        const block = documents.find(doc => doc.url === url)!.blocks[Number(id.split("b")[1]) - 1];
-        return extraction.facts.some(fact => fact.evidence.url === url && fields.includes(fact.field) &&
-          (fact.evidence.blockId === block.id || coverageText(fact.evidence.quote).includes(coverageText(block.text))));
-      };
-      const financialMissing = documents.map(doc => ({
-        url: doc.url,
-        blockIds: blocks(doc).filter(block => priced(block.text) && !cited(doc.url, block.id, ["fees", "rewards", "limits", "terms"])).map(block => block.id),
-      }));
-      const eligibilityMissing = documents.map(doc => ({
-        url: doc.url,
-        blockIds: blocks(doc).filter(block => /(?:countries|regions).{0,100}(?:eligible to apply|can apply)|(?:eligible to apply|can apply).{0,100}(?:countries|regions)/i.test(block.text) && !cited(doc.url, block.id, ["residentCountries", "terms"])).map(block => block.id),
-      }));
-      const missing = [...financialMissing, ...eligibilityMissing].filter(page => page.blockIds.length);
-      const correctionBlocks: { url: string; blockId: string; text: string }[] = [];
-      for (const page of missing) for (const blockId of page.blockIds) {
-        const text = documents.find(doc => doc.url === page.url)!.blocks[Number(blockId.split("b")[1]) - 1].text;
-        const block = { url: page.url, blockId, text };
-        if (JSON.stringify([...correctionBlocks, block]).length <= 24_000) correctionBlocks.push(block);
-      }
-      const coverage = missing.length ? `Uncovered financial or eligibility source blocks: ${JSON.stringify(missing)}. Source text for correction: ${JSON.stringify(correctionBlocks)}. Include at least one separately cited fact for EACH listed block. For an illustration, marketing statement, legal notice or unrepresentable clause, use field terms with a brief qualified summary retaining its figures; do not discard it as boilerplate or turn it into a current card fee or guaranteed limit. Keep representable payable fees, rewards and limits typed. Preserve competing source claims independently; never silently choose one.` : "";
-      try { candidate(adapter, [extraction], undefined, documents); }
-      catch (error) { throw new Error([error instanceof Error ? error.message : String(error), coverage].filter(Boolean).join("\n")); }
       if (coverage) throw new Error(coverage);
       return { extraction, documents, issues: [...issues, ...disagreementIssues] };
     } catch (error) {

@@ -2,13 +2,21 @@
 
 Current verification uses **33 active adapters / 396 configured URLs**. Ready, SafePal and Gnosis Pay remain retired and were excluded from fresh source/model work; all 36 configurations remain archived. Verification attempts are **completed**; **29/33 current candidates validate**. Latest outcomes across attempted phases: 4 failed, 3 published, 5 review, 21 unchanged; 0 not yet attempted. Formal candidate validation is separate from manual completeness and source-conflict acceptance.
 
+## Follow-up: remaining four adapters
+
+The shared correction flow now reports omitted financial/eligibility blocks alongside schema, currency, citation and target errors in the same attempt. Previously, reconciliation or schema failure could exit before completeness diagnostics, leaving only a later correction to discover the missing blocks. Acceptance requirements and the initial prompt are unchanged; validated caches remain usable.
+
+Four regression cases exercise these combined failures and a successful complete replacement. Recorded responses for Crypto.com, Kolo, MEXC and Revolut were replayed locally to confirm their correction feedback includes uncovered blocks. Replay supplies no new model answer and does **not** establish successful extraction for those four. All 195 tests pass (175 unit cases and 20 separately executed PostgreSQL integration cases); TypeScript, ESLint and the production build pass.
+
+No new OpenRouter requests or canonical data changes were made during this follow-up. The total remains $9.972534960 / $10. The remaining $0.027465040 cannot cover the conservative request bounds needed to correct and verify all four, so **29/33 remains the last verified result**. The four adapters require a fresh paid extraction before they can be reported fixed end to end.
+
 ## Current implementation: schema 8 / prompt 41 / merge 18
 
 One shared Luna extractor retains the existing three tools and data-only adapters. Sync extracts and caches each configured source independently, then reconciles all source claims through the existing shared resolver. Valid source caches survive failures elsewhere; publication still waits for the complete provider. Normal source failures allow other pages to be cached; budget and authorization failures halt the run. Financial source blocks are supplied before generation; already supplied full blocks are not resent by tools. Completeness checks also cover incremental source extraction. Numbered headings, telephone numbers and toll-free contact text are not prices. Truncated JSON is rejected and may use the existing two correction attempts. The shared parser keeps article content, streamed articles, outside-main page sections, and issuer/financial footer disclosures. It excludes unrelated navigation and site chrome. Confirmation uses fresh canonical evidence after product/tier alias resolution, preventing unchanged tiers from being falsely marked unconfirmed. Source precedence is applied across narrower prose conditions only when a broad authoritative rule explicitly supersedes the lower source; tier scope remains part of rule identity. Explicit /mo periods, percentages adjacent to labels, and definite fees-do-not-apply clauses and attached numeric footnotes on no-fee wording are supported without inventing currencies. Evidence checks reject country-heading citations, unsupported card types or calendar periods, and returned-payment charges inferred from late-payment text. Explicit Hindi physical/virtual card words are recognized with Unicode word matching; localized sources still require manual completeness review. No provider-specific scraper, fallback model, service, or schema relaxation was added.
 
 The model is `openai/gpt-6-luna`, with low reasoning. Request bounds remain 300 seconds, 24,000 output tokens, 512,000 request bytes, 12 turns and two corrections. Earlier low-reasoning attempts and failed candidates remain recorded locally; their costs have not been reset. Failed or partial extractions retain accepted values. Independent card-type, scalar and non-additive inventory disagreements retain their quoted clauses and omit disputed typed values; same-block contradictions still require correction. Sensitive changes stay pending review; no reviews were automatically approved.
 
-All **396 source URLs** were fetched using the supported crawler with proxy, TLS, robots and trusted-domain checks. This establishes retrieval, not complete model acceptance. Current validated source caches cover **391/396 configured pages**. Current code passes **191 tests**, including **20 PostgreSQL integration cases**, TypeScript, ESLint and adapter validation. The production build passes locally; exact-commit CI status is available on [draft PR #1](https://github.com/Shaileshkhote/crypto-cards/pull/1).
+All **396 source URLs** were fetched using the supported crawler with proxy, TLS, robots and trusted-domain checks. This establishes retrieval, not complete model acceptance. Current validated source caches cover **391/396 configured pages**. Current code passes **195 tests**, including **20 PostgreSQL integration cases**, TypeScript, ESLint and adapter validation. The production build passes locally; exact-commit CI status is available on [draft PR #1](https://github.com/Shaileshkhote/crypto-cards/pull/1).
 
 ## Fresh adapter outcomes
 
@@ -78,8 +86,6 @@ Local PostgreSQL, migrations, health, authenticated admin pages, anonymous rejec
 - Accepted values from **17/17 original cards** remained. Dump/restore preserved complete rows across all eight tables. No production database was used.
 - The latest full paid attempt cost **$0.189563670**, targeted repair **$0.087627770**, and the broader validation cycle **$2.996888155**. These incomplete results do not prove complete ingestion below $5.
 
-Historical counts and acceptance above do not establish acceptance of the current profile or recovery of the previous database.
 
-Historical counts and acceptance above do not establish acceptance of the current profile or recovery of the previous database.
 
 Historical counts and acceptance above do not establish acceptance of the current profile or recovery of the previous database.
