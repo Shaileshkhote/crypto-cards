@@ -1,8 +1,18 @@
 # Validation status
 
+## Validator simplification: schema 8 / prompt 42 / merge 18
+
+Mandatory numeric/eligibility coverage and keyword-based service, calendar-period, card-type and country interpretation blockers have been removed. Schema, required scopes, exact URL/block/quote checks, unsupported numeric/currency checks, same-scope conflict reconciliation and the existing version-checked review workflow remain. The same extractor is instructed to retain ambiguous claims only as cited narrative. No new gate, agent, service, provider rule or paid request was added.
+
+An offline replay of five exact historical saved model drafts failed all five before the change. One Jupiter draft now passes (20 facts); two earlier Jupiter drafts still fail unsupported numeric evidence, and two MEXC drafts still fail schema validation. This is recovered historical draft acceptance, not recovery or publication of a currently failed card. The rejected raw responses for the seven latest validation-failed cards were not saved, so their full recovery cannot be established by replaying error messages or reconstructed fixtures. Saved errors identify the removed Payitfast/Picnic coverage blockers, but do not substitute for their full drafts. All 207 tests, including 23 PostgreSQL integration cases, TypeScript, lint and the production build pass. All 19 local published card hashes/versions are unchanged. No canonical data was modified by the replay and no paid calls were made.
+
+Passing the simplified validator establishes structural validity and literal citation grounding, not complete extraction or correct interpretation of every claim. Earlier paid acceptance below belongs to prompt 41 and must not be presented as fresh prompt-42 acceptance.
+
+## Prior paid verification
+
 Current verification uses **33 active adapters / 396 configured URLs**. Ready, SafePal and Gnosis Pay remain retired and were excluded from fresh source/model work; all 36 configurations remain archived. Verification attempts are **completed**; **33/33 current candidates validate**. Latest outcomes across attempted phases: 5 review, 28 unchanged; 0 not yet attempted. Formal candidate validation is separate from manual completeness and source-conflict acceptance.
 
-## Current implementation: schema 8 / prompt 41 / merge 18
+## Prior paid implementation: schema 8 / prompt 41 / merge 18
 
 Fresh paid verification resumed after the user raised the total allocation ceiling from $10 to $12. All earlier spending and unknown charges remain accounted.
 
@@ -20,7 +30,7 @@ All **396 source URLs** were fetched using the supported crawler with proxy, TLS
 
 Full jobs now start one task per selected active adapter (currently 33), sharing one $5.00 default and maximum request budget. Per-adapter accounts retain correct source and card cost attribution while reservations and aggregate totals remain shared. Progress writes are serialized, fatal errors block further reservations, and job finalization waits for in-flight work. Dedicated session-lock connections keep long-running card locks outside the query pool.
 
-The concurrency change passes 207 tests, including 23 isolated PostgreSQL integration cases, TypeScript and ESLint. Tests exercise all active adapters overlapping, aggregate/per-card costs, fatal-error draining, reservation contention and query access while all 33 card locks are held. Paid concurrent extraction has not been run; earlier model and warm-cache outcomes below remain prior acceptance evidence.
+The concurrency change passes 207 tests, including 23 isolated PostgreSQL integration cases, TypeScript and ESLint. Tests exercise all active adapters overlapping, aggregate/per-card costs, fatal-error draining, reservation contention and query access while all 33 card locks are held. A subsequent prompt-41 local concurrent run attempted all 23 remaining cards, published 9 and failed 14 for $0.710924730 conservatively accounted. The local DB has 19 published cards and 296 validated source caches. Its prior ten published rows/hashes/versions were unchanged, per-card costs matched the job total, and public cache checks passed. Combined conservative accounting is $11.722783410, including all earlier encumbrance; the previous $0.024099250 local outstanding reservation remains included. These results do not establish prompt-42 acceptance or historical cloud database recovery.
 
 Before this concurrency change, the local Mac's shared-$0.75 sequential refresh published 10 cards, failed 8, and left 15 not run after the next request could not be reserved. It conservatively accounted for $0.727396265 and retained 130 validated source caches. Network/robots failures affected Bitunix, Bybit, Coinbase, EtherFi and KAST; Exa failed source coverage, Kraken timed out, and MEXC stopped on budget. The local database is distinct from the earlier 33-card acceptance below. Combined conservative accounting, including upstream $10.246623815, prior local $0.037838600 and this refresh, is $11.011858680; the earlier local $0.024099250 outstanding reservation remains included. Neither the historical database nor original private ledgers have been recovered. The concurrency code checks incurred no paid model cost.
 

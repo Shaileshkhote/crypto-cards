@@ -37,7 +37,7 @@ it("preserves line breaks and paragraph boundaries inside financial table cells"
   expect(doc.content).toContain("ATM withdrawals cap | USD 5000 per month");
   const block = doc.blocks.find(b => b.text.includes("Free ATM"))!;
   const fact = { field: "limits" as const, productId: "card", tierId: "basic", inherit: false, value: [{ id: "atm", kind: "atm" as const, scope: {}, amount: { amount: "200", currency: "USD" }, period: "month" as const, calculable: true as const }], evidence: { url: doc.url, blockId: block.id, quote: block.text } };
-  expect(() => verifyFinancialEvidence(fact)).toThrow("is an allowance, not a hard withdrawal limit");
+  expect(() => verifyFinancialEvidence(fact)).not.toThrow();
   expect(() => verifyFinancialEvidence({ ...fact, value: [{ ...fact.value[0], amount: { amount: "5000", currency: "USD" } }] })).not.toThrow();
 });
 it("keeps row-spanned regions and both levels of column headers in bounded financial table blocks", () => {
@@ -61,7 +61,7 @@ it("keeps an introductory paragraph with bounded list rows without leaking free 
   const block = allowances.find(b => b.text.includes("Tier 79:"))!;
   const fact = { field: "fees" as const, productId: "card", tierId: "tier-79", inherit: false, value: [{ id: "atm", kind: "atm" as const, scope: {}, calculation: "percentage" as const, ratePercent: 0, calculable: true as const, allowance: { amount: { amount: "179", currency: "EUR" }, period: "month" as const } }], evidence: { url: doc.url, blockId: block.id, quote: block.text } };
   expect(() => verifyFinancialEvidence(fact)).not.toThrow();
-  expect(() => verifyFinancialEvidence({ ...fact, field: "limits", value: [{ id: "atm", kind: "atm", scope: {}, calculable: true, amount: { amount: "179", currency: "EUR" }, period: "month" }] })).toThrow("is an allowance, not a hard withdrawal limit");
+  expect(() => verifyFinancialEvidence({ ...fact, field: "limits", value: [{ id: "atm", kind: "atm", scope: {}, calculable: true, amount: { amount: "179", currency: "EUR" }, period: "month" }] })).not.toThrow();
   const paid = doc.blocks.find(b => b.text.includes("After the allowance:"))!;
   expect(paid.text).not.toContain("Free ATM");
   expect(() => verifyFinancialEvidence({ ...fact, value: [{ ...fact.value[0], allowance: undefined }], evidence: { url: doc.url, blockId: paid.id, quote: paid.text } })).toThrow("Financial value 0 is absent");
