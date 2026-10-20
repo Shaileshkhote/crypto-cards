@@ -742,6 +742,10 @@ export const extract: Extractor = async (
         : error instanceof Error ? error.message : String(error);
       if (/Invalid citation/i.test(message))
         message += " Return only url and blockId for evidence; omit quote. The application copies the exact source text.";
+      if (/card availability is absent from its cited block/.test(message))
+        message += " Omit unsupported cardTypes members, including false. Absence of physical/virtual wording is unknown, never false. Emit only the independently supported member, or omit the fact when neither type is stated.";
+      if (/Unknown fact (?:tier|product):/.test(message))
+        message += " This extraction must be self-contained: use an identity in provider configuration, or declare every referenced product/tier with a source-supported name in this response. Never assume another source response declared it.";
       if (/Unknown fact (?:tier|product): null(?:\s|$)/.test(message))
         message += ' An untargeted productId or tierId must be JSON null, not the literal string "null"; otherwise use an existing or explicitly declared identity.';
       if (message.includes("Ambiguous fees identity"))
