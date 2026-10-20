@@ -1,17 +1,33 @@
 import type { CardStaticData } from "@cards/core/schema";
 
 export default {
-  note: "Imported adapter identities and explicit manual facts; source pages and legacy assumptions have not been re-verified.",
   products: [
     {
+      defillamaSlug: "phantom",
       id: "phantom-cash",
       name: "Phantom Cash",
-      defillamaSlug: "phantom",
+      network: "visa",
+      cardTypes: {
+        physical: false,
+        virtual: true,
+      },
+      iban: {
+        supported: false,
+      },
       tiers: [
         {
           id: "phantom-cash--united-states--default",
           name: "Default",
           legacyRegion: "united-states",
+          network: "visa",
+          issuer: {
+            id: "lead-bank",
+            name: "Lead Bank",
+            country: "US",
+          },
+          cardTypes: {
+            virtual: true,
+          },
         },
       ],
     },

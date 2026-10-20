@@ -19,6 +19,7 @@ import {
 } from "./agent";
 import {
   candidate,
+  withoutStaticFacts,
   preserveSourceDisagreements,
   merge,
   markUnconfirmed,
@@ -149,7 +150,7 @@ export async function syncAdapter(
         ).rows[0];
         if (cached && !deps.force) {
           try {
-            const parsed = Extraction.parse(cached.data);
+            const parsed = Extraction.parse(withoutStaticFacts(adapter, cached.data));
             if (!parsed.complete || parsed.facts.some(fact => !verifyEvidence(fact.evidence, [doc])))
               throw new Error("Incomplete extraction or invalid source citation");
             for (const fact of parsed.facts) verifyFinancialEvidence(fact);
@@ -229,16 +230,16 @@ export async function syncAdapter(
         products: extractions.flatMap(extraction => extraction.products),
         tiers: extractions.flatMap(extraction => extraction.tiers),
         facts: extractions.flatMap(extraction => extraction.facts),
-      }, adapter.sources);
+      }, adapter.sources, adapter);
       extractions.splice(0, extractions.length, reconciled.extraction);
       result.issues.push(...reconciled.issues);
       const built = candidate(adapter, extractions, accepted, snapshots);
-      const unconfirmed = accepted
+      const unconfirmed = accepted && !deps.staticOnly
         ? markUnconfirmed(accepted, [
             ...snapshots,
             ...prior.filter(source => !inventory.includes(source.url) && source.snapshot).map(source => source.snapshot!),
           ], extractions, built.data)
-        : undefined;
+        : accepted;
       const merged = merge(unconfirmed, built.data);
       if (accepted && unconfirmed)
         merged.changes.push(...unconfirmedChanges(unconfirmed));

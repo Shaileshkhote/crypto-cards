@@ -1,24 +1,41 @@
 import type { CardStaticData } from "@cards/core/schema";
 
 export default {
-  note: "Imported adapter identities and explicit manual facts; source pages and legacy assumptions have not been re-verified.",
   products: [
     {
+      defillamaSlug: "metamask-card",
       id: "metamask",
       name: "MetaMask",
-      defillamaSlug: "metamask-card",
+      network: "mastercard",
+      cardTypes: {
+        virtual: true,
+      },
+      iban: {
+        supported: false,
+      },
       tiers: [
         {
           id: "metamask--global--default",
           name: "Default",
           legacyRegion: "global",
+          cardTypes: {
+            virtual: true,
+          },
         },
         {
           id: "metamask--global--metal",
           name: "Metal",
           legacyRegion: "global",
+          network: "mastercard",
+          cardTypes: {
+            physical: true,
+          },
         },
       ],
+      issuer: {
+        id: "monovate",
+        name: "Monovate",
+      },
     },
   ],
 } satisfies CardStaticData;

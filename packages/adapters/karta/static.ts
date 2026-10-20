@@ -1,12 +1,16 @@
 import type { CardStaticData } from "@cards/core/schema";
 
 export default {
-  note: "Imported adapter identities and explicit manual facts; source pages and legacy assumptions have not been re-verified.",
   products: [
     {
+      defillamaSlug: "karta-card",
       id: "karta",
       name: "Karta",
-      defillamaSlug: "karta-card",
+      network: "visa",
+      cardTypes: {
+        physical: false,
+        virtual: true,
+      },
       tiers: [
         {
           id: "karta--international--default",
@@ -17,8 +21,17 @@ export default {
           id: "karta--united-states--default",
           name: "Default",
           legacyRegion: "united-states",
+          issuer: {
+            id: "third-national",
+            name: "Third National",
+            country: "US",
+          },
         },
       ],
+      issuer: {
+        id: "third-national",
+        name: "Third National",
+      },
     },
   ],
 } satisfies CardStaticData;

@@ -1,12 +1,11 @@
 import type { CardStaticData } from "@cards/core/schema";
 
 export default {
-  note: "Imported adapter identities and explicit manual facts; source pages and legacy assumptions have not been re-verified.",
   products: [
     {
+      defillamaSlug: "payitfast",
       id: "payitfast",
       name: "PayitFast Card",
-      defillamaSlug: "payitfast",
       tiers: [
         {
           id: "payitfast--global--standard",
@@ -18,7 +17,23 @@ export default {
           name: "Elite",
           legacyRegion: "global",
         },
+        {
+          id: "signature",
+          name: "Signature",
+          cardTypes: {
+            physical: true,
+          },
+        },
+        {
+          id: "virtual-platinum",
+          name: "Virtual Platinum",
+          cardTypes: {
+            virtual: true,
+          },
+        },
       ],
+      network: "visa",
     },
   ],
+  network: "visa",
 } satisfies CardStaticData;

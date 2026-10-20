@@ -1,19 +1,52 @@
 import type { CardStaticData } from "@cards/core/schema";
 
 export default {
-  note: "Imported adapter identities and explicit manual facts; source pages and legacy assumptions have not been re-verified.",
   products: [
     {
+      defillamaSlug: "robinhood",
       id: "robinhood-gold",
       name: "Robinhood Gold Card",
-      defillamaSlug: "robinhood",
       tiers: [
         {
           id: "robinhood-gold--united-states--default",
           name: "Default",
           legacyRegion: "united-states",
+          network: "visa",
+          issuer: {
+            id: "coastal-community-bank",
+            name: "Coastal Community Bank",
+            country: "US",
+          },
+          cardTypes: {
+            virtual: true,
+            physical: true,
+          },
+        },
+        {
+          id: "solid-gold",
+          name: "Solid Gold Card: Visa Infinite",
+          issuer: {
+            id: "coastal-community-bank",
+            name: "Coastal Community Bank",
+            country: "US",
+          },
+        },
+        {
+          id: "standard-gold",
+          name: "Standard Gold Card: Visa Signature",
+          issuer: {
+            id: "coastal-community-bank",
+            name: "Coastal Community Bank",
+            country: "US",
+          },
         },
       ],
+      network: "visa",
+      issuer: {
+        id: "coastal-community-bank",
+        name: "Coastal Community Bank",
+        country: "US",
+      },
     },
   ],
 } satisfies CardStaticData;

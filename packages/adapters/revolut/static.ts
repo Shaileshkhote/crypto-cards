@@ -1,7 +1,6 @@
 import type { CardStaticData } from "@cards/core/schema";
 
 export default {
-  note: "Imported adapter identities and explicit manual facts; source pages and legacy assumptions have not been re-verified.",
   products: [
     {
       id: "revolut",
@@ -32,28 +31,47 @@ export default {
           id: "revolut--united-kingdom--standard",
           name: "Standard",
           legacyRegion: "united-kingdom",
+          iban: {
+            supported: true,
+          },
         },
         {
           id: "revolut--united-kingdom--plus",
           name: "Plus",
           legacyRegion: "united-kingdom",
+          iban: {
+            supported: true,
+          },
         },
         {
           id: "revolut--united-kingdom--premium",
           name: "Premium",
           legacyRegion: "united-kingdom",
+          iban: {
+            supported: true,
+          },
         },
         {
           id: "revolut--united-kingdom--metal",
           name: "Metal",
           legacyRegion: "united-kingdom",
+          iban: {
+            supported: true,
+          },
         },
         {
           id: "revolut--united-kingdom--ultra",
           name: "Ultra",
           legacyRegion: "united-kingdom",
+          iban: {
+            supported: true,
+          },
         },
       ],
+      cardTypes: {
+        virtual: true,
+        physical: true,
+      },
     },
   ],
 } satisfies CardStaticData;

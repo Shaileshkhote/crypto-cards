@@ -1,19 +1,41 @@
 import type { CardStaticData } from "@cards/core/schema";
 
 export default {
-  note: "Imported adapter identities and explicit manual facts; source pages and legacy assumptions have not been re-verified.",
   products: [
     {
+      defillamaSlug: "tuyo-card",
       id: "tuyo",
       name: "Tuyo",
-      defillamaSlug: "tuyo-card",
+      network: "visa",
+      cardTypes: {
+        virtual: true,
+        physical: true,
+      },
+      iban: {
+        supported: true,
+      },
       tiers: [
         {
           id: "tuyo--global--default",
           name: "Default",
           legacyRegion: "global",
+          network: "visa",
+          issuer: {
+            id: "rain",
+            name: "Signify Holdings, Inc. (Rain)",
+            country: "US",
+          },
+          cardTypes: {
+            virtual: true,
+            physical: true,
+          },
         },
       ],
+      issuer: {
+        id: "rain",
+        name: "Signify Holdings, Inc. (Rain)",
+        country: "US",
+      },
     },
   ],
 } satisfies CardStaticData;

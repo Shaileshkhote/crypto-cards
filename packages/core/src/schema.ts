@@ -2,7 +2,7 @@ import { z } from "zod";
 import countries from "i18n-iso-countries";
 import { compareDecimals } from "./serialize";
 
-export const SCHEMA_VERSION = "8";
+export const SCHEMA_VERSION = "9";
 export const Id = z
   .string()
   .regex(/^[a-z0-9][a-z0-9-]*$/)
@@ -20,6 +20,30 @@ export const Money = z
     currency: Currency,
   })
   .strict();
+// Token units remain distinct from ISO fiat money; no implicit USD parity.
+export const AssetAmount = z.object({
+  amount: Money.shape.amount,
+  asset: z.string().trim().min(1).max(80),
+}).strict();
+const DateOnly = z.string().date();
+const SpendBrackets = z.array(z.object({
+  upperBound: Money.nullable(),
+  inclusive: z.boolean(),
+  ratePercent: z.number().finite().nonnegative(),
+}).strict()).min(1);
+function validateBrackets(brackets: z.infer<typeof SpendBrackets>, ctx: z.RefinementCtx) {
+  const currency = brackets.find(b => b.upperBound)?.upperBound?.currency;
+  let previous: string | undefined;
+  brackets.forEach((b, i) => {
+    if (b.upperBound === null) {
+      if (i !== brackets.length - 1) ctx.addIssue({ code: "custom", path: ["brackets", i], message: "Unbounded bracket must be last" });
+    } else {
+      if (b.upperBound.currency !== currency || previous !== undefined && compareDecimals(b.upperBound.amount, previous) <= 0)
+        ctx.addIssue({ code: "custom", path: ["brackets", i], message: "Bracket thresholds must increase in one currency" });
+      previous = b.upperBound.amount;
+    }
+  });
+}
 export const Period = z.enum(["day", "week", "month", "year"]);
 export const Weekday = z.enum(["mon", "tue", "wed", "thu", "fri", "sat", "sun"]);
 export const Evidence = z
@@ -52,11 +76,18 @@ export const Scope = z
     paymentRails: z.array(z.string().regex(/^[a-z0-9][a-z0-9_-]*$/i)
       .transform(value => value.toLowerCase().replaceAll("_", "-")).pipe(Id)).optional(),
     daysOfWeek: z.array(Weekday).optional(),
+    fundingAssets: z.array(z.string().trim().min(1)).min(1).optional(),
+    validFrom: DateOnly.optional(),
+    validUntil: DateOnly.optional(),
     conditions: z.array(z.string().min(1)).min(1)
       .describe("Explicit source conditions not represented by another scope field, such as metal/plastic material, ATM withdrawals versus card purchases, asset conversion or spending bands. Preserve the condition; never invent one to resolve conflicting prices.")
       .optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((s, ctx) => {
+    if (s.validFrom && s.validUntil && s.validFrom > s.validUntil)
+      ctx.addIssue({ code: "custom", path: ["validUntil"], message: "Validity end precedes start" });
+  });
 const RuleBase = {
   id: Id,
   scope: Scope.describe("Required explicit applicability for this rule. Use typed fields and sourced conditions. Use {} only when no qualification is stated; omission does not mean worldwide or unconditional."),
@@ -116,21 +147,18 @@ export const FeeRule = z
         calculable: z.literal(true),
       })
       .strict(),
+    z.object({
+      ...FeeBase,
+      calculation: z.literal("fixed_plus_percentage"),
+      fixed: Money,
+      ratePercent: z.number().finite().nonnegative(),
+      calculable: z.literal(true),
+    }).strict(),
     z
       .object({
         ...FeeBase,
         calculation: z.literal("tiered"),
-        brackets: z
-          .array(
-            z
-              .object({
-                upperBound: Money.nullable(),
-                inclusive: z.boolean(),
-                ratePercent: z.number().finite().nonnegative(),
-              })
-              .strict(),
-          )
-          .min(1),
+        brackets: SpendBrackets,
         mode: z.enum(["marginal", "whole_amount"]),
         period: Period,
         calculable: z.literal(true),
@@ -150,30 +178,7 @@ export const FeeRule = z
       ctx.addIssue({ code: "custom", path: ["serviceId"], message: "Other fee requires a stable serviceId" });
     if (r.kind !== "other" && r.serviceId)
       ctx.addIssue({ code: "custom", path: ["serviceId"], message: "serviceId is only for kind other" });
-    if (r.calculation === "tiered") {
-      const c = r.brackets[0]?.upperBound?.currency;
-      let last: string | undefined;
-      r.brackets.forEach((b, i) => {
-        if (b.upperBound === null) {
-          if (i !== r.brackets.length - 1)
-            ctx.addIssue({
-              code: "custom",
-              message: "Unbounded bracket must be last",
-            });
-        } else {
-          const n = b.upperBound.amount;
-          if (
-            (last !== undefined && compareDecimals(n, last) <= 0) ||
-            b.upperBound.currency !== c
-          )
-            ctx.addIssue({
-              code: "custom",
-              message: "Bracket thresholds must increase in one currency",
-            });
-          last = n;
-        }
-      });
-    }
+    if (r.calculation === "tiered") validateBrackets(r.brackets, ctx);
   });
 export const RewardRule = z
   .object({
@@ -183,8 +188,17 @@ export const RewardRule = z
       .optional(),
     ratePercent: z.number().finite().nonnegative().optional(),
     rewardAsset: z.string().optional(),
+    spendSchedule: z.object({
+      period: Period,
+      mode: z.enum(["marginal", "whole_amount"]),
+      brackets: SpendBrackets,
+    }).strict().superRefine((s, ctx) => {
+      validateBrackets(s.brackets, ctx);
+      if (s.brackets.at(-1)?.upperBound !== null)
+        ctx.addIssue({ code: "custom", path: ["brackets"], message: "Reward schedule needs a sourced final rate beyond its last threshold" });
+    }).describe("Complete source-supported spend schedule. Thresholds are eligible spending, never payout caps. Unknown behavior above the last threshold remains narrative.").optional(),
     cap: z
-      .object({ amount: Money, period: z.enum(["month", "year"]) })
+      .object({ amount: z.union([Money, AssetAmount]), period: z.enum(["month", "year"]) })
       .strict()
       .optional(),
     requirements: z.array(z.string()).optional(),
@@ -192,11 +206,13 @@ export const RewardRule = z
   })
   .strict()
   .superRefine((r, c) => {
-    if (r.calculable && r.ratePercent === undefined)
+    if (r.calculable && r.ratePercent === undefined && r.spendSchedule === undefined)
       c.addIssue({
         code: "custom",
-        message: "Calculable reward requires ratePercent",
+        message: "Calculable reward requires ratePercent or spendSchedule",
       });
+    if (r.ratePercent !== undefined && r.spendSchedule !== undefined)
+      c.addIssue({ code: "custom", path: ["spendSchedule"], message: "Use a flat rate or a spending schedule, not both" });
     if (!r.calculable && !r.description)
       c.addIssue({
         code: "custom",

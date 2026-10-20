@@ -1,12 +1,16 @@
 import type { CardStaticData } from "@cards/core/schema";
 
 export default {
-  note: "Imported adapter identities and explicit manual facts; source pages and legacy assumptions have not been re-verified.",
   products: [
     {
+      defillamaSlug: "kolo-card",
       id: "kolo",
       name: "Kolo",
-      defillamaSlug: "kolo-card",
+      network: "visa",
+      cardTypes: {
+        physical: false,
+        virtual: true,
+      },
       tiers: [
         {
           id: "kolo--global--eur-card",
@@ -14,6 +18,11 @@ export default {
           legacyRegion: "global",
         },
       ],
+      issuer: {
+        id: "banco-popular-de-puerto-rico",
+        name: "Banco Popular de Puerto Rico",
+        country: "PR",
+      },
     },
   ],
 } satisfies CardStaticData;

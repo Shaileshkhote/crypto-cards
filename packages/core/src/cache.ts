@@ -135,7 +135,7 @@ export function filterDirectory(rows: DirectoryRow[], f: Filter) {
       (f.kyc === undefined || x.kyc === f.kyc) &&
       (!f.currency || !!x.currencies?.includes(f.currency)) &&
       (f.reward === undefined ||
-        x.rewards?.some((r) => (r.ratePercent || 0) > 0) === f.reward) &&
+        x.rewards?.some((r) => (r.ratePercent || 0) > 0 || !!r.spendSchedule?.brackets.some(b => b.ratePercent > 0)) === f.reward) &&
       (!f.feature || !!x.features?.includes(f.feature))
     );
   });
@@ -146,6 +146,8 @@ export function applicable(
 ) {
   // Free-text conditions cannot be established by the directory's sort context.
   if (scope.conditions?.length) return false;
+  // The directory has no transaction date or funding-asset context.
+  if (scope.validFrom || scope.validUntil || scope.fundingAssets) return false;
   if (scope.daysOfWeek && (!context.dayOfWeek || !scope.daysOfWeek.includes(context.dayOfWeek))) return false;
   if (scope.cardTypes && (!context.cardType || !scope.cardTypes.includes(context.cardType))) return false;
   if (scope.cardOrder && scope.cardOrder !== context.cardOrder) return false;

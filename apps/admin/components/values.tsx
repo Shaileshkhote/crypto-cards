@@ -27,12 +27,16 @@ export function Value({ value }: { value: unknown }): ReactNode {
       <span>Confirmed empty list</span>
     );
   const obj = value as Record<string, unknown>;
-  if ("amount" in obj && "currency" in obj)
-    return `${obj.amount} ${obj.currency}`;
+  if ("amount" in obj && ("currency" in obj || "asset" in obj))
+    return `${obj.amount} ${obj.currency || obj.asset}`;
+  if ("upperBound" in obj && "ratePercent" in obj)
+    return <span>
+      {obj.upperBound === null ? "Above the preceding threshold" : <>Spend up to <Value value={obj.upperBound} /> ({obj.inclusive ? "inclusive" : "exclusive"})</>}: {String(obj.ratePercent)}%
+    </span>;
   if ("ratePercent" in obj)
     return (
       <span>
-        {String(obj.serviceId || obj.kind || "Cashback").replace(/[_-]/g, " ")}: {String(obj.ratePercent)}%
+        {String(obj.serviceId || obj.kind || "Cashback").replace(/[_-]/g, " ")}: {obj.calculation === "fixed_plus_percentage" && <><Value value={obj.fixed} /> + </>}{String(obj.ratePercent)}%
         {typeof obj.rewardAsset === "string" && <> in {obj.rewardAsset}</>}
         <FeeQualifiers rule={obj} />
         {!!obj.cap && (

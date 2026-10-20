@@ -1,24 +1,35 @@
 import type { CardStaticData } from "@cards/core/schema";
 
 export default {
-  note: "Imported adapter identities and explicit manual facts; source pages and legacy assumptions have not been re-verified.",
   products: [
     {
+      defillamaSlug: "mexc",
       id: "mexc-global",
       name: "MEXC Global Card",
-      defillamaSlug: "mexc",
+      network: "visa",
+      cardTypes: {
+        physical: false,
+        virtual: true,
+      },
+      iban: {
+        supported: false,
+      },
       tiers: [
         {
           id: "mexc-global--international--default",
           name: "Default",
           legacyRegion: "international",
+          network: "visa",
+          cardTypes: {
+            virtual: true,
+          },
         },
       ],
     },
     {
+      defillamaSlug: "mexc",
       id: "mexc-apac",
       name: "MEXC Card (APAC)",
-      defillamaSlug: "mexc",
       tiers: [
         {
           id: "mexc-apac--asia-pacific--standard",
@@ -36,11 +47,21 @@ export default {
           legacyRegion: "asia-pacific",
         },
       ],
+      network: "visa",
+      issuer: {
+        id: "dcs-card-centre",
+        name: "DCS Card Centre Pte. Ltd.",
+        country: "SG",
+      },
+      cardTypes: {
+        virtual: true,
+        physical: true,
+      },
     },
     {
+      defillamaSlug: "mexc",
       id: "mexc-etherfi",
       name: "MEXC × ether.fi Credit Card",
-      defillamaSlug: "mexc",
       tiers: [
         {
           id: "mexc-etherfi--international--default",
@@ -48,6 +69,10 @@ export default {
           legacyRegion: "international",
         },
       ],
+      network: "visa",
+      cardTypes: {
+        virtual: true,
+      },
     },
   ],
 } satisfies CardStaticData;

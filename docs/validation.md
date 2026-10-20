@@ -1,4 +1,14 @@
+# Static feature precedence: prompt 44 / merge 20
+
+Hardcoded network, issuer, IBAN and cardTypes values are authoritative at their configured provider/product/tier scope. The existing extractor receives the static values and skips configured fields; shared filtering discards returned/cached observations before citation checks and source reconciliation. Missing cardTypes subfields still use extraction. Issuer and IBAN are treated as complete claims once hardcoded. Fields at other scopes remain extractable. Fingerprints include static data so extraction caches do not silently reuse a different static configuration. Static-only updates preserve accepted source data without pretending a fresh source observation occurred. Existing schema/evidence checks for retained extracted fields and version-checked reviews remain unchanged. All 231 tests pass, including 24 PostgreSQL integration cases, TypeScript and lint. No new provider rules or paid calls for this change.
+
 # Validation status
+
+## Ranking representation: schema 9 / prompt 43 / merge 19
+
+Offline only. Fourteen manually labelled cases use exact saved source blocks for Phantom compound fees, Ethena monthly reward bands, MEXC token caps, Tria spending thresholds, VaultLeap/PayitFast separately cited caps, and Picnic expiry. Mocked model responses exercise the real extractor, hydration, schema, evidence and candidate path with zero budget and external requests blocked. These are representation/plumbing tests, not fresh LLM extraction results. Negative tests retain amount/unit/date grounding and reject invalid schedules; conflicting flat/banded claims retain narrative. A PostgreSQL case exercises publication, zero-call cache reuse and cap changes held for existing approval.
+
+Five exact historical raw responses were replayed independently with mocked fetch: one Jupiter draft passes; two wrong-evidence Jupiter drafts and two old malformed MEXC drafts still fail. No current model success rate or new card recovery is claimed. All 228 tests, including 24 isolated PostgreSQL integration cases, TypeScript, ESLint and the production build pass. External CI and deployment were not run for this change. All 28 published local records validate under schema 9 and remain unchanged; no jobs are queued/running. Historical cloud database/private ledger remain unrecovered. No paid calls, automatic reviews or simulator implementation. See [readiness assessment](ranking-readiness.md).
 
 ## Validator simplification: schema 8 / prompt 42 / merge 18
 

@@ -1,12 +1,11 @@
 import type { CardStaticData } from "@cards/core/schema";
 
 export default {
-  note: "Imported adapter identities and explicit manual facts; source pages and legacy assumptions have not been re-verified.",
   products: [
     {
+      defillamaSlug: "bitunix",
       id: "bitunix",
       name: "Bitunix Card",
-      defillamaSlug: "bitunix",
       tiers: [
         {
           id: "bitunix--global--vip-0",
@@ -54,6 +53,11 @@ export default {
           legacyRegion: "global",
         },
       ],
+      network: "visa",
+      cardTypes: {
+        virtual: true,
+        physical: true,
+      },
     },
   ],
 } satisfies CardStaticData;

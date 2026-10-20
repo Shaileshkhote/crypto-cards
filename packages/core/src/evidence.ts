@@ -51,7 +51,19 @@ export function verifyFinancialEvidence(fact: ExtractionData["facts"][number]) {
       if (!new RegExp(`\\b${money.currency}\\b`, "i").test(quote) && !dollar && !(symbol && quote.includes(symbol)) && !(name && quote.toLowerCase().includes(name.toLowerCase())))
         report(`Money currency ${money.currency} is absent from its cited block. Preserve the source unit; a percentage or free charge without a currency is not fixed money.`);
     }
+    const assetMoney = value as { amount?: unknown; asset?: unknown };
+    if (typeof assetMoney.amount === "string" && typeof assetMoney.asset === "string") {
+      const escaped = assetMoney.asset.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      if (!new RegExp(`(?<![A-Za-z0-9])${escaped}(?![A-Za-z0-9])`, "i").test(quote))
+        report(`Reward asset ${assetMoney.asset} is absent from its cited block. Preserve the explicit source unit; never assume token/fiat parity.`);
+    }
     for (const [key, item] of Object.entries(value)) {
+      if (["validFrom", "validUntil"].includes(key) && typeof item === "string") {
+        const citedDates = [...quote.matchAll(/\b\d{4}-\d{2}-\d{2}\b|\b[A-Za-z]{3,9}\.?\s+\d{1,2},?\s+\d{4}\b|\b\d{1,2}\s+[A-Za-z]{3,9}\.?\s+\d{4}\b/g)]
+          .map(m => { const time = Date.parse(`${m[0]} UTC`); return Number.isFinite(time) ? new Date(time).toISOString().slice(0, 10) : m[0]; });
+        if (!citedDates.includes(item)) report(`Validity date ${item} is absent from its cited block. Keep unsupported date formats as narrative.`);
+      }
+
       if (["amount", "ratePercent", "count"].includes(key) && (typeof item === "number" || typeof item === "string")) {
         if (!numbers.some(number => compareDecimals(number, String(item)) === 0))
           report(`Financial value ${item} is absent from its cited block. Cite the row containing that value; emit separate facts for separate table rows. Keep unrepresentable values as narrative.`);

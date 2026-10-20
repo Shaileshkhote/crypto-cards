@@ -1,12 +1,20 @@
 import type { CardStaticData } from "@cards/core/schema";
 
 export default {
-  note: "Imported adapter identities and explicit manual facts; source pages and legacy assumptions have not been re-verified.",
   products: [
     {
+      defillamaSlug: "nexo-card",
       id: "nexo-card",
       name: "Nexo Card",
-      defillamaSlug: "nexo-card",
+      network: "mastercard",
+      cardTypes: {
+        physical: true,
+        virtual: true,
+      },
+      iban: {
+        supported: true,
+        type: "personal",
+      },
       tiers: [
         {
           id: "nexo-card--eea--credit-mode",
@@ -59,6 +67,11 @@ export default {
           legacyRegion: "mexico",
         },
       ],
+      issuer: {
+        id: "dipocket-uab",
+        name: "DiPocket UAB",
+        country: "LT",
+      },
     },
   ],
 } satisfies CardStaticData;

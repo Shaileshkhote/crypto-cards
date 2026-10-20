@@ -13,7 +13,7 @@ import { readCache, rebuildCache } from "@cards/core/cache";
 import { publicationHash, preserveSourceDisagreements, MERGE_VERSION } from "@cards/core/merge";
 import { enqueue, claimJob, status } from "@cards/core/jobs";
 import { adapter, document, extraction } from "./helpers";
-import { Card } from "@cards/core/schema";
+import { Card, Extraction } from "@cards/core/schema";
 import { loadAdapters } from "@cards/core/adapters";
 import { documentFromText } from "@cards/core/crawler";
 const enabled = !!process.env.TEST_DATABASE_URL;
@@ -130,6 +130,35 @@ describe.skipIf(!enabled)(
       const [proposal] = await listReviews();
       await approveReview(proposal.id, "test-admin");
       expect((await fees()).map(fee => fee.calculation === "fixed" && fee.fixed.amount).sort()).toEqual(["0", "200"]);
+    });
+    it("round-trips compound fees, reward bands and token caps, holding cap changes for review", async () => {
+      const sync = async (cap: number, warm = false) => {
+        const doc = documentFromText("https://example.com/fees", `Core purchases: USD 0.30 plus 1%. Monthly cashback: 4% on first USD 1000, then 1%; monthly cap ${cap} USDT.`);
+        return syncAdapter(adapter(), new Budget(0), {
+          fetch: async () => doc,
+          extract: async () => {
+            if (warm) throw Error("Unchanged source must reuse cache without model calls");
+            const evidence = { url: doc.url, blockId: doc.blocks[0].id, quote: doc.blocks[0].text };
+            return { documents: [doc], issues: [], extraction: Extraction.parse({ complete: true, products: [], tiers: [], facts: [
+              { productId: "card", tierId: "core", field: "fees", evidence, value: [{ id: "purchase", kind: "transaction", calculation: "fixed_plus_percentage", fixed: { amount: "0.30", currency: "USD" }, ratePercent: 1, scope: {}, calculable: true }] },
+              { productId: "card", tierId: "core", field: "rewards", evidence, value: [{ id: "cashback", kind: "cashback", rewardAsset: "USDT", scope: {}, spendSchedule: { period: "month", mode: "marginal", brackets: [{ upperBound: { amount: "1000", currency: "USD" }, inclusive: true, ratePercent: 4 }, { upperBound: null, inclusive: false, ratePercent: 1 }] }, cap: { amount: { amount: String(cap), asset: "USDT" }, period: "month" }, calculable: true }] },
+            ] }) };
+          },
+        });
+      };
+      expect((await sync(100)).status).toBe("published");
+      const cache = await readCache("cards/example");
+      expect((await sync(100, true)).status).toBe("unchanged");
+      expect((await readCache("cards/example"))?.payload).toBe(cache?.payload);
+      expect((await sync(200)).status).toBe("review");
+      expect((await read()).products![0].tiers![0].rewards![0].cap?.amount.amount).toBe("100");
+      const [review] = await listReviews();
+      await approveReview(review.id, "offline-test");
+      const tier = (await read()).products![0].tiers![0];
+      expect(tier.rewards![0].cap).toEqual({ amount: { amount: "200", asset: "USDT" }, period: "month" });
+      expect(tier.fees![0]).toMatchObject({ calculation: "fixed_plus_percentage", fixed: { amount: "0.3", currency: "USD" }, ratePercent: 1 });
+      expect(tier.rewards![0].spendSchedule?.brackets).toHaveLength(2);
+      expect((await sync(200, true)).status).toBe("unchanged");
     });
     it("holds changed FX fee; approval changes the reviewed scope and caches only committed data", async () => {
       await run();

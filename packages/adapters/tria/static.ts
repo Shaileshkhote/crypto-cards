@@ -1,17 +1,33 @@
 import type { CardStaticData } from "@cards/core/schema";
 
 export default {
-  note: "Imported adapter identities and explicit manual facts; source pages and legacy assumptions have not been re-verified.",
   products: [
     {
+      defillamaSlug: "tria-card",
       id: "tria",
       name: "Tria",
-      defillamaSlug: "tria-card",
+      network: "visa",
+      cardTypes: {
+        physical: true,
+        virtual: true,
+      },
+      iban: {
+        supported: false,
+      },
       tiers: [
         {
           id: "tria--international--default",
           name: "Default",
           legacyRegion: "international",
+          network: "visa",
+          issuer: {
+            id: "nimbus-llc",
+            name: "Nimbus, LLC",
+            country: "US",
+          },
+          cardTypes: {
+            physical: true,
+          },
         },
         {
           id: "tria--united-states--default",
@@ -87,6 +103,65 @@ export default {
           id: "tria--united-states--vip",
           name: "VIP",
           legacyRegion: "united-states",
+        },
+        {
+          id: "lite",
+          name: "Lite Card",
+          cardTypes: {
+            virtual: true,
+            physical: false,
+          },
+        },
+        {
+          id: "max",
+          name: "Max Card",
+          cardTypes: {
+            virtual: true,
+            physical: true,
+          },
+        },
+        {
+          id: "pro",
+          name: "Pro Card",
+          cardTypes: {
+            virtual: true,
+            physical: true,
+          },
+        },
+        {
+          id: "tria-max",
+          name: "Max",
+          cardTypes: {
+            physical: true,
+          },
+        },
+        {
+          id: "tria-pro",
+          name: "Pro",
+          cardTypes: {
+            physical: true,
+          },
+        },
+        {
+          id: "tria-us-metal",
+          name: "Tria Metal Card",
+          cardTypes: {
+            physical: true,
+          },
+        },
+        {
+          id: "tria-us-plastic",
+          name: "Tria Plastic Card",
+          cardTypes: {
+            physical: true,
+          },
+        },
+        {
+          id: "tria-us-virtual",
+          name: "Tria Virtual Card",
+          cardTypes: {
+            virtual: true,
+          },
         },
       ],
     },

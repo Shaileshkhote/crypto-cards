@@ -616,3 +616,20 @@ it.each([
   e.facts[0].value = [FeeRule.parse(rule)];
   expect(() => candidate(adapter(), [e], undefined, [doc])).toThrow(error);
 });
+
+it("ignores extractor values and citations for hardcoded features while retaining missing subfields", () => {
+  const a = adapter(), doc = document(), e = extraction(doc);
+  a.static = { products: [{ id: "card", name: "Card", tiers: [{ id: "core", name: "Core", network: "visa", cardTypes: { physical: false }, iban: { supported: false }, issuer: { name: "Manual Bank" } }] }] };
+  const ignored = { ...e.facts[0], evidence: { url: "https://example.com/invalid", blockId: "absent", quote: "wrong" } };
+  e.facts.push(
+    { ...ignored, field: "network", value: "mastercard" },
+    { ...ignored, field: "issuer", value: { name: "Extracted Bank" } },
+    { ...ignored, field: "iban", value: { supported: true, type: "personal" } },
+    { ...e.facts[0], field: "cardTypes", value: { physical: true, virtual: true } },
+  );
+  const tier = candidate(a, [e], undefined, [doc]).data.products![0].tiers![0];
+  expect(tier).toMatchObject({ network: "visa", issuer: { name: "Manual Bank" }, iban: { supported: false }, cardTypes: { physical: false, virtual: true } });
+  expect(tier.fees![0]).toMatchObject({ ratePercent: 1.5 });
+  const broken = structuredClone(e); broken.facts[0].evidence = ignored.evidence;
+  expect(() => candidate(a, [broken], undefined, [doc])).toThrow("Invalid evidence");
+});

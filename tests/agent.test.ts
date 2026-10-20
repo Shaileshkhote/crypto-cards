@@ -426,10 +426,10 @@ it("derives redundant fee flags and retains source text for uncertain rewards", 
   expect((result.extraction.facts[0].value as Record<string, unknown>[])[0].calculable).toBe(true);
   expect((result.extraction.facts[1].value as Record<string, unknown>[])[0]).toMatchObject({ calculable: false, description: doc.blocks[0].text });
 });
-it("retains an unsupported compound formula as source text without publishing a guessed calculation", async () => {
+it("retains an unsupported formula as source text without publishing guessed coefficients", async () => {
   vi.stubEnv("OPENROUTER_API_KEY", "fixture-not-a-real-key");
   const doc = documentFromText("https://example.com/fees", "ATM fee: $1 plus 0.65% per withdrawal."), wire = extraction(doc);
-  (wire.facts[0] as { value: unknown }).value = [{ id: "atm", kind: "atm", scope: {}, calculation: "fixed_plus_percentage", fixed: { amount: "99", currency: "USD" }, ratePercent: 99, calculable: true }];
+  (wire.facts[0] as { value: unknown }).value = [{ id: "atm", kind: "atm", scope: {}, calculation: "maximum_of_fixed_and_percentage", fixed: { amount: "99", currency: "USD" }, ratePercent: 99, calculable: true }];
   vi.stubGlobal("fetch", vi.fn(async (url: string) => url.endsWith("/models")
     ? Response.json({ data: [{ id: modelName(), pricing: { prompt: "0.0000001", completion: "0.0000001" }, supported_parameters: ["tools", "structured_outputs"] }] })
     : Response.json({ usage: { cost: 0.001 }, choices: [{ finish_reason: "stop", message: { content: JSON.stringify(wire) } }] })));
@@ -857,4 +857,22 @@ it("blocks new requests after a concurrent billing overrun but settles in-flight
   expect(() => b.reserve(0.01)).toThrow("Provider cost exceeded");
   b.settle(0.1, 0.05);
   expect(total.spent).toBeCloseTo(0.25);
+});
+
+it("supplies static values and drops configured observations before citation hydration without paid calls", async () => {
+  vi.stubEnv("OPENROUTER_API_KEY", "fixture-not-a-real-key");
+  const a = adapter(), doc = document(), good = extraction(doc);
+  a.static = { products: [{ id: "card", name: "Card", tiers: [{ id: "core", name: "Core", network: "visa", cardTypes: { physical: false } }] }] };
+  const before = fingerprint(doc, a);
+  const output = { ...good, facts: [...good.facts, { ...good.facts[0], field: "network", value: "mastercard", evidence: { url: "https://example.com/nonexistent", blockId: "bad", quote: "invented" } }] };
+  vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+    if (url.endsWith("/models")) return Response.json({ data: [{ id: modelName(), pricing: { prompt: "0", completion: "0" }, supported_parameters: ["tools", "structured_outputs"] }] });
+    const body = JSON.parse(String(init?.body));
+    expect(JSON.parse(body.messages[1].content).staticValues).toEqual(a.static);
+    expect(body.messages[0].content).toContain("hardcoded values are authoritative");
+    return Response.json({ usage: { cost: 0 }, choices: [{ finish_reason: "stop", message: { content: JSON.stringify(output) } }] });
+  }));
+  await expect(extract(a, [doc], new Budget(0))).resolves.toMatchObject({ extraction: good });
+  a.static.products![0].tiers![0].network = "mastercard";
+  expect(fingerprint(doc, a)).not.toBe(before);
 });

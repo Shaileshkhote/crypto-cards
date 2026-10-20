@@ -1,22 +1,37 @@
 import type { CardStaticData } from "@cards/core/schema";
 
 export default {
-  note: "Imported adapter identities and explicit manual facts; source pages and legacy assumptions have not been re-verified.",
   products: [
     {
+      defillamaSlug: "exa-card",
       id: "exa",
       name: "Exa",
-      defillamaSlug: "exa-card",
+      network: "visa",
+      cardTypes: {
+        physical: false,
+        virtual: true,
+      },
       tiers: [
         {
           id: "exa--international--default",
           name: "Default",
           legacyRegion: "international",
+          network: "visa",
+          issuer: {
+            id: "third-national",
+            name: "Third National",
+          },
         },
         {
           id: "exa--united-states--default",
           name: "Default",
           legacyRegion: "united-states",
+          network: "visa",
+          issuer: {
+            id: "third-national",
+            name: "Third National",
+            country: "US",
+          },
         },
       ],
     },

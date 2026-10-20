@@ -1,25 +1,30 @@
 import type { CardStaticData } from "@cards/core/schema";
 
 export default {
-  note: "Imported adapter identities and explicit manual facts; source pages and legacy assumptions have not been re-verified.",
   products: [
     {
+      defillamaSlug: "ruvo",
       id: "ruvo",
       name: "Ruvo Card",
-      defillamaSlug: "ruvo",
+      inheritFields: [
+        "cardTypes",
+      ],
+      cardTypes: {
+        physical: true,
+        virtual: true,
+      },
       tiers: [
         {
           id: "ruvo--global--default",
           name: "Default",
           legacyRegion: "global",
+          network: "visa",
+          cardTypes: {
+            physical: true,
+          },
         },
       ],
-      inheritFields: ["cardTypes"],
-      cardTypes: {
-        physical: true,
-        virtual: true,
-      },
+      network: "visa",
     },
   ],
-  sourceDate: "2026-10-15",
 } satisfies CardStaticData;

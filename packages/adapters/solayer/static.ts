@@ -1,17 +1,33 @@
 import type { CardStaticData } from "@cards/core/schema";
 
 export default {
-  note: "Imported adapter identities and explicit manual facts; source pages and legacy assumptions have not been re-verified.",
   products: [
     {
+      defillamaSlug: "solayer-card",
       id: "solayer",
       name: "Solayer",
-      defillamaSlug: "solayer-card",
+      network: "visa",
+      cardTypes: {
+        physical: true,
+        virtual: true,
+      },
+      iban: {
+        supported: false,
+      },
       tiers: [
         {
           id: "solayer--international--default",
           name: "Default",
           legacyRegion: "international",
+          network: "visa",
+          issuer: {
+            id: "third-national",
+            name: "Third National",
+          },
+          cardTypes: {
+            virtual: true,
+            physical: true,
+          },
         },
       ],
     },

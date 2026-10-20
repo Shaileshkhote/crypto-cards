@@ -9,7 +9,7 @@ import {
 } from "./schema";
 import { canonical, hash, slug } from "./serialize";
 import { verifyEvidence, verifyFinancialEvidence } from "./evidence";
-export const MERGE_VERSION = "18";
+export const MERGE_VERSION = "20";
 type ObjectValue = Record<string, unknown>;
 const isObject = (v: unknown): v is ObjectValue =>
   !!v && typeof v === "object" && !Array.isArray(v);
@@ -47,7 +47,9 @@ export function overlay(base: unknown, patch: unknown): unknown {
       base.calculation !== patch.calculation) ||
       (typeof base.calculable === "boolean" &&
         typeof patch.calculable === "boolean" &&
-        base.calculable !== patch.calculable)
+        base.calculable !== patch.calculable) ||
+      (("spendSchedule" in base || "spendSchedule" in patch) &&
+        ("spendSchedule" in base) !== ("spendSchedule" in patch))
     )
       return patch;
     const out = { ...base };
@@ -208,6 +210,7 @@ function moneyCurrencies(value: unknown): string[] {
   if (!isObject(value)) return [];
   return [...new Set([
     ...(typeof value.amount === "string" && typeof value.currency === "string" ? [value.currency] : []),
+    ...(typeof value.amount === "string" && typeof value.asset === "string" ? [`asset:${value.asset}`] : []),
     ...Object.values(value).flatMap(moneyCurrencies),
   ])].sort();
 }
@@ -215,7 +218,9 @@ function rules(value: unknown, field: string, target: string, origin: unknown, t
   if (!Array.isArray(value) || !["fees", "rewards", "limits"].includes(field)) return value;
   return coalesceRules(value.map(r => {
     const obj = ordered(r) as ObjectValue;
-    const currencies = moneyCurrencies(obj);
+    // Spend thresholds are formula inputs, not a separate reward identity.
+    // Otherwise a banded observation could coexist with an unconditional rate.
+    const currencies = moneyCurrencies(field === "rewards" ? { ...obj, spendSchedule: undefined } : obj);
     const identityScope = ordered(obj.scope || {}) as ObjectValue;
     if (targetTier && Array.isArray(identityScope.tierIds) && identityScope.tierIds.length === 1 && identityScope.tierIds[0] === targetTier)
       delete identityScope.tierIds;
@@ -249,10 +254,15 @@ function staticOrigin(v: unknown, path = "provider", targetTier?: string): unkno
   return out;
 }
 function compatible(left: unknown, right: unknown, ruleArray = false): boolean {
-  if (isObject(left) && isObject(right))
+  if (isObject(left) && isObject(right)) {
+    // A flat claim and a spend-dependent claim are competing formulas, not
+    // complementary fields that can be combined into one invalid reward.
+    if (("spendSchedule" in left && "ratePercent" in right) ||
+        ("spendSchedule" in right && "ratePercent" in left)) return false;
     return Object.keys(right)
       .filter((k) => !["source", "status", "id"].includes(k) && !(k === "description" && typeof left.calculable === "boolean" && left.calculable === right.calculable))
       .every((k) => !(k in left) || compatible(left[k], right[k]));
+  }
   if (
     Array.isArray(left) &&
     Array.isArray(right) &&
@@ -283,7 +293,33 @@ function conflictDetails(first: unknown, second: unknown): string {
 // Different source blocks may genuinely disagree. Keep each cited statement
 // rather than choosing a price/list or failing every other supported field.
 // Same-block collisions still need correction: they usually lack a qualifier.
-export function preserveSourceDisagreements(extraction: ExtractionData, sources?: Adapter["sources"]) {
+// Ignore extractor observations for explicitly configured static feature leaves.
+// Scope stays exact: a regional tier never changes a different tier's defaults.
+export function withoutStaticFacts(adapter: Adapter, extraction: ExtractionData): ExtractionData {
+  if (!extraction || !Array.isArray(extraction.facts)) return extraction;
+  const fields = new Set(["network", "issuer", "iban", "cardTypes"]);
+  const products = [...adapter.config.products, ...(adapter.static.products || [])];
+  return { ...extraction, facts: extraction.facts.flatMap(fact => {
+    if (!fact || !fields.has(fact.field)) return [fact];
+    const productHint = extraction.products?.find(p => p.id === fact.productId);
+    const productId = fact.productId ? identity(fact.productId, productHint?.name || fact.productId, products, adapter.config.aliases) : undefined;
+    const product = adapter.static.products?.find(p => p.id === productId);
+    const tierHint = extraction.tiers?.find(t => t.id === fact.tierId);
+    const tiers = [...adapter.config.tiers.filter(t => t.productId === productId), ...(product?.tiers || [])];
+    const tierId = fact.tierId ? identity(fact.tierId, tierHint?.name || fact.tierId, tiers, adapter.config.aliases) : undefined;
+    const target = tierId ? product?.tiers?.find(t => t.id === tierId) : productId ? product : adapter.static;
+    const configured = (target as ObjectValue | undefined)?.[fact.field];
+    if (configured === undefined || configured === null) return [fact];
+    if (fact.field === "network" || fact.field === "issuer") return [];
+    if (!isObject(fact.value)) return [];
+    const remaining = Object.fromEntries(Object.entries(fact.value).filter(([key]) => !isObject(configured) || configured[key] === undefined || configured[key] === null));
+    // An IBAN subtype alone is not a standalone supported/unsupported claim.
+    if (!Object.keys(remaining).length || (fact.field === "iban" && !("supported" in remaining))) return [];
+    return [{ ...fact, value: remaining }];
+  }) };
+}
+export function preserveSourceDisagreements(extraction: ExtractionData, sources?: Adapter["sources"], adapter?: Adapter) {
+  if (adapter) extraction = withoutStaticFacts(adapter, extraction);
   for (const fact of extraction.facts) verifyFinancialEvidence(fact);
   type Entry = { fact: number; value: ObjectValue; source: string };
   const groups = new Map<string, Entry[]>();
@@ -411,6 +447,7 @@ export function candidate(
   accepted?: CardData,
   documents: Document[] = [],
 ): { data: CardData; discrepancies: string[] } {
+  extractions = extractions.map(extraction => withoutStaticFacts(adapter, extraction));
   if (extractions.some(extraction => !extraction.complete))
     throw new Error("Incomplete extraction cannot form a candidate");
   // Return the evidence failures together so one correction can fix a whole
