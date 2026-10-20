@@ -176,7 +176,7 @@ function providerSchema(value: unknown, preserveNull = false): unknown {
     // The model selects source references; the application copies the exact
     // quote from that block rather than asking the model to reproduce text.
     if (props.url && props.blockId && props.quote && Object.keys(props).length === 3)
-      { delete props.quote; props.blockId = { type: "string", pattern: "^p[1-9][0-9]*b[1-9][0-9]*$" }; }
+      { delete props.quote; props.url = { $ref: "#/$defs/sourceUrl" }; props.blockId = { type: "string", pattern: "^p[1-9][0-9]*b[1-9][0-9]*$" }; }
     if (props.scope && props.calculable) {
       delete props.source; delete props.status;
       if (props.calculation) delete props.calculable;
@@ -203,8 +203,8 @@ function providerSchema(value: unknown, preserveNull = false): unknown {
   return out;
 }
 let sharedModelSchema: Record<string, unknown> | undefined;
-function extractionSchema() {
-  return sharedModelSchema ??= {
+function extractionSchema(urls: string[]) {
+  const schema = sharedModelSchema ??= {
     ...providerSchema(zodToJsonSchema(Extraction, { $refStrategy: "none" })) as Record<string, unknown>,
     $defs: {
       country: { type: "string", enum: Country.options, description: Country.description },
@@ -212,6 +212,7 @@ function extractionSchema() {
       targetId: { anyOf: [{ type: "string", pattern: "^[a-z0-9][a-z0-9-]*$" }, { type: "null" }] },
     },
   };
+  return { ...schema, $defs: { ...schema.$defs as Record<string, unknown>, sourceUrl: { type: "string", enum: [...new Set(urls)] } } };
 }
 
 // Decode provider-required null placeholders using each field's schema. The
@@ -317,10 +318,14 @@ export const extract: Extractor = async (
     let normalized: string | undefined;
     try { normalized = normalizeUrl(e.url); } catch { /* Report invalid references with the other draft errors. */ }
     const doc = documents.find(d => d.url === e.url || normalized !== undefined && normalizeUrl(d.url) === normalized);
-    const index = doc ? blocks(doc).findIndex(b => b.id === e.blockId) : -1;
-    if (index < 0 && e.quote === undefined)
+    const index = doc ? doc.blocks.findIndex((b, i) => b.id === e.blockId || `p${documents.indexOf(doc) + 1}b${i + 1}` === e.blockId) : -1;
+    if (index < 0)
       errors.push(`Unknown source reference: ${e.url}#${e.blockId}.${doc ? ` This URL is page p${documents.indexOf(doc) + 1}, with ${doc.blocks.length} blocks.` : ""} Select the exact URL and block ID returned by readPage or searchDocs; do not generate a quote.`);
-    return index < 0 ? e : { ...e, url: doc!.url, blockId: doc!.blocks[index].id, quote: e.quote ?? doc!.blocks[index].text };
+    const page = /^p([1-9][0-9]*)b[1-9][0-9]*$/.exec(e.blockId);
+    const expected = page ? documents[Number(page[1]) - 1] : undefined;
+    if (index < 0 && expected && expected.url !== e.url)
+      errors.push(`For EVERY citation from page p${page![1]}, replace ${JSON.stringify(e.url)} with the exact evidence.url ${JSON.stringify(expected.url)}. Copy its percent-encoding exactly; keep the block selector. The invalid URL is not accepted automatically.`);
+    return index < 0 ? e : { ...e, url: doc!.url, blockId: doc!.blocks[index].id, quote: doc!.blocks[index].text };
   };
   // Keep source text in the conversation once. An excerpt does not mark the
   // complete block as read: a later readPage still returns its full text.
@@ -383,7 +388,32 @@ export const extract: Extractor = async (
       const block = { url: page.url, blockId, text };
       if (JSON.stringify([...correctionBlocks, block]).length <= 24_000) correctionBlocks.push(block);
     }
-    return missing.length ? `Uncovered financial or eligibility source blocks: ${JSON.stringify(missing)}. Source text for correction: ${JSON.stringify(correctionBlocks)}. Include at least one separately cited fact for EACH listed block. For an illustration, marketing statement, legal notice or unrepresentable clause, use field terms with a brief qualified summary retaining its figures; do not discard it as boilerplate or turn it into a current card fee or guaranteed limit. Keep representable payable fees, rewards and limits typed. Preserve competing source claims independently; never silently choose one.` : "";
+    const required = documents.map(doc => ({ url: doc.url, blockIds: blocks(doc).filter(block => priced(block.text) || /(?:countries|regions).{0,100}(?:eligible to apply|can apply)|(?:eligible to apply|can apply).{0,100}(?:countries|regions)/i.test(block.text)).map(block => block.id) }));
+    return missing.length ? `Complete citation checklist for the replacement draft: ${JSON.stringify(required)}. Keep EVERY already-covered block represented as well as adding the missing blocks. Uncovered financial or eligibility source blocks: ${JSON.stringify(missing)}. Source text for correction: ${JSON.stringify(correctionBlocks)}. Include at least one separately cited fact for EACH listed block. For an illustration, marketing statement, legal notice or unrepresentable clause, use field terms with a brief qualified summary retaining its figures; do not discard it as boilerplate or turn it into a current card fee or guaranteed limit. Keep representable payable fees, rewards and limits typed. Preserve competing source claims independently; never silently choose one.` : "";
+  };
+  const sourceAlternatives = (facts: ExtractionData["facts"]) => {
+    const suggestions: { factIndex: number; ruleId: string; url: string; blockId: string; text: string }[] = [];
+    for (const [factIndex, fact] of facts.entries()) {
+      if (!["fees", "limits", "rewards"].includes(fact.field) || !Array.isArray(fact.value)) continue;
+      try { verifyFinancialEvidence(fact); continue; } catch { /* Find evidence, never rewrite a value or citation. */ }
+      const doc = documents.find(doc => doc.url === fact.evidence.url);
+      if (!doc) continue;
+      for (const rule of fact.value) {
+        const single = { ...fact, value: [rule] } as typeof fact;
+        try { verifyFinancialEvidence(single); continue; } catch { /* Only locate the invalid rule. */ }
+        const matches = blocks(doc).filter(block => {
+          try { verifyFinancialEvidence({ ...single, evidence: { ...fact.evidence, quote: block.text } }); return true; }
+          catch { return false; }
+        });
+        // An ubiquitous zero or percentage cannot locate the correct service.
+        if (!matches.length || matches.length > 3) continue;
+        for (const block of matches) {
+          const hint = { factIndex, ruleId: String((rule as { id?: string }).id || ""), url: doc.url, blockId: block.id, text: block.text };
+          if (JSON.stringify([...suggestions, hint]).length <= 24_000) suggestions.push(hint);
+        }
+      }
+    }
+    return suggestions.length ? `Possible source blocks for invalid financial rules: ${JSON.stringify(suggestions)}. These are search matches, not verified replacement citations. Check the complete service, tier, currency and period before selecting one; split rules across separately cited facts where necessary. Never change an amount just to fit a block.` : "";
   };
   const tools = [
     {
@@ -435,7 +465,6 @@ export const extract: Extractor = async (
       },
     },
   ];
-  const modelSchema = extractionSchema();
   const messages: Record<string, unknown>[] = [
     {
       role: "system",
@@ -456,7 +485,6 @@ export const extract: Extractor = async (
       }),
     },
   ];
-  let corrections = 0;
   for (let step = 0; step < 12; step++) {
     const body = {
       model: modelName(),
@@ -474,7 +502,7 @@ export const extract: Extractor = async (
           ? { order: [process.env.EXTRACTION_PROVIDER] }
           : {}),
       },
-      response_format: { type: "json_schema", json_schema: { name: "card_extraction", strict: false, schema: modelSchema } },
+      response_format: { type: "json_schema", json_schema: { name: "card_extraction", strict: false, schema: extractionSchema(documents.map(doc => doc.url)) } },
     };
     const serialized = JSON.stringify(body);
     if (Buffer.byteLength(serialized) > 512_000)
@@ -727,7 +755,7 @@ export const extract: Extractor = async (
         const block = doc?.blocks.findIndex(b => b.id === f.evidence.blockId) ?? -1;
         return [{ index, url: f.evidence.url, blockId: doc && block >= 0 ? `p${documents.indexOf(doc) + 1}b${block + 1}` : f.evidence.blockId }];
       });
-      if (invalid.length) throw new Error(`Invalid citations: ${JSON.stringify(invalid.slice(0, 6))}. Use the exact source selector.`);
+      if (invalid.length) throw new Error([`Invalid citations: ${JSON.stringify(invalid.slice(0, 6))}. Use the exact source selector.`, coverageFeedback(extraction.facts.filter(fact => verifyEvidence(fact.evidence, documents)))].filter(Boolean).join("\n"));
       // Coverage is independent of schema/reconciliation failures. Report it in
       // the same correction so fixing a wrong row does not consume a turn just
       // to discover the omitted rows afterwards.
@@ -742,7 +770,7 @@ export const extract: Extractor = async (
         let detail = error instanceof Error ? error.message : String(error);
         try { candidate(adapter, [extraction], undefined, documents); }
         catch (validationError) { detail = validationError instanceof Error ? validationError.message : String(validationError); }
-        throw new Error([detail, coverage].filter(Boolean).join("\n"));
+        throw new Error([detail, coverage, sourceAlternatives(extraction.facts)].filter(Boolean).join("\n"));
       }
       if (coverage) throw new Error(coverage);
       return { extraction, documents, issues: [...issues, ...disagreementIssues] };
@@ -760,6 +788,8 @@ export const extract: Extractor = async (
         message += ' An untargeted productId or tierId must be JSON null, not the literal string "null"; otherwise use an existing or explicitly declared identity.';
       if (message.includes("Ambiguous fees identity"))
         message += " If the source explicitly charges different components, identify each source-named component in scope.conditions (such as FX padding versus exchange processing, ATM withdrawals versus card purchases, or card funding versus bank transfers). Use supported funding rails, regions and tiers when those actually distinguish the rates. A variable or approximate charge remains one non-calculable fee with its source clause. Never invent conditions to separate conflicting prices for the same charge; preserve those conflicting clauses in terms.";
+      if (message.includes("Ambiguous limits identity"))
+        message += " Distinguish the exact source-named service in each limit scope. For transaction_count, card purchases, ATM withdrawals, bank transfers and funding operations are different services: use their actual source labels in scope.conditions or sourced paymentRails. Different rule IDs alone do not distinguish limits. Never invent a condition to hide conflicting counts for the same service.";
       if (message.includes("Ambiguous rewards identity") || message.includes("/rewards;"))
         message += " Scope each reward to its actual balance/spending band, award variant, cap and merchant category. A generic tier-dependent condition does not distinguish different rates. When a block lists conditional alternatives without their individual conditions, use one non-calculable reward preserving the full conditional clause, not multiple conflicting rates with identical scopes. Cite separately scoped rows when available; never invent a band or condition.";
       // Storage uses content hashes; the model saw short page/block selectors.
@@ -767,7 +797,7 @@ export const extract: Extractor = async (
       for (const doc of documents)
         for (const [index, block] of doc.blocks.entries())
           message = message.replaceAll(`${doc.url}#${block.id}`, `${doc.url}#p${documents.indexOf(doc) + 1}b${index + 1}`);
-      if (++corrections > 2 || step === 11) throw new Error(message);
+      if (step === 11) throw new Error(message);
       messages.push({ role: "user", content: `Candidate validation failed: ${message}. Replace or remove each invalid original fact; do not retain it alongside a corrected replacement. Split facts spanning different source blocks into separately cited facts. Return the entire corrected extraction JSON, including all supported facts from the previous draft. Do not return only the changed facts. Correct the candidate using the existing sources and schema; never invent facts to satisfy validation.` });
     }
   }

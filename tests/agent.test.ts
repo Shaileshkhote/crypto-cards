@@ -17,6 +17,7 @@ it("corrects an output-limit response within the existing bound without acceptin
     if (url.endsWith("/models")) return Response.json({ data: [{ id: modelName(), pricing: { prompt: "0", completion: "0" }, supported_parameters: ["tools", "structured_outputs"] }] });
     const body = JSON.parse(String(init?.body));
     expect(body.max_tokens).toBe(24000);
+    expect(body.response_format.json_schema.schema.$defs.sourceUrl.enum).toEqual([doc.url]);
     if (++calls === 2) expect(body.messages.at(-1).content).toContain("response reached the output limit");
     return Response.json({ usage: { cost: 0 }, choices: [{ finish_reason: calls === 1 ? "length" : "stop", message: { content: calls === 1 ? '{"complete":true,"facts":[' : JSON.stringify(good) } }] });
   }));
@@ -56,11 +57,128 @@ it.each(["schema", "citation", "currency", "target"])("reports omitted financial
     if (++calls === 2) {
       const feedback = JSON.parse(String(init?.body)).messages.at(-1).content;
       expect(feedback).toContain("Uncovered financial");
+      expect(feedback).toContain("Complete citation checklist");
+      expect(feedback).toContain('"p1b1"');
       expect(feedback).toContain("Annual fee: USD 20 per year.");
       expect(feedback).toContain('"p1b4"');
       expect(feedback).toContain(({ schema: "explicit scope object", citation: "Period month", currency: "Money currency USD", target: "Unknown fact tier" })[failure]);
     }
     return Response.json({ usage: { cost: 0 }, choices: [{ finish_reason: "stop", message: { content: JSON.stringify(calls === 1 ? broken : good) } }] });
+  }));
+  await expect(extract(adapter(), [doc], new Budget(0))).resolves.toMatchObject({ extraction: good });
+  expect(calls).toBe(2);
+});
+it("allows a fourth complete draft within the unchanged twelve-turn limit", async () => {
+  vi.stubEnv("OPENROUTER_API_KEY", "fixture-not-a-real-key");
+  const doc = document(), good = extraction(doc), bad = structuredClone(good);
+  (bad.facts[0].value as { ratePercent: number }[])[0].ratePercent = 99;
+  let calls = 0;
+  vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+    if (url.endsWith("/models")) return Response.json({ data: [{ id: modelName(), pricing: { prompt: "0", completion: "0" }, supported_parameters: ["tools", "structured_outputs"] }] });
+    return Response.json({ usage: { cost: 0 }, choices: [{ finish_reason: "stop", message: { content: JSON.stringify(++calls < 4 ? bad : good) } }] });
+  }));
+  await expect(extract(adapter(), [doc], new Budget(0))).resolves.toMatchObject({ extraction: good });
+  expect(calls).toBe(4);
+});
+it("copies the selected source block even when a response supplies a stale quote", async () => {
+  vi.stubEnv("OPENROUTER_API_KEY", "fixture-not-a-real-key");
+  const doc = document(), good = extraction(doc), wire = structuredClone(good);
+  wire.facts[0].evidence = { url: doc.url, blockId: "p1b1", quote: "An unrelated previous table row." };
+  vi.stubGlobal("fetch", vi.fn(async (url: string) => url.endsWith("/models")
+    ? Response.json({ data: [{ id: modelName(), pricing: { prompt: "0", completion: "0" }, supported_parameters: ["tools", "structured_outputs"] }] })
+    : Response.json({ usage: { cost: 0 }, choices: [{ finish_reason: "stop", message: { content: JSON.stringify(wire) } }] })));
+  await expect(extract(adapter(), [doc], new Budget(0))).resolves.toMatchObject({ extraction: good });
+});
+it("rejects an invented amount even when the response puts it in its own quote", async () => {
+  vi.stubEnv("OPENROUTER_API_KEY", "fixture-not-a-real-key");
+  const doc = document(), wire = extraction(doc, 99);
+  wire.facts[0].evidence = { url: doc.url, blockId: "p1b1", quote: "Core FX fee: 99% for residents of Germany." };
+  vi.stubGlobal("fetch", vi.fn(async (url: string) => url.endsWith("/models")
+    ? Response.json({ data: [{ id: modelName(), pricing: { prompt: "0", completion: "0" }, supported_parameters: ["tools", "structured_outputs"] }] })
+    : Response.json({ usage: { cost: 0 }, choices: [{ finish_reason: "stop", message: { content: JSON.stringify(wire) } }] })));
+  await expect(extract(adapter(), [doc], new Budget(0))).rejects.toThrow("Financial value 99 is absent");
+});
+it("shows possible source rows for an invalid financial citation without changing the claim", async () => {
+  vi.stubEnv("OPENROUTER_API_KEY", "fixture-not-a-real-key");
+  const doc = documentFromText("https://example.com/fees", "Core FX fee: 1.5% for residents of Germany.\nAnnual fee: USD 20 per year.");
+  const good = extraction(doc);
+  good.facts.push({ ...good.facts[0], field: "fees", value: [{ id: "annual", kind: "annual", calculation: "fixed", fixed: { amount: "20", currency: "USD" }, scope: {}, calculable: true }], evidence: { url: doc.url, blockId: doc.blocks[1].id, quote: doc.blocks[1].text } });
+  const bad = structuredClone(good);
+  bad.facts[0].evidence = { ...bad.facts[1].evidence };
+  let calls = 0;
+  vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+    if (url.endsWith("/models")) return Response.json({ data: [{ id: modelName(), pricing: { prompt: "0", completion: "0" }, supported_parameters: ["tools", "structured_outputs"] }] });
+    if (++calls === 2) {
+      const feedback = JSON.parse(String(init?.body)).messages.at(-1).content;
+      expect(feedback).toContain("Financial value 1.5 is absent");
+      expect(feedback).toContain("Possible source blocks for invalid financial rules");
+      expect(feedback).toContain('"blockId":"p1b1"');
+      expect(feedback).toContain("not verified replacement citations");
+    }
+    return Response.json({ usage: { cost: 0 }, choices: [{ finish_reason: "stop", message: { content: JSON.stringify(calls === 1 ? bad : good) } }] });
+  }));
+  await expect(extract(adapter(), [doc], new Budget(0))).resolves.toMatchObject({ extraction: good });
+  expect(calls).toBe(2);
+});
+it("updates the source URL enum after discovering another allowed page", async () => {
+  vi.stubEnv("OPENROUTER_API_KEY", "fixture-not-a-real-key");
+  const a = adapter(); a.config.discovery = true;
+  const initial = document(), discovered = documentFromText("https://example.com/more-fees", "Core FX fee: 1.5% for residents of Germany.");
+  const combined = { ...extraction(initial), facts: [...extraction(initial).facts, ...extraction(discovered).facts] };
+  let calls = 0;
+  vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+    if (url.endsWith("/models")) return Response.json({ data: [{ id: modelName(), pricing: { prompt: "0", completion: "0" }, supported_parameters: ["tools", "structured_outputs"] }] });
+    const body = JSON.parse(String(init?.body));
+    expect(body.response_format.json_schema.schema.$defs.sourceUrl.enum).toEqual(++calls === 1 ? [initial.url] : [initial.url, discovered.url]);
+    const message = calls === 1
+      ? { content: null, tool_calls: [{ id: "discover", function: { name: "readPage", arguments: JSON.stringify({ url: discovered.url, offset: 0 }) } }] }
+      : { content: JSON.stringify(combined) };
+    return Response.json({ usage: { cost: 0 }, choices: [{ finish_reason: calls === 1 ? "tool_calls" : "stop", message }] });
+  }));
+  const discover = vi.fn(async () => discovered);
+  const result = await extract(a, [initial], new Budget(0), discover);
+  expect(result.documents).toHaveLength(2);
+  expect(discover).toHaveBeenCalledWith(discovered.url);
+  expect(calls).toBe(2);
+});
+it("shows the exact page URL for a mistyped source selector and still requires a corrected response", async () => {
+  vi.stubEnv("OPENROUTER_API_KEY", "fixture-not-a-real-key");
+  const doc = document(), good = extraction(doc), bad = structuredClone(good);
+  bad.facts[0].evidence = { url: "https://example.com/fees%20wrong", blockId: "p1b1", quote: doc.blocks[0].text };
+  let calls = 0;
+  vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+    if (url.endsWith("/models")) return Response.json({ data: [{ id: modelName(), pricing: { prompt: "0", completion: "0" }, supported_parameters: ["tools", "structured_outputs"] }] });
+    if (++calls === 2) {
+      const feedback = JSON.parse(String(init?.body)).messages.at(-1).content;
+      expect(feedback).toContain("Unknown source reference");
+      expect(feedback).toContain(`exact evidence.url ${JSON.stringify(doc.url)}`);
+      expect(feedback).toContain("not accepted automatically");
+    }
+    return Response.json({ usage: { cost: 0 }, choices: [{ finish_reason: "stop", message: { content: JSON.stringify(calls === 1 ? bad : good) } }] });
+  }));
+  await expect(extract(adapter(), [doc], new Budget(0))).resolves.toMatchObject({ extraction: good });
+  expect(calls).toBe(2);
+});
+it("corrects count-limit collisions by the sourced service without choosing or dropping either count", async () => {
+  vi.stubEnv("OPENROUTER_API_KEY", "fixture-not-a-real-key");
+  const doc = documentFromText("https://example.com/fees", "Daily limits: at most 15 card transactions per day and 3 ATM withdrawals per day.");
+  const good = extraction(doc);
+  good.facts[0] = { ...good.facts[0], field: "limits", value: [
+    { id: "purchases", kind: "transaction_count", count: 15, period: "day", calculable: true, scope: { conditions: ["Card transactions"] } },
+    { id: "atm", kind: "transaction_count", count: 3, period: "day", calculable: true, scope: { conditions: ["ATM withdrawals"] } },
+  ] };
+  const bad = structuredClone(good);
+  for (const rule of bad.facts[0].value as { scope: Record<string, unknown> }[]) rule.scope = {};
+  let calls = 0;
+  vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+    if (url.endsWith("/models")) return Response.json({ data: [{ id: modelName(), pricing: { prompt: "0", completion: "0" }, supported_parameters: ["tools", "structured_outputs"] }] });
+    if (++calls === 2) {
+      const feedback = JSON.parse(String(init?.body)).messages.at(-1).content;
+      expect(feedback).toContain("Ambiguous limits identity");
+      expect(feedback).toContain("source-named service");
+      expect(feedback).toContain("Never invent a condition");
+    }
+    return Response.json({ usage: { cost: 0 }, choices: [{ finish_reason: "stop", message: { content: JSON.stringify(calls === 1 ? bad : good) } }] });
   }));
   await expect(extract(adapter(), [doc], new Budget(0))).resolves.toMatchObject({ extraction: good });
   expect(calls).toBe(2);
@@ -223,7 +341,7 @@ it("runs one three-tool loop and validates its final evidence", async () => {
     expect(
       body.tools.map((x: { function: { name: string } }) => x.function.name),
     ).toEqual(["listPages", "searchDocs", "readPage"]);
-    expect(body.tool_choice).toBe("auto");
+    expect(body.tool_choice).toBe(requests === 12 ? "none" : "auto");
     expect(body.reasoning).toEqual({ effort: "low", exclude: true });
     expect(body.max_tokens).toBe(24_000);
     expect(body.response_format.type).toBe("json_schema");
@@ -289,10 +407,12 @@ it("runs one three-tool loop and validates its final evidence", async () => {
   expect(b.requests).toBe(2);
   expect(b.spent).toBe(0.0002);
   // Removing the provider's URI hint must not relax runtime URL validation.
+  requests = 0;
   wireExtraction.facts[0].evidence.url = "not-a-url";
   await expect(extract(a, [doc], new Budget())).rejects.toThrow(
     "Invalid url",
   );
+  expect(requests).toBe(12);
 });
 it("does not send a paid request without a key", async () => {
   vi.stubEnv("OPENROUTER_API_KEY", "");
