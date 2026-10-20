@@ -18,7 +18,7 @@ Run the live evaluation with a securely injected key:
 MAX_RUN_COST_USD=0.10 pnpm evaluate
 ```
 
-The script defaults to a shared $1 cap. The core clamps every invocation to at most $4.99. It stops on a fatal model configuration or budget error and reports unrun cases separately. Reports go to ignored `.local/evaluation.json`; unit tests use simulated model responses and require no key.
+The script defaults to a shared $1 cap. The core clamps every invocation to at most $5.00. It stops on a fatal model configuration or budget error and reports unrun cases separately. Reports go to ignored `.local/evaluation.json`; unit tests use simulated model responses and require no key.
 
 Use a dedicated database, functioning DNS and accessible official sources for the complete source-to-database benchmark:
 

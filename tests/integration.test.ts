@@ -3,7 +3,7 @@ import { promisify } from "node:util";
 import { randomUUID } from "node:crypto";
 import { executeJob } from "@cards/core/runner";
 import { beforeAll, beforeEach, afterAll, describe, it, expect, vi } from "vitest";
-import { db, closeDb, publish, transaction, getPublishedCard, listPublishedCards, type CardRow } from "@cards/db";
+import { db, closeDb, publish, transaction, withLock, getPublishedCard, listPublishedCards, type CardRow } from "@cards/db";
 import { migrate } from "../packages/db/src/migrate";
 import { syncAdapter } from "@cards/core/sync";
 import * as syncFunctions from "@cards/core/sync";
@@ -429,7 +429,7 @@ describe.skipIf(!enabled)(
         expect((await db().query("SELECT count(*)::int AS n FROM cards")).rows[0].n).toBe(0);
       } finally { fetch.mockRestore(); }
     });
-    it("continues all-adapter work after an accounted timeout, but halts on budget exhaustion", async () => {
+    it("drains concurrent adapters after timeout or budget failure", async () => {
       for (const haltRun of [false, true]) {
         const mocked = vi.spyOn(syncFunctions, "syncAdapter").mockImplementation(async (a) => ({
           cardId: a.config.id, status: "failed", changed: 0, reused: 0, proposed: 0, costUsd: 0, inputTokens: 0, outputTokens: 0,
@@ -441,11 +441,80 @@ describe.skipIf(!enabled)(
           expect(claimed?.id).toBe(id);
           const result = await executeJob(claimed!);
           expect(result.status).toBe("failed");
-          expect(mocked.mock.calls.length).toBe(haltRun ? 1 : (await loadAdapters()).length);
+          expect(mocked.mock.calls.length).toBe((await loadAdapters()).length);
           expect(mocked.mock.calls.some(([a]) => a.config.retired || ["safepal", "gnosis-pay"].includes(a.config.id))).toBe(false);
-          if (haltRun) expect((result.progress.results as { error?: string }[])[1].error).toBe("Run stopped: Budget exhausted: no new OpenRouter request sent");
+          expect((result.progress.results as { status: string }[]).every(r => r.status === "failed")).toBe(true);
         } finally { mocked.mockRestore(); }
       }
+    });
+    it("runs every active adapter concurrently with shared totals and separate costs", async () => {
+      const count = (await loadAdapters()).length;
+      let started = 0;
+      let release!: () => void;
+      const barrier = new Promise<void>(resolve => { release = resolve; });
+      const mocked = vi.spyOn(syncFunctions, "syncAdapter").mockImplementation(async (a, budget) => {
+        budget.reserve(0.01);
+        if (++started === count) release();
+        await barrier;
+        budget.settle(0.01, 0.005, 10, 1);
+        return { cardId: a.config.id, status: "unchanged", changed: 0, reused: 1,
+          proposed: 0, costUsd: budget.spent, inputTokens: budget.inputTokens, outputTokens: budget.outputTokens };
+      });
+      try {
+        await enqueue("sync");
+        const result = await executeJob((await claimJob())!);
+        expect(result.status).toBe("completed");
+        expect(started).toBe(count);
+        expect(Number(result.cost_usd)).toBeCloseTo(count * 0.005);
+        expect(result.progress).toMatchObject({ requests: count, inputTokens: count * 10, outputTokens: count });
+        const results = result.progress.results as { cardId: string; costUsd: number }[];
+        expect(results.map(r => r.cardId)).toEqual((await loadAdapters()).map(a => a.config.id));
+        expect(results.every(r => r.costUsd === 0.005)).toBe(true);
+      } finally { mocked.mockRestore(); }
+    });
+    it("blocks further requests after a fatal result and drains already-reserved work", async () => {
+      const adapters = await loadAdapters();
+      let fatalReported!: () => void;
+      const fatal = new Promise<void>(resolve => { fatalReported = resolve; });
+      let inFlightSettled = false;
+      const mocked = vi.spyOn(syncFunctions, "syncAdapter").mockImplementation(async (a, budget) => {
+        if (a.config.id === adapters[0].config.id) {
+          fatalReported();
+          return { cardId: a.config.id, status: "failed", changed: 0, reused: 0,
+            proposed: 0, costUsd: 0, inputTokens: 0, outputTokens: 0,
+            error: "Authorization failed", haltRun: true };
+        }
+        budget.reserve(0.01);
+        await fatal;
+        // Let the fatal adapter's runner continuation stop new reservations.
+        await new Promise(resolve => setImmediate(resolve));
+        expect(() => budget.reserve(0.001)).toThrow("Authorization failed");
+        budget.settle(0.01, 0.005);
+        inFlightSettled = true;
+        return { cardId: a.config.id, status: "unchanged", changed: 0, reused: 0,
+          proposed: 0, costUsd: budget.spent, inputTokens: 0, outputTokens: 0 };
+      });
+      try {
+        await enqueue("sync");
+        const result = await executeJob((await claimJob())!);
+        expect(result.status).toBe("failed");
+        expect(inFlightSettled).toBe(true);
+        expect(result.progress.requests).toBe(adapters.length - 1);
+        expect(Number(result.cost_usd)).toBeCloseTo((adapters.length - 1) * 0.005);
+      } finally { mocked.mockRestore(); }
+    });
+    it("keeps the query pool usable while all card advisory locks are held", async () => {
+      const count = (await loadAdapters()).length;
+      let started = 0;
+      let release!: () => void;
+      const barrier = new Promise<void>(resolve => { release = resolve; });
+      await Promise.all(Array.from({ length: count }, (_, i) => withLock(`parallel-test:${i}`, async () => {
+        if (++started === count) release();
+        await barrier;
+        expect((await db().query("SELECT 1 AS value")).rows[0].value).toBe(1);
+        await expect(withLock(`parallel-test:${i}`, async () => {})).rejects.toThrow("Already running");
+      })));
+      expect(started).toBe(count);
     });
     it("approves from the CLI without an extra required reviewer flag", async () => {
       await run();

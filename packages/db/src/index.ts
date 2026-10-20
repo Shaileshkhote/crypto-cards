@@ -63,8 +63,11 @@ export async function withLock<T>(
   key: string,
   work: () => Promise<T>,
 ): Promise<T> {
-  const c = await db().connect();
+  // Session locks live for the whole sync; keep them outside the query pool.
+  if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is required; see .env.example");
+  const c = new pg.Client({ connectionString: process.env.DATABASE_URL, connectionTimeoutMillis: 10_000 });
   try {
+    await c.connect();
     const { rows } = await c.query(
       "SELECT pg_try_advisory_lock(hashtextextended($1,0)) AS locked",
       [key],
@@ -76,7 +79,7 @@ export async function withLock<T>(
       await c.query("SELECT pg_advisory_unlock(hashtextextended($1,0))", [key]);
     }
   } finally {
-    c.release();
+    await c.end();
   }
 }
 export async function publish(

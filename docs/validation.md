@@ -14,7 +14,13 @@ Correction feedback includes the full required citation checklist so replacement
 
 The model is `openai/gpt-6-luna`, with low reasoning. Request bounds remain 300 seconds, 24,000 output tokens, 512,000 request bytes, 12 total turns shared by reading and correction. Earlier low-reasoning attempts and failed candidates remain recorded locally; their costs have not been reset. Failed or partial extractions retain accepted values. Independent card-type, scalar and non-additive inventory disagreements retain their quoted clauses and omit disputed typed values; same-block contradictions still require correction. Sensitive changes stay pending review; no reviews were automatically approved.
 
-All **396 source URLs** were fetched using the supported crawler with proxy, TLS, robots and trusted-domain checks. This establishes retrieval, not complete model acceptance. Current validated source caches cover **396/396 configured pages**. Current code passes **202 tests**, including **20 PostgreSQL integration cases**, TypeScript, ESLint and adapter validation. The production build passes locally; exact-commit CI status is available on [draft PR #1](https://github.com/Shaileshkhote/crypto-cards/pull/1).
+All **396 source URLs** were fetched using the supported crawler with proxy, TLS, robots and trusted-domain checks. This establishes retrieval, not complete model acceptance. Current validated source caches cover **396/396 configured pages**. Current code passes **207 tests**, including **23 PostgreSQL integration cases**, TypeScript, ESLint and adapter validation. The production build passes locally; exact-commit CI status is available on [draft PR #1](https://github.com/Shaileshkhote/crypto-cards/pull/1).
+
+## Concurrent job execution
+
+Full jobs now start one task per selected active adapter (currently 33), sharing one $5.00 default and maximum request budget. Per-adapter accounts retain correct source and card cost attribution while reservations and aggregate totals remain shared. Progress writes are serialized, fatal errors block further reservations, and job finalization waits for in-flight work. Dedicated session-lock connections keep long-running card locks outside the query pool.
+
+The concurrency change passes 207 tests, including 23 isolated PostgreSQL integration cases, TypeScript and ESLint. Tests exercise all active adapters overlapping, aggregate/per-card costs, fatal-error draining, reservation contention and query access while all 33 card locks are held. Paid concurrent extraction has not been run; earlier model and warm-cache outcomes below remain prior acceptance evidence.
 
 ## Fresh adapter outcomes
 

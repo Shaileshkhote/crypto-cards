@@ -64,7 +64,7 @@ pnpm cards cache
 
 The reviewer flag is optional and defaults to the operating-system account; provide an explicit identity for clearer audit records.
 
-`sync` creates and executes a tracked job. The UI enqueues the same kind of job for the worker. Failed or budget-exhausted subsets result in a failed job and nonzero CLI exit status. Force creates a new candidate; it does not bypass review.
+`sync` creates and executes a tracked job. A full job runs all active adapters concurrently (currently 33 card tasks), sharing one $5 default and maximum model budget; smaller `MAX_RUN_COST_USD` overrides remain supported. Each card has separate usage counters, and no request starts without a reservation against the shared total. Fatal errors stop new requests while already-reserved requests finish. The UI enqueues the same kind of job for the worker. Failed or budget-exhausted subsets result in a failed job and nonzero CLI exit status. Force creates a new candidate; it does not bypass review.
 
 ## Checks
 

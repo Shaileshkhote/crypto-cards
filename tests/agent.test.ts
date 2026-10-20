@@ -302,7 +302,7 @@ it("shares a conservative request budget across adapters", () => {
   b.settle(2.99, 2);
   expect(b.spent).toBe(4);
   expect(() => b.reserve(2)).toThrow();
-  expect(new Budget(25).max).toBe(4.99);
+  expect(new Budget(25).max).toBe(5);
   expect(() => new Budget(-1)).toThrow("Invalid MAX_RUN_COST_USD");
   expect(() => new Budget(Number.NaN)).toThrow("Invalid MAX_RUN_COST_USD");
 });
@@ -859,4 +859,30 @@ it("accepts a short clause covered verbatim by a richer same-page citation, but 
   calls = 0; secondPage = true; a.sources.urls.push(other.url);
   expect((await extract(a, [one, other], new Budget(0))).extraction.facts).toHaveLength(2);
   expect(calls).toBe(2);
+});
+
+it("attributes concurrent adapter usage separately while enforcing one shared cap", async () => {
+  const total = new Budget(0.1), a = total.fork(), b = total.fork();
+  a.reserve(0.06);
+  expect(() => b.reserve(0.05)).toThrow("Budget exhausted");
+  b.reserve(0.04);
+  b.settle(0.04, 0.02, 20, 2);
+  a.settle(0.06, 0.03, 30, 3);
+  expect(a.spent).toBe(0.03);
+  expect(b.spent).toBe(0.02);
+  expect(total.spent).toBeCloseTo(0.05);
+  expect(total.requests).toBe(2);
+  expect(total.inputTokens).toBe(50);
+  expect(total.outputTokens).toBe(5);
+  total.stop(new RunError("Authorization failed"));
+  expect(() => a.reserve(0.001)).toThrow("Authorization failed");
+  expect(() => total.fork().reserve(0.001)).toThrow("Authorization failed");
+});
+it("blocks new requests after a concurrent billing overrun but settles in-flight usage", () => {
+  const total = new Budget(1), a = total.fork(), b = total.fork();
+  a.reserve(0.1); b.reserve(0.1);
+  expect(() => a.settle(0.1, 0.2)).toThrow("Provider cost exceeded");
+  expect(() => b.reserve(0.01)).toThrow("Provider cost exceeded");
+  b.settle(0.1, 0.05);
+  expect(total.spent).toBeCloseTo(0.25);
 });

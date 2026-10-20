@@ -59,31 +59,51 @@ export class Budget {
   outputTokens = 0;
   requests = 0;
   private held = 0;
+  private readonly account: Budget;
+  private stopped?: RunError;
   readonly max: number;
-  constructor(limit = Number(process.env.MAX_RUN_COST_USD || 4.5)) {
+  constructor(limit = Number(process.env.MAX_RUN_COST_USD || 5), parent?: Budget) {
     if (!Number.isFinite(limit) || limit < 0)
       throw new Error("Invalid MAX_RUN_COST_USD");
-    this.max = Math.min(4.99, limit);
+    this.max = parent?.max ?? Math.min(5, limit);
+    this.account = parent?.account ?? this;
+  }
+  fork() {
+    return new Budget(this.max, this);
+  }
+  stop(error: RunError) {
+    this.account.stopped ??= error;
   }
   reserve(amount: number) {
+    const account = this.account;
+    if (account.stopped) throw account.stopped;
     if (
       !Number.isFinite(amount) ||
       amount < 0 ||
-      this.spent + this.held + amount > this.max
+      account.spent + account.held + amount > this.max
     )
       throw new BudgetError("Budget exhausted: no new OpenRouter request sent");
-    this.held += amount;
+    account.held += amount;
   }
   settle(reservation: number, actual: number, input = 0, output = 0) {
-    this.held -= reservation;
+    this.account.held -= reservation;
+    if (this.account !== this) {
+      this.account.spent += actual;
+      this.account.inputTokens += input;
+      this.account.outputTokens += output;
+      this.account.requests++;
+    }
     this.spent += actual;
     this.inputTokens += input;
     this.outputTokens += output;
     this.requests++;
-    if (actual > reservation + 0.000001)
-      throw new BudgetError(
+    if (actual > reservation + 0.000001) {
+      const error = new BudgetError(
         "Provider cost exceeded conservative reservation; stopping. Configure provider-side spend controls.",
       );
+      this.stop(error);
+      throw error;
+    }
   }
 }
 export interface AgentResult {

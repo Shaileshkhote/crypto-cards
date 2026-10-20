@@ -79,7 +79,7 @@ Earlier profiles exposed context exhaustion, wrong source-row selection, free-AT
 
 The original allocation's conservative upper bound remains **$24.9488113742 / $25**: model testing $9.9782594042 / $10 and adapters $14.9705519700 / $15. The subsequently authorized **additional $10** is separate: **$5.463243515 settled application accounting + $0.371175375 outstanding reservations = $5.834418890 / $10**. Interrupted calls may be settled at their full conservative reservation; these values are not provider invoices.
 
-The latest full Luna attempt cost **$0.189563670**, but had 12 failures. Its targeted repair cost **$0.087627770**, leaving two failures. The broader validation cycle, including earlier attempts, model diagnostics and corrections, accounts for **$2.996888155**, below its $4.50 cap. None of these amounts proves that all adapters can be completely ingested below $5. Each production invocation defaults to $4.50 with a hard $4.99 ceiling. No paid work is currently running; the temporary credential shell was closed.
+The latest full Luna attempt cost **$0.189563670**, but had 12 failures. Its targeted repair cost **$0.087627770**, leaving two failures. The broader validation cycle, including earlier attempts, model diagnostics and corrections, accounts for **$2.996888155**, below its $4.50 cap. None of these amounts proves that all adapters can be completely ingested below $5. At that historical point, each production invocation defaulted to $4.50 with a hard $4.99 ceiling; the current concurrent runner defaults to and caps at $5.00. No paid work is currently running; the temporary credential shell was closed.
 
 | Additional allocation run | Accounted / upper-bound USD |
 | --- | ---: |
